@@ -2918,6 +2918,7 @@ public class PathmindMarketplaceScreen extends Screen {
         }
         if (authSession == null) {
             authBusy = true;
+            statusMessage = "Opening Discord sign-in...";
             if (popupPreset != null) {
                 popupStatusMessage = "Opening Discord sign-in...";
                 popupStatusColor = UITheme.TEXT_SECONDARY;
@@ -2929,13 +2930,15 @@ public class PathmindMarketplaceScreen extends Screen {
                 this.client.execute(() -> {
                     authBusy = false;
                     if (throwable != null || session == null) {
+                        statusMessage = fallback(throwable == null ? null : throwable.getMessage(), "Discord sign-in failed.");
                         if (popupPreset != null) {
-                            popupStatusMessage = fallback(throwable == null ? null : throwable.getMessage(), "Discord sign-in failed.");
+                            popupStatusMessage = statusMessage;
                             popupStatusColor = UITheme.STATE_ERROR;
                         }
                         return;
                     }
                     authSession = session;
+                    statusMessage = "Signed in as " + fallback(session.getDisplayName(), fallback(session.getEmail(), "Discord user")) + ".";
                     if (myPresetsOnly) {
                         refreshListings();
                     } else {

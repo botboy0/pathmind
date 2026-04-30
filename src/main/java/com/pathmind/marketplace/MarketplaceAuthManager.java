@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.pathmind.PathmindMod;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Util;
@@ -113,6 +114,7 @@ public final class MarketplaceAuthManager {
                 ensureCallbackServer();
                 openExternalBrowser(buildDiscordAuthorizeUrl(codeVerifier));
             } catch (Exception e) {
+                PathmindMod.LOGGER.warn("Marketplace Discord sign-in browser launch failed: {}", e.getMessage());
                 pendingLogin = null;
                 login.future.completeExceptionally(e);
             }
