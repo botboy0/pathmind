@@ -145,6 +145,8 @@ public class Node {
     private NodeMode mode;
     private final NodeLayoutState layoutState;
     private final NodeInteractionState interactionState;
+    private final NodeAttachments attachments;
+    private final NodeRuntimeState runtimeState;
     private static final int MIN_WIDTH = 92;
     private static final int MIN_HEIGHT = 44;
     private static final int EVENT_FUNCTION_MIN_HEIGHT = 36;
@@ -324,24 +326,8 @@ public class Node {
         t.setDaemon(true);
         return t;
     });
-    private int nextOutputSocket = 0;
-    private int repeatRemainingIterations = 0;
-    private boolean repeatActive = false;
-    private boolean repeatExecuteAttachedAction = false;
-    private boolean lastSensorResult = false;
     private final List<NodeParameter> parameters;
-    private Node attachedSensor;
-    private Node parentControl;
-    private Node attachedActionNode;
-    private Node parentActionControl;
-    private final Map<Integer, Node> attachedParameters;
-    private Node parentParameterHost;
-    private int parentParameterSlotIndex;
     private boolean booleanToggleValue = true;
-    private RuntimeParameterData runtimeParameterData;
-    private transient Node owningStartNode;
-    private transient Node activeRepeatUntilGuard;
-    private int startNodeNumber;
     private final List<String> messageLines;
     private boolean messageClientSide;
     private String bookText;
@@ -354,11 +340,6 @@ public class Node {
     private int templateVersion;
     private boolean customNodeInstance;
     private NodeGraphData templateGraphData;
-    private transient Random randomGenerator;
-    private transient String randomSeedCache;
-    private transient double fallingPeakY = Double.NaN;
-    private transient boolean fallingPeakInitialized = false;
-    private transient long lastFallingDetectedAtMs = Long.MIN_VALUE;
 
     private boolean usesTemplateBacking() {
         return type == NodeType.TEMPLATE || type == NodeType.CUSTOM_NODE;
@@ -374,17 +355,9 @@ public class Node {
             STICKY_NOTE_MIN_WIDTH + 32,
             STICKY_NOTE_MIN_HEIGHT + 20);
         this.interactionState = new NodeInteractionState();
+        this.attachments = new NodeAttachments();
+        this.runtimeState = new NodeRuntimeState();
         this.parameters = new ArrayList<>();
-        this.attachedSensor = null;
-        this.parentControl = null;
-        this.attachedActionNode = null;
-        this.parentActionControl = null;
-        this.attachedParameters = new HashMap<>();
-        this.parentParameterHost = null;
-        this.parentParameterSlotIndex = -1;
-        this.owningStartNode = null;
-        this.activeRepeatUntilGuard = null;
-        this.startNodeNumber = 0;
         this.messageLines = new ArrayList<>();
         if (type == NodeType.MESSAGE) {
             this.messageLines.add("Hello World");
@@ -403,29 +376,6 @@ public class Node {
         initializeParameters();
         recalculateDimensions();
         resetControlState();
-    }
-
-    private static final class RuntimeParameterData {
-        private BlockPos targetBlockPos;
-        private Vec3d targetVector;
-        private Entity targetEntity;
-        private Item targetItem;
-        private String targetBlockId;
-        private List<String> targetBlockIds;
-        private String targetPlayerName;
-        private String targetItemId;
-        private String targetTradeKey;
-        private String targetEntityId;
-        private String message;
-        private Double durationSeconds;
-        private Integer slotIndex;
-        private SlotSelectionType slotSelectionType;
-        private String schematicName;
-        private Float resolvedYaw;
-        private Float resolvedPitch;
-        private Double resolvedLookDistance;
-        private String resolvedButtonValue;
-        private boolean resolvedButtonIsMouse;
     }
 
     private static final class PlacementFailure extends RuntimeException {
@@ -654,10 +604,10 @@ public class Node {
 
     public void setPosition(int x, int y) {
         setPositionSilently(x, y);
-        if (attachedSensor != null) {
+        if (attachments.getAttachedSensor() != null) {
             updateAttachedSensorPosition();
         }
-        if (attachedActionNode != null) {
+        if (attachments.getAttachedActionNode() != null) {
             updateAttachedActionPosition();
         }
         updateAttachedParameterPositions();
@@ -879,31 +829,31 @@ public class Node {
     }
 
     public boolean hasAttachedSensor() {
-        return attachedSensor != null;
+        return attachments.getAttachedSensor() != null;
     }
 
     public Node getAttachedSensor() {
-        return attachedSensor;
+        return attachments.getAttachedSensor();
     }
 
     public boolean isAttachedToControl() {
-        return parentControl != null;
+        return attachments.getParentControl() != null;
     }
 
     public Node getParentControl() {
-        return parentControl;
+        return attachments.getParentControl();
     }
 
     public String getAttachedSensorId() {
-        return attachedSensor != null ? attachedSensor.getId() : null;
+        return attachments.getAttachedSensor() != null ? attachments.getAttachedSensor().getId() : null;
     }
 
     public String getParentControlId() {
-        return parentControl != null ? parentControl.getId() : null;
+        return attachments.getParentControl() != null ? attachments.getParentControl().getId() : null;
     }
 
     public boolean hasAttachedParameter() {
-        return !attachedParameters.isEmpty();
+        return attachments.hasAttachedParameters();
     }
 
     public Node getAttachedParameter() {
@@ -914,19 +864,27 @@ public class Node {
         if (slotIndex < 0) {
             return null;
         }
-        return attachedParameters.get(slotIndex);
+        return attachments.getAttachedParameter(slotIndex);
     }
 
     public Node getParentParameterHost() {
-        return parentParameterHost;
+        return attachments.getParentParameterHost();
     }
 
     public int getParentParameterSlotIndex() {
-        return parentParameterSlotIndex;
+        return attachments.getParentParameterSlotIndex();
     }
 
     public Map<Integer, Node> getAttachedParameters() {
-        return Collections.unmodifiableMap(attachedParameters);
+        return attachments.getAttachedParametersView();
+    }
+
+    NodeAttachments getAttachments() {
+        return attachments;
+    }
+
+    NodeRuntimeState getRuntimeState() {
+        return runtimeState;
     }
 
     public String getAttachedParameterId() {
@@ -935,35 +893,35 @@ public class Node {
     }
 
     public String getParentParameterHostId() {
-        return parentParameterHost != null ? parentParameterHost.getId() : null;
+        return attachments.getParentParameterHost() != null ? attachments.getParentParameterHost().getId() : null;
     }
 
     public void setOwningStartNode(Node startNode) {
-        this.owningStartNode = startNode;
+        runtimeState.owningStartNode = startNode;
     }
 
     public Node getOwningStartNode() {
-        return owningStartNode;
+        return runtimeState.owningStartNode;
     }
 
     private Node resolveExecutionStartNode() {
-        if (owningStartNode != null) {
-            return owningStartNode;
+        if (runtimeState.owningStartNode != null) {
+            return runtimeState.owningStartNode;
         }
-        if (parentParameterHost != null) {
-            Node hostStart = parentParameterHost.resolveExecutionStartNode();
+        if (attachments.getParentParameterHost() != null) {
+            Node hostStart = attachments.getParentParameterHost().resolveExecutionStartNode();
             if (hostStart != null) {
                 return hostStart;
             }
         }
-        if (parentControl != null) {
-            Node controlStart = parentControl.resolveExecutionStartNode();
+        if (attachments.getParentControl() != null) {
+            Node controlStart = attachments.getParentControl().resolveExecutionStartNode();
             if (controlStart != null) {
                 return controlStart;
             }
         }
-        if (parentActionControl != null) {
-            Node actionStart = parentActionControl.resolveExecutionStartNode();
+        if (attachments.getParentActionControl() != null) {
+            Node actionStart = attachments.getParentActionControl().resolveExecutionStartNode();
             if (actionStart != null) {
                 return actionStart;
             }
@@ -972,11 +930,11 @@ public class Node {
     }
 
     public int getStartNodeNumber() {
-        return startNodeNumber;
+        return runtimeState.startNodeNumber;
     }
 
     public void setStartNodeNumber(int startNodeNumber) {
-        this.startNodeNumber = startNodeNumber;
+        runtimeState.startNodeNumber = startNodeNumber;
     }
 
     public boolean isGotoAllowBreakWhileExecuting() {
@@ -1025,31 +983,31 @@ public class Node {
     }
 
     public boolean hasAttachedActionNode() {
-        return attachedActionNode != null;
+        return attachments.getAttachedActionNode() != null;
     }
 
     public Node getAttachedActionNode() {
-        return attachedActionNode;
+        return attachments.getAttachedActionNode();
     }
 
     public boolean isAttachedToActionControl() {
-        return parentActionControl != null;
+        return attachments.getParentActionControl() != null;
     }
 
     public Node getParentActionControl() {
-        return parentActionControl;
+        return attachments.getParentActionControl();
     }
 
     public String getAttachedActionId() {
-        return attachedActionNode != null ? attachedActionNode.getId() : null;
+        return attachments.getAttachedActionNode() != null ? attachments.getAttachedActionNode().getId() : null;
     }
 
     public String getParentActionControlId() {
-        return parentActionControl != null ? parentActionControl.getId() : null;
+        return attachments.getParentActionControl() != null ? attachments.getParentActionControl().getId() : null;
     }
 
     public void setActiveRepeatUntilGuard(Node guard) {
-        this.activeRepeatUntilGuard = guard;
+        this.runtimeState.activeRepeatUntilGuard = guard;
     }
 
     public int getInputSocketCount() {
@@ -1117,17 +1075,17 @@ public class Node {
     }
     
     public void setNextOutputSocket(int socketIndex) {
-        this.nextOutputSocket = socketIndex < 0 ? NO_OUTPUT : Math.max(0, socketIndex);
+        this.runtimeState.nextOutputSocket = socketIndex < 0 ? NO_OUTPUT : Math.max(0, socketIndex);
     }
 
     public int consumeNextOutputSocket() {
-        int value = this.nextOutputSocket;
-        this.nextOutputSocket = 0;
+        int value = this.runtimeState.nextOutputSocket;
+        this.runtimeState.nextOutputSocket = 0;
         return value;
     }
 
     public boolean shouldExecuteRepeatAttachedAction() {
-        return type == NodeType.CONTROL_REPEAT && repeatExecuteAttachedAction;
+        return type == NodeType.CONTROL_REPEAT && runtimeState.repeatExecuteAttachedAction;
     }
     
     public boolean isSocketClicked(int mouseX, int mouseY, int socketIndex, boolean isInput) {
@@ -1234,7 +1192,7 @@ public class Node {
     }
 
     public int getSensorSlotHeight() {
-        int sensorContentHeight = attachedSensor != null ? attachedSensor.getHeight() : SENSOR_SLOT_MIN_CONTENT_HEIGHT;
+        int sensorContentHeight = attachments.getAttachedSensor() != null ? attachments.getAttachedSensor().getHeight() : SENSOR_SLOT_MIN_CONTENT_HEIGHT;
         return sensorContentHeight + 2 * SENSOR_SLOT_INNER_PADDING;
     }
 
@@ -2246,7 +2204,7 @@ public class Node {
     }
 
     public void updateAttachedParameterPositions() {
-        for (Integer slotIndex : attachedParameters.keySet()) {
+        for (Integer slotIndex : attachments.getAttachedParameterSlotIndices()) {
             updateAttachedParameterPosition(slotIndex);
         }
     }
@@ -2304,7 +2262,7 @@ public class Node {
     }
 
     public int getActionSlotHeight() {
-        int contentHeight = attachedActionNode != null ? attachedActionNode.getHeight() : ACTION_SLOT_MIN_CONTENT_HEIGHT;
+        int contentHeight = attachments.getAttachedActionNode() != null ? attachments.getAttachedActionNode().getHeight() : ACTION_SLOT_MIN_CONTENT_HEIGHT;
         return contentHeight + 2 * ACTION_SLOT_INNER_PADDING;
     }
 
@@ -2321,29 +2279,29 @@ public class Node {
     }
 
     public void updateAttachedSensorPosition() {
-        if (attachedSensor == null) {
+        if (attachments.getAttachedSensor() == null) {
             return;
         }
         int slotX = getSensorSlotLeft() + SENSOR_SLOT_INNER_PADDING;
         int slotY = getSensorSlotTop() + SENSOR_SLOT_INNER_PADDING;
         int availableWidth = getSensorSlotWidth() - 2 * SENSOR_SLOT_INNER_PADDING;
         int availableHeight = getSensorSlotHeight() - 2 * SENSOR_SLOT_INNER_PADDING;
-        int sensorX = slotX + Math.max(0, (availableWidth - attachedSensor.getWidth()) / 2);
-        int sensorY = slotY + Math.max(0, (availableHeight - attachedSensor.getHeight()) / 2);
-        attachedSensor.setPosition(sensorX, sensorY);
+        int sensorX = slotX + Math.max(0, (availableWidth - attachments.getAttachedSensor().getWidth()) / 2);
+        int sensorY = slotY + Math.max(0, (availableHeight - attachments.getAttachedSensor().getHeight()) / 2);
+        attachments.getAttachedSensor().setPosition(sensorX, sensorY);
     }
 
     public void updateAttachedActionPosition() {
-        if (attachedActionNode == null) {
+        if (attachments.getAttachedActionNode() == null) {
             return;
         }
         int slotX = getActionSlotLeft() + ACTION_SLOT_INNER_PADDING;
         int slotY = getActionSlotTop() + ACTION_SLOT_INNER_PADDING;
         int availableWidth = getActionSlotWidth() - 2 * ACTION_SLOT_INNER_PADDING;
         int availableHeight = getActionSlotHeight() - 2 * ACTION_SLOT_INNER_PADDING;
-        int nodeX = slotX + Math.max(0, (availableWidth - attachedActionNode.getWidth()) / 2);
-        int nodeY = slotY + Math.max(0, (availableHeight - attachedActionNode.getHeight()) / 2);
-        attachedActionNode.setPosition(nodeX, nodeY);
+        int nodeX = slotX + Math.max(0, (availableWidth - attachments.getAttachedActionNode().getWidth()) / 2);
+        int nodeY = slotY + Math.max(0, (availableHeight - attachments.getAttachedActionNode().getHeight()) / 2);
+        attachments.getAttachedActionNode().setPosition(nodeX, nodeY);
     }
 
     public boolean attachSensor(Node sensor) {
@@ -2351,25 +2309,22 @@ public class Node {
             return false;
         }
 
-        if (sensor.parentControl == this && attachedSensor == sensor) {
+        if (attachments.isSensorAttachedTo(this, sensor)) {
             updateAttachedSensorPosition();
             return true;
         }
 
-        if (sensor.parentControl != null) {
-            sensor.parentControl.detachSensor();
+        if (sensor.attachments.getParentControl() != null) {
+            sensor.attachments.getParentControl().detachSensor();
         }
 
-        if (attachedSensor != null && attachedSensor != sensor) {
-            Node previousSensor = attachedSensor;
-            previousSensor.parentControl = null;
+        Node previousSensor = attachments.attachSensor(this, sensor);
+        if (previousSensor != null) {
             previousSensor.setDragging(false);
             previousSensor.setSelected(false);
             previousSensor.setPositionSilently(getX() + getWidth() + SENSOR_SLOT_MARGIN_HORIZONTAL, getY());
         }
 
-        attachedSensor = sensor;
-        sensor.parentControl = this;
         sensor.setDragging(false);
         sensor.setSelected(false);
 
@@ -2379,10 +2334,8 @@ public class Node {
     }
 
     public void detachSensor() {
-        if (attachedSensor != null) {
-            Node sensor = attachedSensor;
-            sensor.parentControl = null;
-            attachedSensor = null;
+        Node sensor = attachments.detachSensor();
+        if (sensor != null) {
             recalculateDimensions();
         }
     }
@@ -2410,7 +2363,7 @@ public class Node {
             return false;
         }
 
-        if (parameter.parentParameterHost == this && parameter.parentParameterSlotIndex == slotIndex) {
+        if (parameter.attachments.isAttachedToParameterHost(this, slotIndex)) {
             parameter.recalculateDimensions();
             refreshAttachedParameterValues();
             recalculateDimensions();
@@ -2424,21 +2377,24 @@ public class Node {
             return false;
         }
 
-        Node previousHost = parameter.parentParameterHost;
-        int previousSlot = parameter.parentParameterSlotIndex;
+        Node previousHost = parameter.attachments.getParentParameterHost();
+        int previousSlot = parameter.attachments.getParentParameterSlotIndex();
 
         if (previousHost != null && (previousHost != this || previousSlot != slotIndex)) {
             previousHost.detachParameter(previousSlot);
         }
 
-        Node existing = attachedParameters.get(slotIndex);
-        if (existing != null && existing != parameter) {
-            detachParameter(slotIndex);
+        Node replaced = attachments.getAttachedParameter(slotIndex);
+        if (replaced != null && replaced != parameter) {
+            replaced = attachments.detachParameter(slotIndex);
+            if (replaced != null) {
+                replaced.setSocketsHidden(false);
+                replaced.recalculateDimensions();
+                replaced.setPositionSilently(getX() + getWidth() + PARAMETER_SLOT_MARGIN_HORIZONTAL, getY());
+            }
         }
 
-        attachedParameters.put(slotIndex, parameter);
-        parameter.parentParameterHost = this;
-        parameter.parentParameterSlotIndex = slotIndex;
+        attachments.attachParameter(this, slotIndex, parameter);
         parameter.setDragging(false);
         parameter.setSelected(false);
         parameter.setSocketsHidden(true);
@@ -2458,12 +2414,10 @@ public class Node {
     }
 
     public void detachParameter(int slotIndex) {
-        Node parameter = attachedParameters.remove(slotIndex);
+        Node parameter = attachments.detachParameter(slotIndex);
         if (parameter == null) {
             return;
         }
-        parameter.parentParameterHost = null;
-        parameter.parentParameterSlotIndex = -1;
         parameter.setSocketsHidden(false);
         parameter.recalculateDimensions();
         parameter.setPositionSilently(getX() + getWidth() + PARAMETER_SLOT_MARGIN_HORIZONTAL, getY());
@@ -2475,17 +2429,17 @@ public class Node {
     }
 
     private void updateParentControlLayout() {
-        if (parentControl != null) {
-            parentControl.recalculateDimensions();
-            parentControl.updateAttachedSensorPosition();
+        if (attachments.getParentControl() != null) {
+            attachments.getParentControl().recalculateDimensions();
+            attachments.getParentControl().updateAttachedSensorPosition();
         }
     }
 
     private void notifyParentParameterHostOfResize() {
-        if (parentParameterHost == null || parentParameterSlotIndex < 0) {
+        if (attachments.getParentParameterHost() == null || attachments.getParentParameterSlotIndex() < 0) {
             return;
         }
-        parentParameterHost.onAttachedParameterResized(parentParameterSlotIndex);
+        attachments.getParentParameterHost().onAttachedParameterResized(attachments.getParentParameterSlotIndex());
     }
 
     private void onAttachedParameterResized(int slotIndex) {
@@ -2494,10 +2448,10 @@ public class Node {
     }
 
     private void notifyParentActionControlOfResize() {
-        if (parentActionControl == null) {
+        if (attachments.getParentActionControl() == null) {
             return;
         }
-        parentActionControl.onAttachedActionResized();
+        attachments.getParentActionControl().onAttachedActionResized();
     }
 
     private void onAttachedActionResized() {
@@ -2506,10 +2460,10 @@ public class Node {
     }
 
     private void notifyParentControlOfResize() {
-        if (parentControl == null) {
+        if (attachments.getParentControl() == null) {
             return;
         }
-        parentControl.onAttachedSensorResized();
+        attachments.getParentControl().onAttachedSensorResized();
     }
 
     private void onAttachedSensorResized() {
@@ -2650,13 +2604,13 @@ public class Node {
         if (!existingValues.isEmpty()) {
             applyParameterValuesFromMap(existingValues);
         }
-        if (attachedParameters.isEmpty()) {
+        if (!attachments.hasAttachedParameters()) {
             return;
         }
-        List<Integer> slotIndices = new ArrayList<>(attachedParameters.keySet());
+        List<Integer> slotIndices = new ArrayList<>(attachments.getAttachedParameterSlotIndices());
         Collections.sort(slotIndices);
         for (Integer slotIndex : slotIndices) {
-            Node parameter = attachedParameters.get(slotIndex);
+            Node parameter = attachments.getAttachedParameter(slotIndex);
             if (parameter == null) {
                 continue;
             }
@@ -2756,25 +2710,22 @@ public class Node {
             return false;
         }
 
-        if (node.parentActionControl == this && attachedActionNode == node) {
+        if (attachments.isActionNodeAttachedTo(this, node)) {
             updateAttachedActionPosition();
             return true;
         }
 
-        if (node.parentActionControl != null) {
-            node.parentActionControl.detachActionNode();
+        if (node.attachments.getParentActionControl() != null) {
+            node.attachments.getParentActionControl().detachActionNode();
         }
 
-        if (attachedActionNode != null && attachedActionNode != node) {
-            Node previous = attachedActionNode;
-            previous.parentActionControl = null;
+        Node previous = attachments.attachActionNode(this, node);
+        if (previous != null) {
             previous.setDragging(false);
             previous.setSelected(false);
             previous.setPositionSilently(getX() + getWidth() + ACTION_SLOT_MARGIN_HORIZONTAL, getY());
         }
 
-        attachedActionNode = node;
-        node.parentActionControl = this;
         node.setDragging(false);
         node.setSelected(false);
         node.setSocketsHidden(true);
@@ -2785,11 +2736,9 @@ public class Node {
     }
 
     public void detachActionNode() {
-        if (attachedActionNode != null) {
-            Node node = attachedActionNode;
-            node.parentActionControl = null;
+        Node node = attachments.detachActionNode();
+        if (node != null) {
             node.setSocketsHidden(false);
-            attachedActionNode = null;
             recalculateDimensions();
         }
     }
@@ -2859,8 +2808,8 @@ public class Node {
             }
         }
 
-        if (!attachedParameters.isEmpty()) {
-            for (Node parameterNode : attachedParameters.values()) {
+        if (attachments.hasAttachedParameters()) {
+            for (Node parameterNode : attachments.getAttachedParameterNodes()) {
                 if (parameterNode == null || !parameterNode.isParameterNode()) {
                     continue;
                 }
@@ -4308,8 +4257,8 @@ public class Node {
         }
         if (hasParameterSlot()) {
             int parameterContentWidth = PARAMETER_SLOT_MIN_CONTENT_WIDTH;
-            if (!attachedParameters.isEmpty()) {
-                for (Node parameterNode : attachedParameters.values()) {
+            if (attachments.hasAttachedParameters()) {
+                for (Node parameterNode : attachments.getAttachedParameterNodes()) {
                     if (parameterNode != null) {
                         parameterContentWidth = Math.max(parameterContentWidth, parameterNode.getWidth());
                     }
@@ -4363,16 +4312,16 @@ public class Node {
         }
         if (hasSensorSlot()) {
             int sensorContentWidth = SENSOR_SLOT_MIN_CONTENT_WIDTH;
-            if (attachedSensor != null) {
-                sensorContentWidth = Math.max(sensorContentWidth, attachedSensor.getWidth());
+            if (attachments.getAttachedSensor() != null) {
+                sensorContentWidth = Math.max(sensorContentWidth, attachments.getAttachedSensor().getWidth());
             }
             int requiredWidth = sensorContentWidth + 2 * (SENSOR_SLOT_INNER_PADDING + SENSOR_SLOT_MARGIN_HORIZONTAL);
             computedWidth = Math.max(computedWidth, requiredWidth);
         }
         if (hasActionSlot()) {
             int actionContentWidth = ACTION_SLOT_MIN_CONTENT_WIDTH;
-            if (attachedActionNode != null) {
-                actionContentWidth = Math.max(actionContentWidth, attachedActionNode.getWidth());
+            if (attachments.getAttachedActionNode() != null) {
+                actionContentWidth = Math.max(actionContentWidth, attachments.getAttachedActionNode().getWidth());
             }
             int requiredWidth = actionContentWidth + 2 * (ACTION_SLOT_INNER_PADDING + ACTION_SLOT_MARGIN_HORIZONTAL);
             computedWidth = Math.max(computedWidth, requiredWidth);
@@ -4568,10 +4517,10 @@ public class Node {
         // field. We now keep them compact by clamping their height to the minimal
         // content they need instead of expanding to match their width.
 
-        if (attachedSensor != null) {
+        if (attachments.getAttachedSensor() != null) {
             updateAttachedSensorPosition();
         }
-        if (attachedActionNode != null) {
+        if (attachments.getAttachedActionNode() != null) {
             updateAttachedActionPosition();
         }
         updateAttachedParameterPositions();
@@ -4702,8 +4651,8 @@ public class Node {
     }
 
     private ParameterHandlingResult preprocessAttachedParameter(EnumSet<ParameterUsage> usages, CompletableFuture<Void> future) {
-        if (!attachedParameters.isEmpty()) {
-            java.util.List<Integer> slotIndices = new java.util.ArrayList<>(attachedParameters.keySet());
+        if (attachments.hasAttachedParameters()) {
+            java.util.List<Integer> slotIndices = new java.util.ArrayList<>(attachments.getAttachedParameterSlotIndices());
             java.util.Collections.sort(slotIndices);
             ParameterHandlingResult result = ParameterHandlingResult.CONTINUE;
             boolean resetRuntime = true;
@@ -4737,7 +4686,7 @@ public class Node {
             return ParameterHandlingResult.CONTINUE;
         }
         if (resetRuntimeData) {
-            runtimeParameterData = null;
+            runtimeState.runtimeParameterData = null;
         }
         Node parameterNode = getAttachedParameter(slotIndex);
         return preprocessParameterNode(parameterNode, slotIndex, usages, future);
@@ -4762,8 +4711,8 @@ public class Node {
                 }
             }
         }
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
 
         boolean handled = false;
@@ -4809,8 +4758,8 @@ public class Node {
             if (durationValue != null && !durationValue.trim().isEmpty()) {
                 String trimmedDuration = durationValue.trim();
                 Double parsedDurationSeconds = parseDoubleOrNull(trimmedDuration);
-                if (runtimeParameterData != null && parsedDurationSeconds != null) {
-                    runtimeParameterData.durationSeconds = Math.max(0.0, parsedDurationSeconds);
+                if (runtimeState.runtimeParameterData != null && parsedDurationSeconds != null) {
+                    runtimeState.runtimeParameterData.durationSeconds = Math.max(0.0, parsedDurationSeconds);
                 }
                 if (!handled) {
                     setParameterValueAndPropagate("Duration", trimmedDuration);
@@ -4822,7 +4771,7 @@ public class Node {
         }
 
         if (parameterNode.getType() == NodeType.LIST_ITEM) {
-            Entity resolved = resolveListItemEntity(parameterNode, runtimeParameterData, future);
+            Entity resolved = resolveListItemEntity(parameterNode, runtimeState.runtimeParameterData, future);
             if (resolved != null) {
                 handled = true;
             } else if (future != null && future.isDone()) {
@@ -4831,10 +4780,10 @@ public class Node {
         }
 
         if (usages.contains(ParameterUsage.POSITION)) {
-            Optional<Vec3d> targetVec = resolvePositionTarget(parameterNode, runtimeParameterData, future);
+            Optional<Vec3d> targetVec = resolvePositionTarget(parameterNode, runtimeState.runtimeParameterData, future);
             if (targetVec.isPresent()) {
                 handled = true;
-                runtimeParameterData.targetVector = targetVec.get();
+                runtimeState.runtimeParameterData.targetVector = targetVec.get();
                 applyVectorToCoordinateParameters(targetVec.get());
             } else if (future != null && future.isDone()) {
                 return ParameterHandlingResult.COMPLETE;
@@ -4842,7 +4791,7 @@ public class Node {
         }
 
         if (usages.contains(ParameterUsage.LOOK_ORIENTATION)) {
-            boolean oriented = resolveLookOrientation(parameterNode, runtimeParameterData, future);
+            boolean oriented = resolveLookOrientation(parameterNode, runtimeState.runtimeParameterData, future);
             if (oriented) {
                 handled = true;
             } else if (future != null && future.isDone()) {
@@ -4881,10 +4830,10 @@ public class Node {
         if (!handled && usages.isEmpty() && (type == NodeType.PLACE || type == NodeType.PLACE_HAND)) {
             NodeType parameterType = parameterNode.getType();
             if (parameterType == NodeType.PARAM_BLOCK
-                && parameterNode.parentParameterSlotIndex == 0) {
+                && parameterNode.attachments.getParentParameterSlotIndex() == 0) {
                 handled = true;
             }
-            if (parameterType == NodeType.PARAM_INVENTORY_SLOT && parameterNode.parentParameterSlotIndex == 0) {
+            if (parameterType == NodeType.PARAM_INVENTORY_SLOT && parameterNode.attachments.getParentParameterSlotIndex() == 0) {
                 handled = true;
             }
         }
@@ -4892,15 +4841,15 @@ public class Node {
             if (providesTrait(parameterNode, NodeValueTrait.KEY)) {
                 String buttonValue = getParameterString(parameterNode, "Key");
                 if (buttonValue != null && !buttonValue.isBlank()) {
-                    runtimeParameterData.resolvedButtonValue = buttonValue;
-                    runtimeParameterData.resolvedButtonIsMouse = false;
+                    runtimeState.runtimeParameterData.resolvedButtonValue = buttonValue;
+                    runtimeState.runtimeParameterData.resolvedButtonIsMouse = false;
                 }
                 handled = true;
             } else if (providesTrait(parameterNode, NodeValueTrait.MOUSE_BUTTON)) {
                 String buttonValue = getParameterString(parameterNode, "MouseButton");
                 if (buttonValue != null && !buttonValue.isBlank()) {
-                    runtimeParameterData.resolvedButtonValue = buttonValue;
-                    runtimeParameterData.resolvedButtonIsMouse = true;
+                    runtimeState.runtimeParameterData.resolvedButtonValue = buttonValue;
+                    runtimeState.runtimeParameterData.resolvedButtonIsMouse = true;
                 }
                 handled = true;
             }
@@ -5529,8 +5478,8 @@ public class Node {
         int x = MathHelper.floor(targetVec.x);
         int y = MathHelper.floor(targetVec.y);
         int z = MathHelper.floor(targetVec.z);
-        if (runtimeParameterData != null) {
-            runtimeParameterData.targetBlockPos = new BlockPos(x, y, z);
+        if (runtimeState.runtimeParameterData != null) {
+            runtimeState.runtimeParameterData.targetBlockPos = new BlockPos(x, y, z);
         }
         setParameterValueAndPropagate("X", Integer.toString(x));
         setParameterValueAndPropagate("Y", Integer.toString(y));
@@ -5883,7 +5832,7 @@ public class Node {
             }
             // Allow block parameters in slot 0 (they provide block type, not position)
             if (parameterType == NodeType.PARAM_BLOCK
-                && parameterNode.parentParameterSlotIndex == 0) {
+                && parameterNode.attachments.getParentParameterSlotIndex() == 0) {
                 return;
             }
         }
@@ -5948,10 +5897,10 @@ public class Node {
     }
 
     private boolean reportEmptyParametersForAttachedParameters(CompletableFuture<Void> future) {
-        if (attachedParameters.isEmpty()) {
+        if (!attachments.hasAttachedParameters()) {
             return true;
         }
-        for (Node parameterNode : attachedParameters.values()) {
+        for (Node parameterNode : attachments.getAttachedParameterNodes()) {
             if (parameterNode == null || !parameterNode.isParameterNode()) {
                 continue;
             }
@@ -6192,17 +6141,17 @@ public class Node {
     private Random getRandomGenerator() {
         String seed = getParameterString(this, "Seed");
         if (seed == null || seed.trim().isEmpty() || isAnySeedValue(seed)) {
-            randomGenerator = null;
-            randomSeedCache = null;
+            runtimeState.randomGenerator = null;
+            runtimeState.randomSeedCache = null;
             return null;
         }
         String trimmed = seed.trim();
-        if (randomGenerator == null || randomSeedCache == null || !randomSeedCache.equals(trimmed)) {
+        if (runtimeState.randomGenerator == null || runtimeState.randomSeedCache == null || !runtimeState.randomSeedCache.equals(trimmed)) {
             long hashedSeed = hashSeedString(trimmed);
-            randomGenerator = new Random(hashedSeed);
-            randomSeedCache = trimmed;
+            runtimeState.randomGenerator = new Random(hashedSeed);
+            runtimeState.randomSeedCache = trimmed;
         }
-        return randomGenerator;
+        return runtimeState.randomGenerator;
     }
 
     private static long hashSeedString(String seed) {
@@ -6355,7 +6304,7 @@ public class Node {
 
         List<String> desiredItemIds = new ArrayList<>();
         List<String> desiredTradeKeys = new ArrayList<>();
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         if (parameterData != null && parameterData.targetItemId != null && !parameterData.targetItemId.isEmpty()) {
             desiredItemIds.add(parameterData.targetItemId);
         }
@@ -6546,13 +6495,13 @@ public class Node {
     private List<String> resolveCollectTargets(CompletableFuture<Void> future) {
         List<String> blockIds = new ArrayList<>();
 
-        if (runtimeParameterData != null) {
-            if (runtimeParameterData.targetBlockIds != null) {
-                for (String id : runtimeParameterData.targetBlockIds) {
+        if (runtimeState.runtimeParameterData != null) {
+            if (runtimeState.runtimeParameterData.targetBlockIds != null) {
+                for (String id : runtimeState.runtimeParameterData.targetBlockIds) {
                     addBlockIds(blockIds, id);
                 }
-            } else if (runtimeParameterData.targetBlockId != null) {
-                addBlockIds(blockIds, runtimeParameterData.targetBlockId);
+            } else if (runtimeState.runtimeParameterData.targetBlockId != null) {
+                addBlockIds(blockIds, runtimeState.runtimeParameterData.targetBlockId);
             }
         }
 
@@ -8535,14 +8484,14 @@ public class Node {
     }
 
     private BlockPos resolveTravelTargetFromAttachedBlockParameter(CompletableFuture<Void> future) {
-        if (attachedParameters.isEmpty()) {
+        if (!attachments.hasAttachedParameters()) {
             return null;
         }
 
-        List<Integer> slotIndices = new ArrayList<>(attachedParameters.keySet());
+        List<Integer> slotIndices = new ArrayList<>(attachments.getAttachedParameterSlotIndices());
         Collections.sort(slotIndices);
         for (Integer slotIndex : slotIndices) {
-            Node parameterNode = attachedParameters.get(slotIndex);
+            Node parameterNode = attachments.getAttachedParameter(slotIndex);
             if (parameterNode == null) {
                 continue;
             }
@@ -8561,8 +8510,8 @@ public class Node {
             if (future.isDone() || targetBlock == null) {
                 return targetBlock;
             }
-            if (runtimeParameterData != null) {
-                runtimeParameterData.targetBlockPos = targetBlock;
+            if (runtimeState.runtimeParameterData != null) {
+                runtimeState.runtimeParameterData.targetBlockPos = targetBlock;
             }
             return targetBlock;
         }
@@ -8796,7 +8745,7 @@ public class Node {
     }
 
     private boolean tryExecuteGotoUsingAttachedParameter(Object baritone, Object customGoalProcess, CompletableFuture<Void> future) {
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         if (parameterData != null && parameterData.targetEntity != null) {
             return gotoSpecificEntity(parameterData.targetEntity, customGoalProcess, future);
         }
@@ -8916,7 +8865,7 @@ public class Node {
         }
 
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         if (parameterData != null && parameterData.targetEntity != null) {
             if (handled != null && handled.length > 0) {
                 handled[0] = true;
@@ -8985,10 +8934,10 @@ public class Node {
                     return null;
                 }
 
-                if (runtimeParameterData != null) {
-                    runtimeParameterData.targetBlockPos = matchedPosition.get();
-                    runtimeParameterData.targetItem = matchedItem;
-                    runtimeParameterData.targetItemId = matchedItemId;
+                if (runtimeState.runtimeParameterData != null) {
+                    runtimeState.runtimeParameterData.targetBlockPos = matchedPosition.get();
+                    runtimeState.runtimeParameterData.targetItem = matchedItem;
+                    runtimeState.runtimeParameterData.targetItemId = matchedItemId;
                 }
 
                 return matchedPosition.get();
@@ -9028,20 +8977,20 @@ public class Node {
                     future.complete(null);
                     return null;
                 }
-                if (runtimeParameterData != null) {
-                    runtimeParameterData.targetBlockPos = nearest.getBlockPos();
-                    runtimeParameterData.targetEntity = nearest;
+                if (runtimeState.runtimeParameterData != null) {
+                    runtimeState.runtimeParameterData.targetBlockPos = nearest.getBlockPos();
+                    runtimeState.runtimeParameterData.targetEntity = nearest;
                 }
                 return nearest.getBlockPos();
             }
             case LIST_ITEM: {
-                Entity target = resolveListItemEntity(parameterNode, runtimeParameterData, future);
+                Entity target = resolveListItemEntity(parameterNode, runtimeState.runtimeParameterData, future);
                 if (target == null) {
                     return null;
                 }
-                if (runtimeParameterData != null) {
-                    runtimeParameterData.targetBlockPos = target.getBlockPos();
-                    runtimeParameterData.targetEntity = target;
+                if (runtimeState.runtimeParameterData != null) {
+                    runtimeState.runtimeParameterData.targetBlockPos = target.getBlockPos();
+                    runtimeState.runtimeParameterData.targetEntity = target;
                 }
                 return target.getBlockPos();
             }
@@ -9080,17 +9029,17 @@ public class Node {
                     return null;
                 }
 
-                if (runtimeParameterData != null) {
-                    runtimeParameterData.targetBlockPos = match.get().getBlockPos();
-                    runtimeParameterData.targetEntity = match.get();
+                if (runtimeState.runtimeParameterData != null) {
+                    runtimeState.runtimeParameterData.targetBlockPos = match.get().getBlockPos();
+                    runtimeState.runtimeParameterData.targetEntity = match.get();
                 }
                 return match.get().getBlockPos();
             }
             case PARAM_BLOCK: {
                 String blockId = getBlockParameterValue(parameterNode);
                 BlockPos pos = resolveGotoFallbackTargetFromBlockId(blockId, future);
-                if (pos != null && runtimeParameterData != null) {
-                    runtimeParameterData.targetBlockPos = pos;
+                if (pos != null && runtimeState.runtimeParameterData != null) {
+                    runtimeState.runtimeParameterData.targetBlockPos = pos;
                 }
                 return pos;
             }
@@ -9238,10 +9187,10 @@ public class Node {
         }
 
         BlockPos pos = matchedPosition.get();
-        if (runtimeParameterData != null) {
-            runtimeParameterData.targetBlockPos = pos;
-            runtimeParameterData.targetItem = matchedItem;
-            runtimeParameterData.targetItemId = matchedItemId;
+        if (runtimeState.runtimeParameterData != null) {
+            runtimeState.runtimeParameterData.targetBlockPos = pos;
+            runtimeState.runtimeParameterData.targetItem = matchedItem;
+            runtimeState.runtimeParameterData.targetItemId = matchedItemId;
         }
 
         startGotoTaskWithBreakGuard(future);
@@ -9360,7 +9309,7 @@ public class Node {
         }
 
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         BlockPos targetPos = parameterData != null ? parameterData.targetBlockPos : null;
         String sanitized = sanitizeResourceId(blockId);
         String normalized = (sanitized != null && !sanitized.isEmpty())
@@ -9640,10 +9589,10 @@ public class Node {
             return;
         }
 
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
-        runtimeParameterData.targetBlockPos = targetPos;
+        runtimeState.runtimeParameterData.targetBlockPos = targetPos;
 
         Vec3d eyePos = client.player.getEyePos();
         Vec3d center = Vec3d.ofCenter(targetPos);
@@ -9676,7 +9625,7 @@ public class Node {
         new Thread(() -> {
             try {
                 runOnClientThread(client, () -> {
-                    orientPlayerTowardsRuntimeTarget(client, runtimeParameterData);
+                    orientPlayerTowardsRuntimeTarget(client, runtimeState.runtimeParameterData);
                     if (client.interactionManager != null) {
                         client.interactionManager.attackBlock(targetPos, finalBreakFace);
                     }
@@ -13587,7 +13536,7 @@ public class Node {
                 return;
             }
         } else {
-            runtimeParameterData = null;
+            runtimeState.runtimeParameterData = null;
         }
 
         if (coordinateParameterNode != null) {
@@ -13627,7 +13576,7 @@ public class Node {
         if (yParam != null) y = yParam.getIntValue();
         if (zParam != null) z = zParam.getIntValue();
 
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         if (parameterData != null) {
             if (parameterData.targetBlockId != null && !parameterData.targetBlockId.isEmpty()) {
                 block = parameterData.targetBlockId;
@@ -13866,11 +13815,11 @@ public class Node {
             sendNodeErrorMessage(client, "Selected slot for " + type.getDisplayName() + " does not contain a block.");
             return null;
         }
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
-        runtimeParameterData.slotIndex = slotValue;
-        runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
+        runtimeState.runtimeParameterData.slotIndex = slotValue;
+        runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
         if (!ensureStackSelectedInMainHand(client, inventory, slotValue, stack)) {
             sendNodeErrorMessage(client, "Failed to prepare selected block for " + type.getDisplayName() + ".");
             return null;
@@ -13965,8 +13914,8 @@ public class Node {
             return;
         }
 
-        boolean usePlayerOriginCommand = runtimeParameterData != null
-            ? runtimeParameterData.targetVector == null && mode == NodeMode.BUILD_PLAYER
+        boolean usePlayerOriginCommand = runtimeState.runtimeParameterData != null
+            ? runtimeState.runtimeParameterData.targetVector == null && mode == NodeMode.BUILD_PLAYER
             : mode == NodeMode.BUILD_PLAYER;
         String command = usePlayerOriginCommand
             ? String.format("#build %s", schematic)
@@ -13993,7 +13942,7 @@ public class Node {
     }
 
     private BlockPos resolveBuildOrigin() {
-        Vec3d targetVector = runtimeParameterData != null ? runtimeParameterData.targetVector : null;
+        Vec3d targetVector = runtimeState.runtimeParameterData != null ? runtimeState.runtimeParameterData.targetVector : null;
         if (targetVector != null) {
             return BlockPos.ofFloored(targetVector);
         }
@@ -14185,7 +14134,7 @@ public class Node {
             return;
         }
         double baseDuration = Math.max(0.0, getDoubleParameter("Duration", 1.0));
-        Double attachedDurationSeconds = runtimeParameterData != null ? runtimeParameterData.durationSeconds : null;
+        Double attachedDurationSeconds = runtimeState.runtimeParameterData != null ? runtimeState.runtimeParameterData.durationSeconds : null;
 
         final double waitSeconds;
         NodeMode waitMode = mode != null ? mode : NodeMode.WAIT_SECONDS;
@@ -14245,18 +14194,18 @@ public class Node {
             return;
         }
         int count = Math.max(0, getIntParameter("Count", 1));
-        if (!repeatActive) {
-            repeatRemainingIterations = count;
-            repeatActive = true;
+        if (!runtimeState.repeatActive) {
+            runtimeState.repeatRemainingIterations = count;
+            runtimeState.repeatActive = true;
         }
-        if (repeatRemainingIterations > 0) {
-            repeatRemainingIterations--;
-            repeatExecuteAttachedAction = true;
+        if (runtimeState.repeatRemainingIterations > 0) {
+            runtimeState.repeatRemainingIterations--;
+            runtimeState.repeatExecuteAttachedAction = true;
             setNextOutputSocket(0);
         } else {
-            repeatRemainingIterations = 0;
-            repeatActive = false;
-            repeatExecuteAttachedAction = false;
+            runtimeState.repeatRemainingIterations = 0;
+            runtimeState.repeatActive = false;
+            runtimeState.repeatExecuteAttachedAction = false;
             setNextOutputSocket(0);
         }
         future.complete(null);
@@ -14268,11 +14217,11 @@ public class Node {
         }
         boolean conditionMet = evaluateConditionFromParameters();
         if (conditionMet) {
-            repeatRemainingIterations = 0;
-            repeatActive = false;
+            runtimeState.repeatRemainingIterations = 0;
+            runtimeState.repeatActive = false;
             setNextOutputSocket(1);
         } else {
-            repeatActive = true;
+            runtimeState.repeatActive = true;
             setNextOutputSocket(0);
         }
         future.complete(null);
@@ -14320,7 +14269,7 @@ public class Node {
         if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
             return;
         }
-        repeatActive = true;
+        runtimeState.repeatActive = true;
         setNextOutputSocket(0);
         future.complete(null);
     }
@@ -15428,8 +15377,8 @@ public class Node {
         }
 
         if (!isBaritoneApiAvailable() && isBaritoneModAvailable()) {
-            if (runtimeParameterData != null && runtimeParameterData.targetBlockPos != null) {
-                BlockPos target = runtimeParameterData.targetBlockPos;
+            if (runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetBlockPos != null) {
+                BlockPos target = runtimeState.runtimeParameterData.targetBlockPos;
                 String command = String.format("#goal %d %d %d", target.getX(), target.getY(), target.getZ());
                 executeCommand(command);
                 future.complete(null);
@@ -15575,8 +15524,8 @@ public class Node {
 
 
         if (!isBaritoneApiAvailable() && isBaritoneModAvailable()) {
-            if (runtimeParameterData != null && runtimeParameterData.targetBlockPos != null) {
-                BlockPos target = runtimeParameterData.targetBlockPos;
+            if (runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetBlockPos != null) {
+                BlockPos target = runtimeState.runtimeParameterData.targetBlockPos;
                 String goalCommand = String.format("#goal %d %d %d", target.getX(), target.getY(), target.getZ());
                 executeCommand(goalCommand);
             }
@@ -15593,8 +15542,8 @@ public class Node {
 
             // Start the Baritone pathing task
             Object customGoalProcess = BaritoneApiProxy.getCustomGoalProcess(baritone);
-            if (runtimeParameterData != null && runtimeParameterData.targetBlockPos != null) {
-                BlockPos target = runtimeParameterData.targetBlockPos;
+            if (runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetBlockPos != null) {
+                BlockPos target = runtimeState.runtimeParameterData.targetBlockPos;
                 BaritoneApiProxy.setGoal(customGoalProcess, BaritoneApiProxy.createGoalBlock(target.getX(), target.getY(), target.getZ()));
             }
             BaritoneApiProxy.path(customGoalProcess);
@@ -15960,7 +15909,7 @@ public class Node {
             }
             slot = foundSlot;
         } else {
-            RuntimeParameterData parameterData = runtimeParameterData;
+            RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
             int resolvedSlot = parameterData != null && parameterData.slotIndex != null
                 ? parameterData.slotIndex
                 : getIntParameter("Slot", 0);
@@ -15990,7 +15939,7 @@ public class Node {
             return;
         }
 
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         boolean hasResolvedTarget = parameterData != null && parameterData.slotIndex != null;
         if (type == NodeType.DROP_SLOT || hasResolvedTarget) {
             executeResolvedDropTarget(client, parameterData, future);
@@ -16652,11 +16601,6 @@ public class Node {
         return new SlotResolution(slot, handlerSlot);
     }
 
-    private enum SlotSelectionType {
-        PLAYER_INVENTORY,
-        GUI_CONTAINER
-    }
-
     private static final class SlotResolution {
         final Slot slot;
         final int handlerSlotIndex;
@@ -16709,12 +16653,12 @@ public class Node {
         if (parameterNode == null) {
             return false;
         }
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
         if (providesTrait(parameterNode, NodeValueTrait.INVENTORY_SLOT)) {
-            runtimeParameterData.slotIndex = parseNodeInt(parameterNode, "Slot", 0);
-            runtimeParameterData.slotSelectionType = resolveInventorySlotSelectionType(parameterNode);
+            runtimeState.runtimeParameterData.slotIndex = parseNodeInt(parameterNode, "Slot", 0);
+            runtimeState.runtimeParameterData.slotSelectionType = resolveInventorySlotSelectionType(parameterNode);
             return true;
         }
         if (providesTrait(parameterNode, NodeValueTrait.ITEM)) {
@@ -16733,8 +16677,8 @@ public class Node {
             }
             return false;
         }
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
 
         List<String> itemIds = resolveItemIdsFromParameter(parameterNode);
@@ -16798,9 +16742,9 @@ public class Node {
             return false;
         }
 
-        runtimeParameterData.slotIndex = foundSlot;
-        runtimeParameterData.slotSelectionType = selectionType;
-        runtimeParameterData.targetItemId = matchedItemId;
+        runtimeState.runtimeParameterData.slotIndex = foundSlot;
+        runtimeState.runtimeParameterData.slotSelectionType = selectionType;
+        runtimeState.runtimeParameterData.targetItemId = matchedItemId;
         return true;
     }
 
@@ -16950,10 +16894,10 @@ public class Node {
         String targetParameter = slotIndex == 0 ? "SourceSlot" : "TargetSlot";
         setParameterValueAndPropagate(targetParameter, Integer.toString(foundSlot));
         if (slotIndex == 0) {
-            if (runtimeParameterData == null) {
-                runtimeParameterData = new RuntimeParameterData();
+            if (runtimeState.runtimeParameterData == null) {
+                runtimeState.runtimeParameterData = new RuntimeParameterData();
             }
-            runtimeParameterData.slotIndex = foundSlot;
+            runtimeState.runtimeParameterData.slotIndex = foundSlot;
         }
         return true;
     }
@@ -16969,15 +16913,15 @@ public class Node {
             }
             return false;
         }
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
 
         PlayerInventory inventory = client.player.getInventory();
         EnumSet<NodeValueTrait> traits = parameterNode.getProvidedTraits();
         boolean isListItem = parameterNode.getType() == NodeType.LIST_ITEM;
         boolean treatAsItem = traits.contains(NodeValueTrait.ITEM)
-            || (isListItem && runtimeParameterData != null && runtimeParameterData.targetItemId != null);
+            || (isListItem && runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetItemId != null);
         if (traits.contains(NodeValueTrait.BLOCK)) {
             {
                 String rawBlock = getParameterString(parameterNode, "Block");
@@ -17004,17 +16948,17 @@ public class Node {
                     sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
                     return false;
                 }
-                runtimeParameterData.slotIndex = result.slotIndex();
-                runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                runtimeParameterData.targetItem = result.item();
-                runtimeParameterData.targetItemId = result.itemId();
+                runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
+                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
+                runtimeState.runtimeParameterData.targetItem = result.item();
+                runtimeState.runtimeParameterData.targetItemId = result.itemId();
                 return true;
             }
         }
         if (treatAsItem) {
             List<String> itemIds;
-            if (isListItem && runtimeParameterData != null && runtimeParameterData.targetItemId != null) {
-                itemIds = java.util.Collections.singletonList(runtimeParameterData.targetItemId);
+            if (isListItem && runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetItemId != null) {
+                itemIds = java.util.Collections.singletonList(runtimeState.runtimeParameterData.targetItemId);
             } else {
                 itemIds = resolveItemIdsFromParameter(parameterNode);
             }
@@ -17028,10 +16972,10 @@ public class Node {
                     sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
                     return false;
                 }
-                runtimeParameterData.slotIndex = result.slotIndex();
-                runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                runtimeParameterData.targetItem = result.item();
-                runtimeParameterData.targetItemId = result.itemId();
+                runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
+                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
+                runtimeState.runtimeParameterData.targetItem = result.item();
+                runtimeState.runtimeParameterData.targetItemId = result.itemId();
                 return true;
         }
         if (traits.contains(NodeValueTrait.INVENTORY_SLOT)) {
@@ -17044,8 +16988,8 @@ public class Node {
                     return false;
                 }
                 int slotValue = clampInventorySlot(inventory, parseNodeInt(parameterNode, "Slot", 0));
-                runtimeParameterData.slotIndex = slotValue;
-                runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
+                runtimeState.runtimeParameterData.slotIndex = slotValue;
+                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
                 return true;
         }
         sendIncompatibleParameterMessage(parameterNode);
@@ -17203,7 +17147,7 @@ public class Node {
             return;
         }
 
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         if (parameterData != null && parameterData.slotIndex != null) {
             if (!prepareSelectedItemForUse(client, parameterData, hand, future)) {
                 return;
@@ -17423,7 +17367,7 @@ public class Node {
                 return;
             }
         } else {
-            runtimeParameterData = null;
+            runtimeState.runtimeParameterData = null;
         }
 
         if (coordinateParameterNode != null) {
@@ -17456,7 +17400,7 @@ public class Node {
         boolean swingOnPlace = getBooleanParameter("SwingOnPlace", true);
         boolean requireBlockHit = getBooleanParameter("RequireBlockHit", true);
 
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         BlockPos directedPlacementPos = null;
         if (parameterData != null && (coordinateProvidesCoordinates || coordinateHandledByBlockParam)) {
             directedPlacementPos = parameterData.targetBlockPos;
@@ -17826,9 +17770,9 @@ public class Node {
         }
 
         Vec3d preferredLook = null;
-        if (runtimeParameterData != null && runtimeParameterData.resolvedYaw != null && runtimeParameterData.resolvedPitch != null) {
-            double yawRad = Math.toRadians(runtimeParameterData.resolvedYaw);
-            double pitchRad = Math.toRadians(runtimeParameterData.resolvedPitch);
+        if (runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.resolvedYaw != null && runtimeState.runtimeParameterData.resolvedPitch != null) {
+            double yawRad = Math.toRadians(runtimeState.runtimeParameterData.resolvedYaw);
+            double pitchRad = Math.toRadians(runtimeState.runtimeParameterData.resolvedPitch);
             double xDir = -Math.sin(yawRad) * Math.cos(pitchRad);
             double yDir = -Math.sin(pitchRad);
             double zDir = Math.cos(yawRad) * Math.cos(pitchRad);
@@ -18124,7 +18068,7 @@ public class Node {
             boolean interrupted = false;
             try {
                 runOnClientThread(client, () -> {
-                    orientPlayerTowardsRuntimeTarget(client, runtimeParameterData);
+                    orientPlayerTowardsRuntimeTarget(client, runtimeState.runtimeParameterData);
                     if (client.options != null && client.options.forwardKey != null) {
                         client.options.forwardKey.setPressed(true);
                     }
@@ -18250,7 +18194,7 @@ public class Node {
         if (manager != null && manager.isStopRequested()) {
             return true;
         }
-        Node guard = activeRepeatUntilGuard;
+        Node guard = runtimeState.activeRepeatUntilGuard;
         return guard != null && guard != this && guard.isRepeatUntilConditionMetForPolling();
     }
 
@@ -18264,7 +18208,7 @@ public class Node {
             return;
         }
 
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         String buttonValue = parameterData != null && parameterData.resolvedButtonValue != null
             ? parameterData.resolvedButtonValue
             : getStringParameter("Key", "GLFW_KEY_SPACE");
@@ -18499,7 +18443,7 @@ public class Node {
             }
         };
 
-        RuntimeParameterData parameterData = runtimeParameterData;
+        RuntimeParameterData parameterData = runtimeState.runtimeParameterData;
         BlockPos parameterTargetPos = parameterData != null ? parameterData.targetBlockPos : null;
 
         NodeParameter blockParameter = getParameter("Block");
@@ -18717,11 +18661,11 @@ public class Node {
 
         BlockPos targetPos = null;
         Direction breakFace = null;
-        if (runtimeParameterData != null) {
-            if (runtimeParameterData.targetBlockPos != null) {
-                targetPos = runtimeParameterData.targetBlockPos;
-            } else if (runtimeParameterData.targetVector != null) {
-                Vec3d vec = runtimeParameterData.targetVector;
+        if (runtimeState.runtimeParameterData != null) {
+            if (runtimeState.runtimeParameterData.targetBlockPos != null) {
+                targetPos = runtimeState.runtimeParameterData.targetBlockPos;
+            } else if (runtimeState.runtimeParameterData.targetVector != null) {
+                Vec3d vec = runtimeState.runtimeParameterData.targetVector;
                 targetPos = new BlockPos(MathHelper.floor(vec.x), MathHelper.floor(vec.y), MathHelper.floor(vec.z));
             }
         }
@@ -18766,10 +18710,10 @@ public class Node {
             return;
         }
 
-        if (runtimeParameterData == null) {
-            runtimeParameterData = new RuntimeParameterData();
+        if (runtimeState.runtimeParameterData == null) {
+            runtimeState.runtimeParameterData = new RuntimeParameterData();
         }
-        runtimeParameterData.targetBlockPos = targetPos;
+        runtimeState.runtimeParameterData.targetBlockPos = targetPos;
 
         Vec3d eyePos = client.player.getEyePos();
         Vec3d center = Vec3d.ofCenter(targetPos);
@@ -18805,7 +18749,7 @@ public class Node {
         new Thread(() -> {
             try {
                 runOnClientThread(client, () -> {
-                    orientPlayerTowardsRuntimeTarget(client, runtimeParameterData);
+                    orientPlayerTowardsRuntimeTarget(client, runtimeState.runtimeParameterData);
                     if (client.interactionManager != null) {
                         client.interactionManager.attackBlock(finalTargetPos, finalBreakFace);
                     }
@@ -20073,7 +20017,7 @@ public class Node {
                 data.slotIndex = slotEntry.slotIndex;
                 data.slotSelectionType = slotEntry.selectionType;
             }
-            applyListSlotSelection(slotEntry.slotIndex, listNode.parentParameterSlotIndex);
+            applyListSlotSelection(slotEntry.slotIndex, listNode.attachments.getParentParameterSlotIndex());
             return client.player;
         }
 
@@ -20424,14 +20368,7 @@ public class Node {
     }
 
     private void resetControlState() {
-        this.repeatRemainingIterations = 0;
-        this.repeatActive = false;
-        this.repeatExecuteAttachedAction = false;
-        this.lastSensorResult = false;
-        this.nextOutputSocket = 0;
-        this.fallingPeakY = Double.NaN;
-        this.fallingPeakInitialized = false;
-        this.lastFallingDetectedAtMs = Long.MIN_VALUE;
+        runtimeState.resetControlState();
     }
     
     private enum SensorConditionType {
@@ -20460,13 +20397,13 @@ public class Node {
     }
 
     private Node getAttachedParameterOfType(NodeType... allowedTypes) {
-        if (attachedParameters.isEmpty()) {
+        if (!attachments.hasAttachedParameters()) {
             return null;
         }
-        List<Integer> slotIndices = new ArrayList<>(attachedParameters.keySet());
+        List<Integer> slotIndices = new ArrayList<>(attachments.getAttachedParameterSlotIndices());
         Collections.sort(slotIndices);
         for (Integer slotIndex : slotIndices) {
-            Node parameter = attachedParameters.get(slotIndex);
+            Node parameter = attachments.getAttachedParameter(slotIndex);
             if (parameter == null || !parameter.isParameterNode()) {
                 continue;
             }
@@ -20517,7 +20454,7 @@ public class Node {
             return false;
         }
         if (!ensureRequiredSensorParameterAttached()) {
-            this.lastSensorResult = false;
+            this.runtimeState.lastSensorResult = false;
             return false;
         }
 
@@ -21016,12 +20953,12 @@ public class Node {
                 break;
         }
         result = adjustBooleanToggleResult(result);
-        this.lastSensorResult = result;
+        this.runtimeState.lastSensorResult = result;
         return result;
     }
 
     private boolean ensureRequiredSensorParameterAttached() {
-        if (!isSensorNode() || !attachedParameters.isEmpty() || !sensorRequiresParameterNode()) {
+        if (!isSensorNode() || attachments.hasAttachedParameters() || !sensorRequiresParameterNode()) {
             return true;
         }
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
@@ -22222,9 +22159,9 @@ public class Node {
     }
 
     private boolean evaluateConditionFromParameters() {
-        if (attachedSensor != null) {
-            boolean result = attachedSensor.evaluateSensor();
-            this.lastSensorResult = result;
+        if (attachments.getAttachedSensor() != null) {
+            boolean result = attachments.getAttachedSensor().evaluateSensor();
+            this.runtimeState.lastSensorResult = result;
             return result;
         }
 
@@ -22236,7 +22173,7 @@ public class Node {
         int y = getIntParameter("Y", 64);
         int z = getIntParameter("Z", 0);
         boolean result = evaluateSensorCondition(SensorConditionType.fromLabel(condition), blockId, entityId, x, y, z);
-        this.lastSensorResult = result;
+        this.runtimeState.lastSensorResult = result;
         return result;
     }
     
@@ -23210,26 +23147,26 @@ public class Node {
         long now = System.currentTimeMillis();
         double currentY = client.player.getY();
         if (client.player.isOnGround()) {
-            fallingPeakY = currentY;
-            fallingPeakInitialized = true;
-            lastFallingDetectedAtMs = Long.MIN_VALUE;
+            runtimeState.fallingPeakY = currentY;
+            runtimeState.fallingPeakInitialized = true;
+            runtimeState.lastFallingDetectedAtMs = Long.MIN_VALUE;
             return false;
         }
         if (client.player.isSwimming()
             || client.player.isSubmergedInWater()
             || client.player.isClimbing()
             || client.player.getAbilities().flying) {
-            fallingPeakY = currentY;
-            fallingPeakInitialized = false;
-            lastFallingDetectedAtMs = Long.MIN_VALUE;
+            runtimeState.fallingPeakY = currentY;
+            runtimeState.fallingPeakInitialized = false;
+            runtimeState.lastFallingDetectedAtMs = Long.MIN_VALUE;
             return false;
         }
 
-        if (!fallingPeakInitialized) {
-            fallingPeakY = currentY;
-            fallingPeakInitialized = true;
-        } else if (currentY > fallingPeakY) {
-            fallingPeakY = currentY;
+        if (!runtimeState.fallingPeakInitialized) {
+            runtimeState.fallingPeakY = currentY;
+            runtimeState.fallingPeakInitialized = true;
+        } else if (currentY > runtimeState.fallingPeakY) {
+            runtimeState.fallingPeakY = currentY;
         }
         double groundClearance = getDistanceFromGround().orElse(Double.POSITIVE_INFINITY);
 
@@ -23241,15 +23178,15 @@ public class Node {
             false,
             client.player.getVelocity().y,
             client.player.fallDistance,
-            fallingPeakY,
+            runtimeState.fallingPeakY,
             currentY,
             groundClearance,
             distance,
             now,
-            lastFallingDetectedAtMs
+            runtimeState.lastFallingDetectedAtMs
         );
         if (falling) {
-            lastFallingDetectedAtMs = now;
+            runtimeState.lastFallingDetectedAtMs = now;
         }
         return falling;
     }
