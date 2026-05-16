@@ -601,6 +601,7 @@ public class NodeGraph {
         nodes.clear();
         connections.clear();
         invalidateRenderCaches();
+        clearTransientGraphState();
         nextStartNodeNumber = 1;
         
         // Calculate workspace area
@@ -1092,6 +1093,56 @@ public class NodeGraph {
         selectedNode = null;
     }
 
+    private void pruneSelectionToCurrentNodes() {
+        if (selectedNodes.isEmpty()) {
+            selectedNode = null;
+            return;
+        }
+        Set<Node> liveNodes = new HashSet<>(nodes);
+        boolean changed = false;
+        java.util.Iterator<Node> iterator = selectedNodes.iterator();
+        while (iterator.hasNext()) {
+            Node entry = iterator.next();
+            if (entry == null || !liveNodes.contains(entry)) {
+                if (entry != null) {
+                    entry.setSelected(false);
+                }
+                iterator.remove();
+                changed = true;
+            }
+        }
+        if (selectedNode == null || !liveNodes.contains(selectedNode)) {
+            selectedNode = selectedNodes.isEmpty() ? null : selectedNodes.iterator().next();
+            changed = true;
+        }
+        if (changed && selectedNode != null) {
+            selectedNode.setSelected(true);
+        }
+    }
+
+    private void clearTransientGraphState() {
+        clearSelection();
+        draggingNode = null;
+        hoveredNode = null;
+        hoveredSocketNode = null;
+        hoveredSocketIndex = -1;
+        hoveredSocket = -1;
+        hoveredSocketIsInput = false;
+        hoveringStartButton = false;
+        hoveredStartNode = null;
+        isDraggingConnection = false;
+        connectionSourceNode = null;
+        disconnectedConnection = null;
+        sensorDropTarget = null;
+        actionDropTarget = null;
+        parameterDropTarget = null;
+        lastClickedNode = null;
+        lastClickTime = 0;
+        cascadeDeletionPreviewNodes.clear();
+        selectionDeletionPreviewActive = false;
+        selectionBoxActive = false;
+    }
+
     public void beginSelectionBox(int screenX, int screenY) {
         selectionBoxActive = true;
         selectionBoxStartX = screenX;
@@ -1190,6 +1241,7 @@ public class NodeGraph {
     }
 
     public boolean copySelectedNodeToClipboard() {
+        pruneSelectionToCurrentNodes();
         if (selectedNodes.isEmpty()) {
             return false;
         }
@@ -1202,6 +1254,7 @@ public class NodeGraph {
     }
 
     public Node duplicateSelectedNode() {
+        pruneSelectionToCurrentNodes();
         if (selectedNodes.isEmpty()) {
             return null;
         }
@@ -1218,6 +1271,7 @@ public class NodeGraph {
     }
 
     public Node pasteClipboardNode() {
+        pruneSelectionToCurrentNodes();
         if (clipboardNodeSnapshot == null) {
             return null;
         }
@@ -1229,6 +1283,7 @@ public class NodeGraph {
     }
 
     public boolean deleteSelectedNode() {
+        pruneSelectionToCurrentNodes();
         if (selectedNodes.isEmpty()) {
             return false;
         }
