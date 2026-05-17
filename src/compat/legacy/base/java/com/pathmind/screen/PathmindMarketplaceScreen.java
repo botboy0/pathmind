@@ -545,8 +545,6 @@ public class PathmindMarketplaceScreen extends Screen {
                 myPresetsFilter == MyPresetsFilter.PRIVATE);
         }
 
-        int resultRowY = myPresetsOnly ? layout.searchFieldY + SORT_BUTTON_HEIGHT + 6 : layout.resultRowY;
-
         int resultCount = getCurrentResultCount();
         String resultLabel = loading
             ? "Loading..."
@@ -554,8 +552,8 @@ public class PathmindMarketplaceScreen extends Screen {
                 ? resultCount + " author" + (resultCount == 1 ? "" : "s")
                 : resultCount + " result" + (resultCount == 1 ? "" : "s");
         int resultWidth = this.textRenderer.getWidth(resultLabel);
-        int resultX = Math.max(layout.searchFieldX, layout.refreshButtonX - resultWidth - 6);
-        context.drawTextWithShadow(this.textRenderer, Text.literal(resultLabel), resultX, resultRowY + 5, UITheme.TEXT_SECONDARY);
+        int resultX = Math.max(layout.sortButtonX + SORT_BUTTON_WIDTH + 8, layout.refreshButtonX - resultWidth - 6);
+        context.drawTextWithShadow(this.textRenderer, Text.literal(resultLabel), resultX, layout.searchFieldY + 5, UITheme.TEXT_SECONDARY);
 
         boolean refreshHovered = isPointInRect(mouseX, mouseY, layout.refreshButtonX, layout.refreshButtonY, REFRESH_BUTTON_SIZE, REFRESH_BUTTON_SIZE);
         drawIconButton(context, layout.refreshButtonX, layout.refreshButtonY, REFRESH_BUTTON_SIZE, REFRESH_BUTTON_SIZE, refreshHovered, loading);
@@ -702,9 +700,7 @@ public class PathmindMarketplaceScreen extends Screen {
         boolean popupInteractive = interactive && usePopupViewportState;
         PreviewGraphModel previewModel = getCachedPreviewGraph(preset);
         if (previewModel == null || previewModel.nodes().isEmpty()) {
-            if (popupInteractive) {
-                requestPreviewGraph(preset);
-            }
+            requestPreviewGraph(preset);
             drawGraphPreview(context, x, y, width, height, popupInteractive);
             return;
         }
@@ -719,6 +715,10 @@ public class PathmindMarketplaceScreen extends Screen {
             float viewScale = Math.max(0.18f, Math.min(1f, fitScale)) * popupPreviewZoom;
             float offsetX = x + width / 2f - (bounds.minX() + bounds.width() / 2f) * viewScale + panX;
             float offsetY = y + height / 2f - (bounds.minY() + bounds.height() / 2f) * viewScale + panY;
+            float visibleLeft = (x + 1 - offsetX) / viewScale;
+            float visibleTop = (y + 1 - offsetY) / viewScale;
+            float visibleRight = (x + width - 1 - offsetX) / viewScale;
+            float visibleBottom = (y + height - 1 - offsetY) / viewScale;
             context.enableScissor(x + 1, y + 1, x + width - 1, y + height - 1);
             Object matrices = context.getMatrices();
             MatrixStackBridge.push(matrices);
@@ -734,17 +734,27 @@ public class PathmindMarketplaceScreen extends Screen {
                 int inputSocket = Math.max(0, connection.getInputSocket());
                 int safeOutputSocket = Math.min(outputSocket, Math.max(0, from.getOutputSocketCount() - 1));
                 int safeInputSocket = Math.min(inputSocket, Math.max(0, to.getInputSocketCount() - 1));
+                int startX = from.getSocketX(false);
+                int startY = from.getSocketY(safeOutputSocket, false);
+                int endX = to.getSocketX(true);
+                int endY = to.getSocketY(safeInputSocket, true);
+                if (!isPreviewConnectionVisible(startX, startY, endX, endY, visibleLeft, visibleTop, visibleRight, visibleBottom)) {
+                    continue;
+                }
                 drawPreviewConnection(
                     context,
-                    from.getSocketX(false),
-                    from.getSocketY(safeOutputSocket, false),
-                    to.getSocketX(true),
-                    to.getSocketY(safeInputSocket, true),
+                    startX,
+                    startY,
+                    endX,
+                    endY,
                     from.getOutputSocketColor(safeOutputSocket),
                     true
                 );
             }
             for (Node node : previewModel.nodes()) {
+                if (!isPreviewNodeVisible(node, visibleLeft, visibleTop, visibleRight, visibleBottom)) {
+                    continue;
+                }
                 renderPreviewNode(context, node, 0f, 0f, 1f, true, true);
             }
             MatrixStackBridge.pop(matrices);
@@ -754,6 +764,10 @@ public class PathmindMarketplaceScreen extends Screen {
         float viewScale = Math.max(0.08f, Math.min(0.6f, fitScale));
         float offsetX = x + width / 2f - (bounds.minX() + bounds.width() / 2f) * viewScale;
         float offsetY = y + height / 2f - (bounds.minY() + bounds.height() / 2f) * viewScale;
+        float visibleLeft = (x + 1 - offsetX) / viewScale;
+        float visibleTop = (y + 1 - offsetY) / viewScale;
+        float visibleRight = (x + width - 1 - offsetX) / viewScale;
+        float visibleBottom = (y + height - 1 - offsetY) / viewScale;
 
         context.enableScissor(x + 1, y + 1, x + width - 1, y + height - 1);
         Object matrices = context.getMatrices();
@@ -770,22 +784,59 @@ public class PathmindMarketplaceScreen extends Screen {
             int inputSocket = Math.max(0, connection.getInputSocket());
             int safeOutputSocket = Math.min(outputSocket, Math.max(0, from.getOutputSocketCount() - 1));
             int safeInputSocket = Math.min(inputSocket, Math.max(0, to.getInputSocketCount() - 1));
+            int startX = from.getSocketX(false);
+            int startY = from.getSocketY(safeOutputSocket, false);
+            int endX = to.getSocketX(true);
+            int endY = to.getSocketY(safeInputSocket, true);
+            if (!isPreviewConnectionVisible(startX, startY, endX, endY, visibleLeft, visibleTop, visibleRight, visibleBottom)) {
+                continue;
+            }
             drawPreviewConnection(
                 context,
-                from.getSocketX(false),
-                from.getSocketY(safeOutputSocket, false),
-                to.getSocketX(true),
-                to.getSocketY(safeInputSocket, true),
+                startX,
+                startY,
+                endX,
+                endY,
                 from.getOutputSocketColor(safeOutputSocket),
                 false
             );
         }
 
         for (Node node : previewModel.nodes()) {
+            if (!isPreviewNodeVisible(node, visibleLeft, visibleTop, visibleRight, visibleBottom)) {
+                continue;
+            }
             renderPreviewNode(context, node, 0f, 0f, 1f, true, false);
         }
         MatrixStackBridge.pop(matrices);
         disableScissorSafely(context);
+    }
+
+    private boolean isPreviewNodeVisible(Node node, float visibleLeft, float visibleTop, float visibleRight, float visibleBottom) {
+        if (node == null) {
+            return false;
+        }
+        float nodeLeft = node.getX();
+        float nodeTop = node.getY();
+        float nodeRight = nodeLeft + Math.max(18, node.getWidth());
+        float nodeBottom = nodeTop + Math.max(14, node.getHeight());
+        return nodeRight >= visibleLeft
+            && nodeLeft <= visibleRight
+            && nodeBottom >= visibleTop
+            && nodeTop <= visibleBottom;
+    }
+
+    private boolean isPreviewConnectionVisible(int startX, int startY, int endX, int endY,
+                                               float visibleLeft, float visibleTop, float visibleRight, float visibleBottom) {
+        float padding = 24f;
+        float minX = Math.min(startX, endX) - padding;
+        float maxX = Math.max(startX, endX) + padding;
+        float minY = Math.min(startY, endY) - padding;
+        float maxY = Math.max(startY, endY) + padding;
+        return maxX >= visibleLeft
+            && minX <= visibleRight
+            && maxY >= visibleTop
+            && minY <= visibleBottom;
     }
 
     private void drawPreviewConnection(DrawContext context, int startX, int startY, int endX, int endY, int color, boolean popup) {
@@ -4263,8 +4314,8 @@ public class PathmindMarketplaceScreen extends Screen {
         int myPresetsButtonX = bodyX + bodyWidth - MY_PRESETS_BUTTON_WIDTH;
         int myPresetsButtonY = searchFieldY;
         int resultRowY = searchFieldY + SORT_BUTTON_HEIGHT + 6;
-        int refreshButtonX = bodyX + bodyWidth - REFRESH_BUTTON_SIZE;
-        int refreshButtonY = resultRowY;
+        int refreshButtonX = myPresetsButtonX - REFRESH_BUTTON_SIZE - 8;
+        int refreshButtonY = searchFieldY;
         int accountButtonX = this.width - OUTER_PADDING - getAccountButtonWidth();
         int accountButtonY = topBarY + 2;
 

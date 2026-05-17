@@ -668,14 +668,35 @@ final class NodeInventoryCommandExecutor {
         Node counterpart = getAttachedParameter(parameterSlotIndex == 0 ? 1 : 0);
         if (counterpart != null && counterpart.getType() != NodeType.PARAM_ITEM) {
             SlotSelectionType counterpartSelection = resolveInventorySlotSelectionType(counterpart);
-            return counterpartSelection == SlotSelectionType.GUI_CONTAINER
-                ? SlotSelectionType.PLAYER_INVENTORY
-                : SlotSelectionType.GUI_CONTAINER;
+            if (counterpartSelection == SlotSelectionType.GUI_CONTAINER) {
+                return SlotSelectionType.PLAYER_INVENTORY;
+            }
+            return hasOpenGuiContainer()
+                ? SlotSelectionType.GUI_CONTAINER
+                : SlotSelectionType.PLAYER_INVENTORY;
         }
 
         return parameterSlotIndex == 0
             ? SlotSelectionType.PLAYER_INVENTORY
             : resolveInventorySlotSelectionType(parameterNode);
+    }
+
+    private boolean hasOpenGuiContainer() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.player == null) {
+            return false;
+        }
+        ScreenHandler handler = client.player.currentScreenHandler;
+        if (handler == null || handler instanceof PlayerScreenHandler) {
+            return false;
+        }
+        for (int i = 0; i < handler.slots.size(); i++) {
+            Slot slot = handler.getSlot(i);
+            if (slot != null && isSlotInSelectionType(slot, SlotSelectionType.GUI_CONTAINER)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     SlotSelectionType resolveInventorySlotSelectionType(Node parameterNode) {
@@ -991,7 +1012,7 @@ final class NodeInventoryCommandExecutor {
             if (selectionType == SlotSelectionType.GUI_CONTAINER && handler != null) {
                 for (int i = 0; i < handler.slots.size(); i++) {
                     Slot slot = handler.getSlot(i);
-                    if (slot != null && !slot.getStack().isEmpty()) {
+                    if (slot != null && !slot.getStack().isEmpty() && isSlotInSelectionType(slot, selectionType)) {
                         foundSlot = i;
                         break;
                     }
@@ -1011,7 +1032,10 @@ final class NodeInventoryCommandExecutor {
                 // Search through all handler slots
                 for (int i = 0; i < handler.slots.size(); i++) {
                     Slot slot = handler.getSlot(i);
-                    if (slot != null && !slot.getStack().isEmpty() && slot.getStack().isOf(candidateItem)) {
+                    if (slot != null
+                        && !slot.getStack().isEmpty()
+                        && isSlotInSelectionType(slot, selectionType)
+                        && slot.getStack().isOf(candidateItem)) {
                         foundSlot = i;
                         break;
                     }
