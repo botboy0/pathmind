@@ -382,9 +382,8 @@ final class NodeVariableListCommandExecutor {
 
             List<BlockPos> positions = owner.findBlocksWithinRange(client, blocks, searchRadius);
             if (positions.isEmpty()) {
-                if (storeRuntimeList(listName, NodeType.PARAM_COORDINATE, Collections.emptyList(), client, future)) {
-                    NodeExecutionCompletion.complete(future);
-                }
+                NodeExecutionCompletion.fail(owner, client, future,
+                    "No matching blocks found nearby for " + owner.getType().getDisplayName() + ".");
                 return;
             }
             if (isCreateListBlockCapEnabled() && positions.size() > getCreateListMaxBlocks()) {
@@ -508,9 +507,8 @@ final class NodeVariableListCommandExecutor {
             GuiSelectionMode guiMode = GuiSelectionMode.fromId(Node.getParameterString(parameterNode, "GUI"));
             List<String> entries = collectGuiListEntries(handler, guiMode);
             if (entries.isEmpty()) {
-                if (storeRuntimeList(listName, parameterType, Collections.emptyList(), client, future)) {
-                    NodeExecutionCompletion.complete(future);
-                }
+                NodeExecutionCompletion.fail(owner, client, future,
+                    "No matching GUI slots found for " + owner.getType().getDisplayName() + ".");
                 return;
             }
 
@@ -545,13 +543,6 @@ final class NodeVariableListCommandExecutor {
                 }
             }
 
-            if (parameterType == NodeType.PARAM_ITEM || parameterType == NodeType.PARAM_PLAYER) {
-                if (storeRuntimeList(listName, parameterType, Collections.emptyList(), client, future)) {
-                    NodeExecutionCompletion.complete(future);
-                }
-                return;
-            }
-
             NodeExecutionCompletion.fail(owner, client, future,
                 "No matching targets found nearby for " + owner.getType().getDisplayName() + ".");
             return;
@@ -576,20 +567,6 @@ final class NodeVariableListCommandExecutor {
         manager.setRuntimeList(startNode, listName.trim(),
             new ExecutionManager.RuntimeList(parameterType, entries));
         NodeExecutionCompletion.complete(future);
-    }
-
-    private boolean storeRuntimeList(String listName, NodeType elementType, List<String> entries,
-                                     net.minecraft.client.MinecraftClient client, CompletableFuture<Void> future) {
-        ExecutionManager manager = ExecutionManager.getInstance();
-        Node startNode = owner.resolveExecutionStartNode();
-        if (startNode == null) {
-            NodeExecutionCompletion.fail(owner, client, future,
-                "No active node tree available for list creation.");
-            return false;
-        }
-        manager.setRuntimeList(startNode, listName.trim(),
-            new ExecutionManager.RuntimeList(elementType, entries));
-        return true;
     }
 
     static boolean isCreateListCollectionTarget(NodeType parameterType) {
