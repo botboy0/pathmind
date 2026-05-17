@@ -395,8 +395,8 @@ public class Node {
         LOOK_ORIENTATION
     }
     
-    private static final Set<String> MOVE_ITEM_SOURCE_KEYS = createParameterKeySet("SourceSlot", "FirstSlot");
-    private static final Set<String> MOVE_ITEM_TARGET_KEYS = createParameterKeySet("TargetSlot", "SecondSlot");
+    private static final Set<String> MOVE_ITEM_SOURCE_KEYS = createParameterKeySet("SourceSlot", "FirstSlot", "Count", "Amount");
+    private static final Set<String> MOVE_ITEM_TARGET_KEYS = createParameterKeySet("TargetSlot", "SecondSlot", "Count", "Amount");
     private static final Set<String> PLACE_POSITION_BLOCK_KEYS = createParameterKeySet("Block", "Blocks", "BlockId");
     private static final Set<String> HOTBAR_INVENTORY_SLOT_ITEM_KEYS = createParameterKeySet("Item", "Items", "Count", "Amount");
     private static final String PARAM_ID_BOOLEAN_MODE = "boolean_mode";

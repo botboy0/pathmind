@@ -50,6 +50,20 @@ class NodeAttachmentsTest {
     }
 
     @Test
+    void moveItemKeepsConfiguredAmountWhenSourceParameterExportsCount() {
+        Node moveItem = new Node(NodeType.MOVE_ITEM, 0, 0);
+        moveItem.setParameterValueAndPropagate("Count", "7");
+
+        Node item = new Node(NodeType.PARAM_ITEM, 0, 0);
+        item.setParameterValueAndPropagate("Item", "minecraft:stone");
+        item.setParameterValueAndPropagate("Amount", "32");
+
+        assertTrue(moveItem.attachParameter(item, 0));
+
+        assertEquals("7", moveItem.getParameter("Count").getStringValue());
+    }
+
+    @Test
     void detachingSensorClearsBothSidesOfRelationship() {
         Node control = new Node(NodeType.CONTROL_IF, 0, 0);
         Node sensor = new Node(NodeType.SENSOR_IS_DAYTIME, 0, 0);

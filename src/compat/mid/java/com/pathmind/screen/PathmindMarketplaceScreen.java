@@ -45,6 +45,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -55,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -92,6 +94,7 @@ public class PathmindMarketplaceScreen extends Screen {
     private static final int AUTHOR_ROW_HEIGHT = 42;
     private static final int AUTHOR_ROW_GAP = 8;
     private static final int ACCOUNT_BUTTON_MIN_WIDTH = SORT_BUTTON_HEIGHT;
+    private static final int MAX_CONCURRENT_PREVIEW_GRAPH_REQUESTS = 3;
     private static final HttpClient AVATAR_HTTP_CLIENT = HttpClient.newHttpClient();
 
     private final Screen parent;
@@ -149,6 +152,8 @@ public class PathmindMarketplaceScreen extends Screen {
     private final Set<String> authorDirectoryAvatarLoading = new HashSet<>();
     private final Map<String, PreviewGraphModel> previewGraphCache = new HashMap<>();
     private final Set<String> previewGraphLoading = new HashSet<>();
+    private final Queue<MarketplacePreset> previewGraphQueue = new ArrayDeque<>();
+    private final Set<String> previewGraphQueued = new HashSet<>();
     private final Map<String, Long> likePulseEndTimes = new HashMap<>();
     private final Map<String, Long> savePulseEndTimes = new HashMap<>();
     private final Map<String, Long> deletePulseEndTimes = new HashMap<>();
@@ -432,7 +437,9 @@ public class PathmindMarketplaceScreen extends Screen {
         } else {
             galleryMetrics = getGalleryScrollMetrics(layout);
             galleryScrollOffset = ScrollbarHelper.clampScroll(galleryScrollOffset, galleryMetrics.maxScroll());
-            for (int index = 0; index < presets.size(); index++) {
+            int firstVisibleIndex = getFirstVisibleCardIndex(layout, galleryScrollOffset);
+            int lastVisibleIndex = getLastVisibleCardIndex(layout, galleryScrollOffset);
+            for (int index = firstVisibleIndex; index <= lastVisibleIndex; index++) {
                 Rect rect = getCardRect(layout, index, galleryScrollOffset);
                 if (rect.y + rect.height < bodyY || rect.y > bodyY + bodyHeight) {
                     continue;
@@ -535,7 +542,7 @@ public class PathmindMarketplaceScreen extends Screen {
 
     private void renderPresetCard(DrawContext context, int mouseX, int mouseY, Rect rect, MarketplacePreset preset, boolean selected) {
         boolean hovered = isPointInRect(mouseX, mouseY, rect.x, rect.y, rect.width, rect.height);
-        float hoverProgress = HoverAnimator.getProgress("marketplace-card:" + preset.getId(), hovered);
+        float hoverProgress = hovered ? 1f : selected ? 0.55f : 0f;
         int bgColor = hoverProgress > 0.001f
             ? AnimationHelper.lerpColor(UITheme.BACKGROUND_TERTIARY, UITheme.TOOLBAR_BG_HOVER, hoverProgress * 0.45f)
             : UITheme.BACKGROUND_TERTIARY;
@@ -556,7 +563,7 @@ public class PathmindMarketplaceScreen extends Screen {
             UITheme.BORDER_SUBTLE,
             UITheme.PANEL_INNER_BORDER
         );
-        renderGraphPreviewSurface(context, previewX, previewY, previewWidth, previewHeight, preset, true, false, 0f, 0f);
+        renderGraphPreviewSurface(context, previewX, previewY, previewWidth, previewHeight, preset, false, false, 0f, 0f);
 
         int deleteX = previewX + previewWidth - 14;
         int deleteY = previewY + 2;
@@ -673,12 +680,14 @@ public class PathmindMarketplaceScreen extends Screen {
         boolean popupInteractive = interactive && usePopupViewportState;
         PreviewGraphModel previewModel = getCachedPreviewGraph(preset);
         if (previewModel == null || previewModel.nodes().isEmpty()) {
-            requestPreviewGraph(preset);
+            if (popupInteractive) {
+                requestPreviewGraph(preset);
+            }
             drawGraphPreview(context, x, y, width, height, popupInteractive);
             return;
         }
 
-        GraphBounds bounds = GraphBounds.of(previewModel.nodes());
+        GraphBounds bounds = previewModel.bounds();
         float horizontalPadding = popupInteractive ? 22f : 16f;
         float verticalPadding = popupInteractive ? 20f : 14f;
         float scaleX = bounds.width() <= 0 ? 1f : Math.max(0.01f, (width - horizontalPadding) / bounds.width());
@@ -759,7 +768,8 @@ public class PathmindMarketplaceScreen extends Screen {
 
     private void drawPreviewConnection(DrawContext context, int startX, int startY, int endX, int endY, int color, boolean popup) {
         int resolvedColor = popup ? presetPopupAnimation.getAnimatedPopupColor(color) : color;
-        int steps = Math.max(8, Math.max(Math.abs(endX - startX), Math.abs(endY - startY)) / 8);
+        int distance = Math.max(Math.abs(endX - startX), Math.abs(endY - startY));
+        int steps = popup ? Math.max(8, distance / 8) : Math.min(14, Math.max(4, distance / 28));
         float controlOffset = Math.max(18f, Math.abs(endX - startX) * 0.33f);
         for (int i = 0; i <= steps; i++) {
             float t = i / (float) steps;
@@ -918,21 +928,47 @@ public class PathmindMarketplaceScreen extends Screen {
     }
 
     private void requestPreviewGraph(MarketplacePreset preset) {
-        if (preset == null || preset.getId() == null || previewGraphCache.containsKey(preset.getId()) || previewGraphLoading.contains(preset.getId())) {
+        String presetId = preset == null ? null : preset.getId();
+        if (presetId == null || previewGraphCache.containsKey(presetId) || previewGraphLoading.contains(presetId) || previewGraphQueued.contains(presetId)) {
             return;
         }
-        previewGraphLoading.add(preset.getId());
+        if (previewGraphLoading.size() >= MAX_CONCURRENT_PREVIEW_GRAPH_REQUESTS) {
+            previewGraphQueue.add(preset);
+            previewGraphQueued.add(presetId);
+            return;
+        }
+        startPreviewGraphRequest(preset, presetId);
+    }
+
+    private void startPreviewGraphRequest(MarketplacePreset preset, String presetId) {
+        previewGraphLoading.add(presetId);
         MarketplaceService.fetchPresetGraphData(preset, authSession == null ? null : authSession.getAccessToken()).whenComplete((graphData, throwable) -> {
             if (this.client == null) {
                 return;
             }
             this.client.execute(() -> {
-                previewGraphLoading.remove(preset.getId());
+                previewGraphLoading.remove(presetId);
                 if (throwable == null && graphData != null) {
-                    previewGraphCache.put(preset.getId(), buildPreviewGraphModel(graphData));
+                    previewGraphCache.put(presetId, buildPreviewGraphModel(graphData));
                 }
+                drainPreviewGraphQueue();
             });
         });
+    }
+
+    private void drainPreviewGraphQueue() {
+        while (previewGraphLoading.size() < MAX_CONCURRENT_PREVIEW_GRAPH_REQUESTS && !previewGraphQueue.isEmpty()) {
+            MarketplacePreset queuedPreset = previewGraphQueue.poll();
+            String queuedPresetId = queuedPreset == null ? null : queuedPreset.getId();
+            if (queuedPresetId == null) {
+                continue;
+            }
+            previewGraphQueued.remove(queuedPresetId);
+            if (previewGraphCache.containsKey(queuedPresetId) || previewGraphLoading.contains(queuedPresetId)) {
+                continue;
+            }
+            startPreviewGraphRequest(queuedPreset, queuedPresetId);
+        }
     }
 
     private void invalidatePreviewGraph(MarketplacePreset preset) {
@@ -941,6 +977,8 @@ public class PathmindMarketplaceScreen extends Screen {
         }
         previewGraphCache.remove(preset.getId());
         previewGraphLoading.remove(preset.getId());
+        previewGraphQueued.remove(preset.getId());
+        previewGraphQueue.removeIf(queuedPreset -> preset.getId().equals(queuedPreset.getId()));
     }
 
     private PreviewGraphModel buildPreviewGraphModel(NodeGraphData graphData) {
@@ -952,7 +990,8 @@ public class PathmindMarketplaceScreen extends Screen {
         List<NodeGraphData.ConnectionData> connections = graphData.getConnections() == null
             ? List.of()
             : List.copyOf(graphData.getConnections());
-        return new PreviewGraphModel(List.copyOf(rebuiltNodes), connections, nodeLookup);
+        List<Node> nodes = List.copyOf(rebuiltNodes);
+        return new PreviewGraphModel(nodes, connections, nodeLookup, GraphBounds.of(nodes));
     }
 
     private void drawGalleryBackdrop(DrawContext context, int x, int y, int width, int height) {
@@ -1993,7 +2032,9 @@ public class PathmindMarketplaceScreen extends Screen {
             int headerHeight = getSectionHeaderHeight();
             int viewportTop = layout.sectionY + headerHeight;
             int viewportBottom = viewportTop + layout.sectionHeight - headerHeight - FOOTER_HEIGHT;
-            for (int index = 0; index < presets.size(); index++) {
+            int firstVisibleIndex = getFirstVisibleCardIndex(layout, galleryScrollOffset);
+            int lastVisibleIndex = getLastVisibleCardIndex(layout, galleryScrollOffset);
+            for (int index = firstVisibleIndex; index <= lastVisibleIndex; index++) {
                 Rect rect = getCardRect(layout, index, galleryScrollOffset);
                 if (rect.y + rect.height < viewportTop || rect.y > viewportBottom) continue;
                 MarketplacePreset preset = presets.get(index);
@@ -3931,7 +3972,7 @@ public class PathmindMarketplaceScreen extends Screen {
 
     private void drawAnimatedDeleteIcon(DrawContext context, int x, int y, MarketplacePreset preset, boolean popup, boolean hovered) {
         float pulse = getIconPulse(deletePulseEndTimes, preset);
-        float hoverFlash = getIconHoverFlash("delete:" + (popup ? "popup:" : "card:") + preset.getId(), hovered);
+        float hoverFlash = getIconHoverFlash(hovered, popup);
         float intensity = Math.max(pulse, hoverFlash);
         boolean pending = isDeletePending(preset);
         int baseColor = pending ? UITheme.TEXT_TERTIARY : UITheme.STATE_ERROR;
@@ -3950,7 +3991,7 @@ public class PathmindMarketplaceScreen extends Screen {
 
     private void drawAnimatedHeartIcon(DrawContext context, int x, int y, MarketplacePreset preset, boolean liked, boolean popup, boolean hovered) {
         float pulse = getIconPulse(likePulseEndTimes, preset);
-        float hoverFlash = getIconHoverFlash("heart:" + (popup ? "popup:" : "card:") + preset.getId(), hovered);
+        float hoverFlash = getIconHoverFlash(hovered, popup);
         float intensity = Math.max(pulse, hoverFlash);
         boolean pending = isLikePending(preset);
         int baseColor = pending ? UITheme.TEXT_TERTIARY : liked ? UITheme.MARKETPLACE_LIKE : UITheme.TEXT_TERTIARY;
@@ -3969,7 +4010,7 @@ public class PathmindMarketplaceScreen extends Screen {
 
     private void drawAnimatedBookmarkIcon(DrawContext context, int x, int y, MarketplacePreset preset, boolean saved, boolean popup, boolean hovered) {
         float pulse = getIconPulse(savePulseEndTimes, preset);
-        float hoverFlash = getIconHoverFlash("bookmark:" + (popup ? "popup:" : "card:") + preset.getId(), hovered);
+        float hoverFlash = getIconHoverFlash(hovered, popup);
         float intensity = Math.max(pulse, hoverFlash);
         int baseColor = saved ? UITheme.MARKETPLACE_SAVE : UITheme.TEXT_TERTIARY;
         int color = popup ? presetPopupAnimation.getAnimatedPopupColor(baseColor) : baseColor;
@@ -3985,13 +4026,12 @@ public class PathmindMarketplaceScreen extends Screen {
         drawBookmarkIcon(context, x, y, color);
     }
 
-    private float getIconHoverFlash(String key, boolean hovered) {
-        float hoverProgress = HoverAnimator.getProgress("marketplace-icon:" + key, hovered);
-        if (hoverProgress <= 0.001f) {
+    private float getIconHoverFlash(boolean hovered, boolean popup) {
+        if (!hovered) {
             return 0f;
         }
         float cycle = 0.5f + 0.5f * (float) Math.sin(System.currentTimeMillis() / 120.0);
-        return hoverProgress * (0.18f + cycle * 0.14f);
+        return (popup ? 0.22f : 0.16f) + cycle * (popup ? 0.12f : 0.08f);
     }
 
     private boolean isLikePending(MarketplacePreset preset) {
@@ -4192,6 +4232,28 @@ public class PathmindMarketplaceScreen extends Screen {
 
     private int getCardsPerPage(Layout layout) {
         return PRESET_GRID_COLUMNS * PRESET_GRID_ROWS;
+    }
+
+    private int getFirstVisibleCardIndex(Layout layout, int scrollOffset) {
+        if (presets.isEmpty()) {
+            return 0;
+        }
+        int columns = Math.max(1, getGridColumns());
+        int firstRow = Math.max(0, (scrollOffset - CARD_SIZE) / (CARD_SIZE + CARD_GAP));
+        int firstIndex = firstRow * columns;
+        return Math.max(0, Math.min(firstIndex, presets.size() - 1));
+    }
+
+    private int getLastVisibleCardIndex(Layout layout, int scrollOffset) {
+        if (presets.isEmpty()) {
+            return -1;
+        }
+        int columns = Math.max(1, getGridColumns());
+        int headerHeight = getSectionHeaderHeight();
+        int bodyHeight = layout.sectionHeight - headerHeight - FOOTER_HEIGHT;
+        int lastRow = Math.max(0, (scrollOffset + bodyHeight + CARD_SIZE) / (CARD_SIZE + CARD_GAP));
+        int lastIndex = (lastRow + 1) * columns - 1;
+        return Math.max(0, Math.min(lastIndex, presets.size() - 1));
     }
 
     private int getAuthorEntriesPerPage(Layout layout) {
@@ -4775,7 +4837,8 @@ public class PathmindMarketplaceScreen extends Screen {
     private record PreviewGraphModel(
         List<Node> nodes,
         List<NodeGraphData.ConnectionData> connections,
-        Map<String, Node> nodeLookup
+        Map<String, Node> nodeLookup,
+        GraphBounds bounds
     ) {
     }
 
