@@ -1303,15 +1303,13 @@ public class Node {
                     : NodeType.LIST_ITEM;
             }
             case SENSOR_POSITION_OF -> isSensorPositionSingleAxisMode() ? NodeType.PARAM_AMOUNT : NodeType.PARAM_COORDINATE;
-            case SENSOR_DISTANCE_BETWEEN -> NodeType.PARAM_DISTANCE;
+            case SENSOR_DISTANCE_BETWEEN, SENSOR_IS_ON_GROUND -> NodeType.PARAM_DISTANCE;
             case SENSOR_TARGETED_BLOCK_FACE -> NodeType.PARAM_BLOCK_FACE;
             case SENSOR_TARGETED_BLOCK -> NodeType.PARAM_BLOCK;
             case SENSOR_TARGETED_ENTITY -> NodeType.PARAM_ENTITY;
             case SENSOR_LOOK_DIRECTION -> isSensorLookSingleAxisMode() ? NodeType.PARAM_AMOUNT : NodeType.PARAM_ROTATION;
             case SENSOR_CURRENT_HAND -> NodeType.PARAM_INVENTORY_SLOT;
-            case SENSOR_IS_ON_GROUND -> NodeType.PARAM_DISTANCE;
-            case SENSOR_SLOT_ITEM_COUNT -> NodeType.PARAM_AMOUNT;
-            case LIST_LENGTH -> NodeType.PARAM_AMOUNT;
+            case SENSOR_SLOT_ITEM_COUNT, LIST_LENGTH -> NodeType.PARAM_AMOUNT;
             default -> type;
         };
     }
@@ -1776,30 +1774,14 @@ public class Node {
             return "+";
         }
         String lowered = trimmed.toLowerCase(Locale.ROOT);
-        switch (lowered) {
-            case "+":
-            case "add":
-            case "plus":
-                return "+";
-            case "-":
-            case "subtract":
-            case "minus":
-                return "-";
-            case "*":
-            case "x":
-            case "multiply":
-            case "times":
-                return "*";
-            case "/":
-            case "divide":
-                return "/";
-            case "%":
-            case "mod":
-            case "modulo":
-                return "%";
-            default:
-                return "+";
-        }
+        return switch (lowered) {
+            case "+", "add", "plus" -> "+";
+            case "-", "subtract", "minus" -> "-";
+            case "*", "x", "multiply", "times" -> "*";
+            case "/", "divide" -> "/";
+            case "%", "mod", "modulo" -> "%";
+            default -> "+";
+        };
     }
 
     private void ensureAmountToggleParameters() {
@@ -2310,16 +2292,17 @@ public class Node {
         if (values == null || values.isEmpty() || slotIndex < 0) {
             return values;
         }
-        switch (type) {
-            case HOTBAR:
+        return switch (type) {
+            case HOTBAR -> {
                 if (parameterNode != null && parameterNode.getType() == NodeType.PARAM_INVENTORY_SLOT) {
                     Map<String, String> adjusted = new HashMap<>(filterParameterMap(values, HOTBAR_INVENTORY_SLOT_ITEM_KEYS));
                     adjusted.put("Item", "");
                     adjusted.put(normalizeParameterKey("Item"), "");
-                    return adjusted;
+                    yield adjusted;
                 }
-                break;
-            case CONTROL_REPEAT: {
+                yield values;
+            }
+            case CONTROL_REPEAT -> {
                 if (parameterNode != null) {
                     if (!values.containsKey("Count")) {
                         String fallback = values.get("Amount");
@@ -2333,32 +2316,31 @@ public class Node {
                             Map<String, String> adjusted = new HashMap<>(values);
                             adjusted.put("Count", fallback);
                             adjusted.put(normalizeParameterKey("Count"), fallback);
-                            return adjusted;
+                            yield adjusted;
                         }
                     }
                 }
-                break;
+                yield values;
             }
-            case MOVE_ITEM:
+            case MOVE_ITEM -> {
                 if (slotIndex == 0) {
-                    return filterParameterMap(values, MOVE_ITEM_TARGET_KEYS);
+                    yield filterParameterMap(values, MOVE_ITEM_TARGET_KEYS);
                 } else if (slotIndex == 1) {
-                    return filterParameterMap(values, MOVE_ITEM_SOURCE_KEYS);
+                    yield filterParameterMap(values, MOVE_ITEM_SOURCE_KEYS);
                 }
-                break;
-            case PLACE:
-            case PLACE_HAND:
+                yield values;
+            }
+            case PLACE, PLACE_HAND -> {
                 if (slotIndex == 1 && parameterNode != null) {
                     NodeType parameterType = parameterNode.getType();
                     if (parameterType == NodeType.PARAM_BLOCK || parameterType == NodeType.PARAM_PLACE_TARGET) {
-                        return filterParameterMap(values, PLACE_POSITION_BLOCK_KEYS);
+                        yield filterParameterMap(values, PLACE_POSITION_BLOCK_KEYS);
                     }
                 }
-                break;
-            default:
-                break;
-        }
-        return values;
+                yield values;
+            }
+            default -> values;
+        };
     }
     
     private Map<String, String> filterParameterMap(Map<String, String> values, Set<String> keysToRemove) {
@@ -2430,62 +2412,48 @@ public class Node {
         if (!canAcceptParameterAt(slotIndex)) {
             return EnumSet.noneOf(ParameterUsage.class);
         }
-        switch (type) {
-            case GOTO:
-            case TRAVEL:
-            case GOAL:
-            case BUILD:
-            case EXPLORE:
-            case FOLLOW:
-            case PATH:
-            case INTERACT:
+        return switch (type) {
+            case GOTO, TRAVEL, GOAL, BUILD, EXPLORE, FOLLOW, PATH, INTERACT -> {
                 if (type == NodeType.GOTO || type == NodeType.TRAVEL || type == NodeType.GOAL) {
-                    return EnumSet.of(ParameterUsage.POSITION, ParameterUsage.LOOK_ORIENTATION);
+                    yield EnumSet.of(ParameterUsage.POSITION, ParameterUsage.LOOK_ORIENTATION);
                 }
-                return EnumSet.of(ParameterUsage.POSITION);
-            case LOOK:
-                return EnumSet.of(ParameterUsage.LOOK_ORIENTATION, ParameterUsage.POSITION);
-            case WALK:
+                yield EnumSet.of(ParameterUsage.POSITION);
+            }
+            case LOOK -> EnumSet.of(ParameterUsage.LOOK_ORIENTATION, ParameterUsage.POSITION);
+            case WALK -> {
                 if (slotIndex == 0) {
-                    return EnumSet.of(ParameterUsage.LOOK_ORIENTATION);
+                    yield EnumSet.of(ParameterUsage.LOOK_ORIENTATION);
                 }
-                return EnumSet.noneOf(ParameterUsage.class);
-            case BREAK:
-                return EnumSet.of(ParameterUsage.POSITION);
-            case PLACE:
+                yield EnumSet.noneOf(ParameterUsage.class);
+            }
+            case BREAK -> EnumSet.of(ParameterUsage.POSITION);
+            case PLACE, PLACE_HAND -> {
                 if (slotIndex == 0 || slotIndex == 1) {
-                    return EnumSet.of(ParameterUsage.POSITION);
+                    yield EnumSet.of(ParameterUsage.POSITION);
                 }
-                break;
-            case PLACE_HAND:
-                if (slotIndex == 0 || slotIndex == 1) {
-                    return EnumSet.of(ParameterUsage.POSITION);
-                }
-                break;
-            default:
-                break;
-        }
-        return EnumSet.noneOf(ParameterUsage.class);
+                yield EnumSet.noneOf(ParameterUsage.class);
+            }
+            default -> EnumSet.noneOf(ParameterUsage.class);
+        };
     }
 
     private boolean parameterSupportsUsage(NodeType parameterType, ParameterUsage usage) {
         if (parameterType == null || usage == null) {
             return false;
         }
-        switch (usage) {
-            case POSITION:
-                return parameterProvidesCoordinates(parameterType);
-            case LOOK_ORIENTATION:
+        return switch (usage) {
+            case POSITION -> parameterProvidesCoordinates(parameterType);
+            case LOOK_ORIENTATION -> {
                 if (parameterProvidesCoordinates(parameterType)) {
-                    return true;
+                    yield true;
                 }
                 EnumSet<NodeValueTrait> traits = NodeTraitRegistry.getProvidedTraits(parameterType);
-                return traits.contains(NodeValueTrait.DIRECTION)
+                yield traits.contains(NodeValueTrait.DIRECTION)
                     || traits.contains(NodeValueTrait.ROTATION)
                     || (type == NodeType.LOOK && traits.contains(NodeValueTrait.NUMBER));
-            default:
-                return false;
-        }
+            }
+            default -> false;
+        };
     }
 
     public boolean canAcceptActionNode(Node node) {
@@ -2766,7 +2734,7 @@ public class Node {
         }
 
         switch (type) {
-            case LIST_LENGTH: {
+            case LIST_LENGTH -> {
                 Optional<Integer> length = resolveListLengthValue(this);
                 String amount = length.map(String::valueOf).orElse("0");
                 values.put("Amount", amount);
@@ -2777,16 +2745,14 @@ public class Node {
                 values.put(normalizeParameterKey("Threshold"), amount);
                 values.put("Value", amount);
                 values.put(normalizeParameterKey("Value"), amount);
-                break;
             }
-            case LIST_ITEM: {
+            case LIST_ITEM -> {
                 Node resolved = resolveListItemValueNode(this, null, false, null);
                 if (resolved != null) {
                     return resolved.exportParameterValues();
                 }
-                break;
             }
-            case OPERATOR_RANDOM: {
+            case OPERATOR_RANDOM -> {
                 double min = getDoubleParameter("Min", 0.0);
                 double max = getDoubleParameter("Max", 1.0);
                 double randomValue = generateRandomValueWithRounding(min, max);
@@ -2799,9 +2765,8 @@ public class Node {
                 values.put(normalizeParameterKey("Threshold"), value);
                 values.put("Value", value);
                 values.put(normalizeParameterKey("Value"), value);
-                break;
             }
-            case OPERATOR_MOD: {
+            case OPERATOR_MOD -> {
                 double modValue = resolveModValue().orElse(0.0);
                 String value = Double.toString(modValue);
                 values.put("Amount", value);
@@ -2812,9 +2777,8 @@ public class Node {
                 values.put(normalizeParameterKey("Threshold"), value);
                 values.put("Value", value);
                 values.put(normalizeParameterKey("Value"), value);
-                break;
             }
-            case SENSOR_POSITION_OF: {
+            case SENSOR_POSITION_OF -> {
                 Node parameterNode = getAttachedParameter(0);
                 if (parameterNode == null) {
                     break;
@@ -2856,9 +2820,8 @@ public class Node {
                     values.put("Z", zValue);
                     values.put(normalizeParameterKey("Z"), zValue);
                 }
-                break;
             }
-            case SENSOR_DISTANCE_BETWEEN: {
+            case SENSOR_DISTANCE_BETWEEN -> {
                 Node parameterNodeA = getAttachedParameter(0);
                 Node parameterNodeB = getAttachedParameter(1);
                 if (parameterNodeA == null || parameterNodeB == null) {
@@ -2887,9 +2850,8 @@ public class Node {
                 String distanceValue = Double.toString(distance);
                 values.put("Distance", distanceValue);
                 values.put(normalizeParameterKey("Distance"), distanceValue);
-                break;
             }
-            case SENSOR_TARGETED_BLOCK: {
+            case SENSOR_TARGETED_BLOCK -> {
                 Optional<BlockState> targetState = getTargetedBlockState();
                 if (targetState.isEmpty()) {
                     break;
@@ -2908,9 +2870,8 @@ public class Node {
                 }
                 values.put("State", stateValue);
                 values.put(normalizeParameterKey("State"), stateValue);
-                break;
             }
-            case SENSOR_TARGETED_ENTITY: {
+            case SENSOR_TARGETED_ENTITY -> {
                 Optional<Entity> targetedEntity = getTargetedEntity();
                 if (targetedEntity.isEmpty()) {
                     break;
@@ -2958,9 +2919,8 @@ public class Node {
                         values.put(normalizeParameterKey("Pitch"), pitchValue);
                     }
                 }
-                break;
             }
-            case SENSOR_CURRENT_HAND: {
+            case SENSOR_CURRENT_HAND -> {
                 Optional<Integer> currentSlot = getCurrentHotbarSlot();
                 if (currentSlot.isEmpty()) {
                     break;
@@ -2972,9 +2932,8 @@ public class Node {
                 values.put(normalizeParameterKey("SourceSlot"), slotValue);
                 values.put("TargetSlot", slotValue);
                 values.put(normalizeParameterKey("TargetSlot"), slotValue);
-                break;
             }
-            case SENSOR_IS_ON_GROUND: {
+            case SENSOR_IS_ON_GROUND -> {
                 Optional<Double> distanceFromGround = getDistanceFromGround();
                 if (distanceFromGround.isEmpty()) {
                     break;
@@ -2984,9 +2943,8 @@ public class Node {
                 values.put(normalizeParameterKey("Distance"), distanceValue);
                 values.put("Value", distanceValue);
                 values.put(normalizeParameterKey("Value"), distanceValue);
-                break;
             }
-            case SENSOR_TARGETED_BLOCK_FACE: {
+            case SENSOR_TARGETED_BLOCK_FACE -> {
                 Optional<Direction> targetFace = getTargetedBlockFace();
                 if (targetFace.isEmpty()) {
                     break;
@@ -3000,9 +2958,8 @@ public class Node {
                 values.put(normalizeParameterKey("Text"), faceValue);
                 values.put("Message", faceValue);
                 values.put(normalizeParameterKey("Message"), faceValue);
-                break;
             }
-            case SENSOR_SLOT_ITEM_COUNT: {
+            case SENSOR_SLOT_ITEM_COUNT -> {
                 Node slotNode = resolveSensorParameterNode(getAttachedParameter(0), 0);
                 int count = 0;
                 if (slotNode != null && providesTrait(slotNode, NodeValueTrait.INVENTORY_SLOT)) {
@@ -3015,10 +2972,7 @@ public class Node {
                 values.put(normalizeParameterKey("Count"), countValue);
                 values.put("Value", countValue);
                 values.put(normalizeParameterKey("Value"), countValue);
-                break;
             }
-            default:
-                break;
         }
 
         return values;
@@ -4432,28 +4386,26 @@ public class Node {
                 Float yaw = null;
                 Float pitch = null;
                 switch (normalized) {
-                    case "north":
+                    case "north" -> {
                         yaw = 180.0F;
-                        break;
-                    case "south":
+                    }
+                    case "south" -> {
                         yaw = 0.0F;
-                        break;
-                    case "west":
+                    }
+                    case "west" -> {
                         yaw = 90.0F;
-                        break;
-                    case "east":
+                    }
+                    case "east" -> {
                         yaw = -90.0F;
-                        break;
-                    case "up":
+                    }
+                    case "up" -> {
                         yaw = client.player.getYaw();
                         pitch = -90.0F;
-                        break;
-                    case "down":
+                    }
+                    case "down" -> {
                         yaw = client.player.getYaw();
                         pitch = 90.0F;
-                        break;
-                    default:
-                        break;
+                    }
                 }
                 if (yaw != null) {
                     setParameterIfPresent("Yaw", formatFloat(yaw));
@@ -5454,255 +5406,84 @@ public class Node {
      */
     private void executeNodeCommand(CompletableFuture<Void> future) {
         switch (type) {
-            case START:
-                // START node doesn't execute any command, just passes through
-                future.complete(null);
-                break;
-            case EVENT_FUNCTION:
-                future.complete(null);
-                break;
-            case EVENT_CALL:
-                future.complete(null);
-                break;
-            case SET_VARIABLE:
-                executeSetVariableCommand(future);
-                break;
-            case CHANGE_VARIABLE:
-                executeChangeVariableCommand(future);
-                break;
+            // START node doesn't execute any command, just passes through
+            case START -> future.complete(null);
+            case EVENT_FUNCTION -> future.complete(null);
+            case EVENT_CALL -> future.complete(null);
+            case SET_VARIABLE -> executeSetVariableCommand(future);
+            case CHANGE_VARIABLE -> executeChangeVariableCommand(future);
 
             // Generalized nodes
-            case GOTO:
-                executeGotoCommand(future);
-                break;
-            case TRAVEL:
-                executeTravelCommand(future);
-                break;
-            case GOAL:
-                executeGoalCommand(future);
-                break;
-            case COLLECT:
-                executeCollectCommand(future);
-                break;
-            case BUILD:
-                executeBuildCommand(future);
-                break;
-            case EXPLORE:
-                executeExploreCommand(future);
-                break;
-            case FOLLOW:
-                executeFollowCommand(future);
-                break;
-            case CONTROL_REPEAT:
-                executeControlRepeat(future);
-                break;
-            case CONTROL_REPEAT_UNTIL:
-                executeControlRepeatUntil(future);
-                break;
-            case CONTROL_WAIT_UNTIL:
-                executeControlWaitUntil(future);
-                break;
-            case CONTROL_FOREVER:
-                executeControlForever(future);
-                break;
-            case CONTROL_IF:
-                executeControlIf(future);
-                break;
-            case CONTROL_IF_ELSE:
-                executeControlIfElse(future);
-                break;
-            case CONTROL_FORK:
-                executeControlFork(future);
-                break;
-            case CONTROL_JOIN_ANY:
-                executeControlJoinAny(future);
-                break;
-            case CONTROL_JOIN_ALL:
-                executeControlJoinAll(future);
-                break;
-            case FARM:
-                executeFarmCommand(future);
-                break;
-            case STOP:
-                executeStopCommand(future);
-                break;
-            case START_CHAIN:
-                executeStartChainNode(future);
-                break;
-            case RUN_PRESET:
-                executeRunPresetNode(future);
-                break;
-            case CUSTOM_NODE:
-            case TEMPLATE:
-                executeRunPresetNode(future);
-                break;
-            case STOP_CHAIN:
-                executeStopChainNode(future);
-                break;
-            case STOP_ALL:
-                executeStopAllNode(future);
-                break;
-            case PLACE:
-                executePlaceCommand(future);
-                break;
-            case CRAFT:
-                executeCraftCommand(future);
-                break;
-            case OPEN_INVENTORY:
-                executePlayerGuiCommand(future, NodeMode.PLAYER_GUI_OPEN);
-                break;
-            case CLOSE_GUI:
-                executePlayerGuiCommand(future, NodeMode.PLAYER_GUI_CLOSE);
-                break;
-            case WRITE_BOOK:
-                executeWriteBookCommand(future);
-                break;
-            case WRITE_SIGN:
-                executeWriteSignCommand(future);
-                break;
-            case UI_UTILS:
-                executeUiUtilsCommand(future);
-                break;
-            case WAIT:
-                executeWaitCommand(future);
-                break;
-            case MESSAGE:
-                executeMessageCommand(future);
-                break;
-            case HOTBAR:
-                executeHotbarCommand(future);
-                break;
-            case DROP_ITEM:
-                executeDropItemCommand(future);
-                break;
-            case DROP_SLOT:
-                executeDropSlotCommand(future);
-                break;
-            case CLICK_SLOT:
-                executeClickSlotCommand(future);
-                break;
-            case CLICK_SCREEN:
-                executeClickScreenCommand(future);
-                break;
-            case MOVE_ITEM:
-                executeMoveItemCommand(future);
-                break;
-            case USE:
-                executeUseCommand(future);
-                break;
-            case BREAK:
-                executeBreakCommand(future);
-                break;
-            case PLACE_HAND:
-                executePlaceHandCommand(future);
-                break;
-            case LOOK:
-                executeLookCommand(future);
-                break;
-            case WALK:
-                executeWalkCommand(future);
-                break;
-            case JUMP:
-                executeJumpCommand(future);
-                break;
-            case PRESS_KEY:
-                executePressKeyCommand(future);
-                break;
-            case CRAWL:
-                executeCrawlCommand(future);
-                break;
-            case CROUCH:
-                executeCrouchCommand(future);
-                break;
-            case SPRINT:
-                executeSprintCommand(future);
-                break;
-            case FLY:
-                executeFlyCommand(future);
-                break;
-            case INTERACT:
-                executeInteractCommand(future);
-                break;
-            case TRADE:
-                executeTradeCommand(future);
-                break;
-            case SWING:
-                executeSwingCommand(future);
-                break;
-            case EQUIP_ARMOR:
-                executeEquipArmorCommand(future);
-                break;
-            case EQUIP_HAND:
-                executeEquipHandCommand(future);
-                break;
-            case SENSOR_TOUCHING_BLOCK:
-            case SENSOR_TOUCHING_ENTITY:
-            case SENSOR_AT_COORDINATES:
-            case SENSOR_IS_DAYTIME:
-            case SENSOR_IS_RAINING:
-            case SENSOR_HEALTH_BELOW:
-            case SENSOR_HUNGER_BELOW:
-            case SENSOR_ITEM_IN_INVENTORY:
-            case SENSOR_ITEM_IN_SLOT:
-            case SENSOR_VILLAGER_TRADE:
-            case SENSOR_IN_STOCK:
-            case SENSOR_IS_SWIMMING:
-            case SENSOR_IS_IN_LAVA:
-            case SENSOR_IS_UNDERWATER:
-            case SENSOR_IS_FALLING:
-            case SENSOR_IS_RENDERED:
-            case SENSOR_IS_VISIBLE:
-            case SENSOR_KEY_PRESSED:
-            case SENSOR_CHAT_MESSAGE:
-            case SENSOR_JOINED_SERVER:
-            case SENSOR_FABRIC_EVENT:
-            case SENSOR_ATTRIBUTE_DETECTION:
-            case SENSOR_TARGETED_BLOCK:
-            case SENSOR_TARGETED_ENTITY:
-            case SENSOR_LOOK_DIRECTION:
-            case SENSOR_CURRENT_HAND:
-            case SENSOR_TARGETED_BLOCK_FACE:
-                completeSensorEvaluation(future);
-                break;
-            case CREATE_LIST:
-                executeCreateListCommand(future);
-                break;
-            case ADD_TO_LIST:
-                executeAddToListCommand(future);
-                break;
-            case REMOVE_FIRST_FROM_LIST:
-                executeRemoveFromListCommand(future, RemoveListMode.FIRST);
-                break;
-            case REMOVE_LAST_FROM_LIST:
-                executeRemoveFromListCommand(future, RemoveListMode.LAST);
-                break;
-            case REMOVE_LIST_ITEM:
-                executeRemoveFromListCommand(future, RemoveListMode.INDEX);
-                break;
-            case REMOVE_FROM_LIST:
-                executeRemoveFromListCommand(future, RemoveListMode.VALUE);
-                break;
+            case GOTO -> executeGotoCommand(future);
+            case TRAVEL -> executeTravelCommand(future);
+            case GOAL -> executeGoalCommand(future);
+            case COLLECT -> executeCollectCommand(future);
+            case BUILD -> executeBuildCommand(future);
+            case EXPLORE -> executeExploreCommand(future);
+            case FOLLOW -> executeFollowCommand(future);
+            case CONTROL_REPEAT -> executeControlRepeat(future);
+            case CONTROL_REPEAT_UNTIL -> executeControlRepeatUntil(future);
+            case CONTROL_WAIT_UNTIL -> executeControlWaitUntil(future);
+            case CONTROL_FOREVER -> executeControlForever(future);
+            case CONTROL_IF -> executeControlIf(future);
+            case CONTROL_IF_ELSE -> executeControlIfElse(future);
+            case CONTROL_FORK -> executeControlFork(future);
+            case CONTROL_JOIN_ANY -> executeControlJoinAny(future);
+            case CONTROL_JOIN_ALL -> executeControlJoinAll(future);
+            case FARM -> executeFarmCommand(future);
+            case STOP -> executeStopCommand(future);
+            case START_CHAIN -> executeStartChainNode(future);
+            case RUN_PRESET -> executeRunPresetNode(future);
+            case CUSTOM_NODE, TEMPLATE -> executeRunPresetNode(future);
+            case STOP_CHAIN -> executeStopChainNode(future);
+            case STOP_ALL -> executeStopAllNode(future);
+            case PLACE -> executePlaceCommand(future);
+            case CRAFT -> executeCraftCommand(future);
+            case OPEN_INVENTORY -> executePlayerGuiCommand(future, NodeMode.PLAYER_GUI_OPEN);
+            case CLOSE_GUI -> executePlayerGuiCommand(future, NodeMode.PLAYER_GUI_CLOSE);
+            case WRITE_BOOK -> executeWriteBookCommand(future);
+            case WRITE_SIGN -> executeWriteSignCommand(future);
+            case UI_UTILS -> executeUiUtilsCommand(future);
+            case WAIT -> executeWaitCommand(future);
+            case MESSAGE -> executeMessageCommand(future);
+            case HOTBAR -> executeHotbarCommand(future);
+            case DROP_ITEM -> executeDropItemCommand(future);
+            case DROP_SLOT -> executeDropSlotCommand(future);
+            case CLICK_SLOT -> executeClickSlotCommand(future);
+            case CLICK_SCREEN -> executeClickScreenCommand(future);
+            case MOVE_ITEM -> executeMoveItemCommand(future);
+            case USE -> executeUseCommand(future);
+            case BREAK -> executeBreakCommand(future);
+            case PLACE_HAND -> executePlaceHandCommand(future);
+            case LOOK -> executeLookCommand(future);
+            case WALK -> executeWalkCommand(future);
+            case JUMP -> executeJumpCommand(future);
+            case PRESS_KEY -> executePressKeyCommand(future);
+            case CRAWL -> executeCrawlCommand(future);
+            case CROUCH -> executeCrouchCommand(future);
+            case SPRINT -> executeSprintCommand(future);
+            case FLY -> executeFlyCommand(future);
+            case INTERACT -> executeInteractCommand(future);
+            case TRADE -> executeTradeCommand(future);
+            case SWING -> executeSwingCommand(future);
+            case EQUIP_ARMOR -> executeEquipArmorCommand(future);
+            case EQUIP_HAND -> executeEquipHandCommand(future);
+            case SENSOR_TOUCHING_BLOCK, SENSOR_TOUCHING_ENTITY, SENSOR_AT_COORDINATES, SENSOR_IS_DAYTIME, SENSOR_IS_RAINING, SENSOR_HEALTH_BELOW, SENSOR_HUNGER_BELOW, SENSOR_ITEM_IN_INVENTORY, SENSOR_ITEM_IN_SLOT, SENSOR_VILLAGER_TRADE, SENSOR_IN_STOCK, SENSOR_IS_SWIMMING, SENSOR_IS_IN_LAVA, SENSOR_IS_UNDERWATER, SENSOR_IS_FALLING, SENSOR_IS_RENDERED, SENSOR_IS_VISIBLE, SENSOR_KEY_PRESSED, SENSOR_CHAT_MESSAGE, SENSOR_JOINED_SERVER, SENSOR_FABRIC_EVENT, SENSOR_ATTRIBUTE_DETECTION, SENSOR_TARGETED_BLOCK, SENSOR_TARGETED_ENTITY, SENSOR_LOOK_DIRECTION, SENSOR_CURRENT_HAND, SENSOR_TARGETED_BLOCK_FACE -> completeSensorEvaluation(future);
+            case CREATE_LIST -> executeCreateListCommand(future);
+            case ADD_TO_LIST -> executeAddToListCommand(future);
+            case REMOVE_FIRST_FROM_LIST -> executeRemoveFromListCommand(future, RemoveListMode.FIRST);
+            case REMOVE_LAST_FROM_LIST -> executeRemoveFromListCommand(future, RemoveListMode.LAST);
+            case REMOVE_LIST_ITEM -> executeRemoveFromListCommand(future, RemoveListMode.INDEX);
+            case REMOVE_FROM_LIST -> executeRemoveFromListCommand(future, RemoveListMode.VALUE);
             
             // Legacy nodes
-            case PATH:
-                executePathCommand(future);
-                break;
-            case INVERT:
-                executeInvertCommand(future);
-                break;
-            case COME:
-                executeComeCommand(future);
-                break;
-            case SURFACE:
-                executeSurfaceCommand(future);
-                break;
-            case TUNNEL:
-                executeTunnelCommand(future);
-                break;
-                
-            default:
-                future.complete(null);
-                break;
+            case PATH -> executePathCommand(future);
+            case INVERT -> executeInvertCommand(future);
+            case COME -> executeComeCommand(future);
+            case SURFACE -> executeSurfaceCommand(future);
+            case TUNNEL -> executeTunnelCommand(future);
+
+            default -> future.complete(null);
         }
     }
 
@@ -6966,22 +6747,12 @@ public class Node {
         if (attachedDurationSeconds != null) {
             waitSeconds = attachedDurationSeconds;
         } else {
-            double unitSeconds;
-            switch (waitMode) {
-                case WAIT_TICKS:
-                    unitSeconds = 0.05;
-                    break;
-                case WAIT_MINUTES:
-                    unitSeconds = 60.0;
-                    break;
-                case WAIT_HOURS:
-                    unitSeconds = 3600.0;
-                    break;
-                case WAIT_SECONDS:
-                default:
-                    unitSeconds = 1.0;
-                    break;
-            }
+            double unitSeconds = switch (waitMode) {
+                case WAIT_TICKS -> 0.05;
+                case WAIT_MINUTES -> 60.0;
+                case WAIT_HOURS -> 3600.0;
+                default -> 1.0;
+            };
             waitSeconds = baseDuration * unitSeconds;
         }
         ExecutionManager manager = ExecutionManager.getInstance();
@@ -7338,101 +7109,77 @@ public class Node {
         if (valueType == null) {
             return "";
         }
-        switch (valueType) {
-            case PARAM_BLOCK:
-            case PARAM_PLACE_TARGET:
-                return getRuntimeValue(values, "block");
-            case PARAM_ITEM:
-            case PARAM_VILLAGER_TRADE:
-                return getRuntimeValue(values, "item");
-            case PARAM_ENTITY:
-                return getRuntimeValue(values, "entity");
-            case PARAM_PLAYER:
-                return getRuntimeValue(values, "player");
-            case PARAM_WAYPOINT:
-                return getRuntimeValue(values, "waypoint");
-            case PARAM_SCHEMATIC:
-                return getRuntimeValue(values, "schematic");
-            case PARAM_INVENTORY_SLOT:
-                return getRuntimeValue(values, "slot");
-            case SENSOR_CURRENT_HAND:
-                return getRuntimeValue(values, "slot");
-            case SENSOR_IS_ON_GROUND:
-                return getRuntimeValue(values, "distance");
-            case PARAM_DURATION:
-                return getRuntimeValue(values, "duration");
-            case PARAM_RANGE:
-            case PARAM_CLOSEST:
-                return getRuntimeValue(values, "range");
-            case PARAM_DISTANCE:
-                return getRuntimeValue(values, "distance");
-            case PARAM_BLOCK_FACE: {
+        return switch (valueType) {
+            case PARAM_BLOCK, PARAM_PLACE_TARGET -> getRuntimeValue(values, "block");
+            case PARAM_ITEM, PARAM_VILLAGER_TRADE -> getRuntimeValue(values, "item");
+            case PARAM_ENTITY ->  getRuntimeValue(values, "entity");
+            case PARAM_PLAYER -> getRuntimeValue(values, "player");
+            case PARAM_WAYPOINT -> getRuntimeValue(values, "waypoint");
+            case PARAM_SCHEMATIC -> getRuntimeValue(values, "schematic");
+            case PARAM_INVENTORY_SLOT, SENSOR_CURRENT_HAND -> getRuntimeValue(values, "slot");
+            case SENSOR_IS_ON_GROUND, PARAM_DISTANCE, SENSOR_DISTANCE_BETWEEN -> getRuntimeValue(values, "distance");
+            case PARAM_DURATION -> getRuntimeValue(values, "duration");
+            case PARAM_RANGE, PARAM_CLOSEST -> getRuntimeValue(values, "range");
+            case PARAM_BLOCK_FACE -> {
                 String face = getRuntimeValue(values, "face");
                 if (!face.isEmpty()) {
-                    return face;
+                    yield face;
                 }
                 face = getRuntimeValue(values, "side");
                 if (!face.isEmpty()) {
-                    return face;
+                    yield face;
                 }
-                return getRuntimeValue(values, "direction");
+                yield getRuntimeValue(values, "direction");
             }
-            case PARAM_DIRECTION: {
+            case PARAM_DIRECTION -> {
                 String yaw = getRuntimeValue(values, "yaw");
                 String pitch = getRuntimeValue(values, "pitch");
                 if (!yaw.isEmpty() && !pitch.isEmpty()) {
-                    return yaw + " " + pitch;
+                    yield yaw + " " + pitch;
                 }
                 String direction = getRuntimeValue(values, "direction");
                 if (!direction.isEmpty()) {
-                    return direction;
+                    yield direction;
                 }
                 direction = getRuntimeValue(values, "side");
                 if (!direction.isEmpty()) {
-                    return direction;
+                    yield direction;
                 }
-                return getRuntimeValue(values, "face");
+                yield getRuntimeValue(values, "face");
             }
-            case PARAM_AMOUNT:
-                return getRuntimeValue(values, "amount");
-            case LIST_LENGTH: {
+            case PARAM_AMOUNT, SENSOR_SLOT_ITEM_COUNT -> getRuntimeValue(values, "amount");
+            case LIST_LENGTH -> {
                 String length = getRuntimeValue(values, "count");
                 if (!length.isEmpty()) {
-                    return length;
+                    yield length;
                 }
                 length = getRuntimeValue(values, "value");
                 if (!length.isEmpty()) {
-                    return length;
+                    yield length;
                 }
-                return getRuntimeValue(values, "amount");
+                yield getRuntimeValue(values, "amount");
             }
-            case SENSOR_SLOT_ITEM_COUNT:
-                return getRuntimeValue(values, "amount");
-            case OPERATOR_RANDOM:
+            case OPERATOR_RANDOM -> {
                 String value = getRuntimeValue(values, "value");
                 if (!value.isEmpty()) {
-                    return value;
+                    yield value;
                 }
-                return getRuntimeValue(values, "amount");
-            case PARAM_BOOLEAN:
-                return getRuntimeValue(values, "toggle");
-            case PARAM_HAND:
-                return getRuntimeValue(values, "hand");
-            case PARAM_COORDINATE:
-                return formatCoordinateValues(values);
-            case PARAM_ROTATION:
-                return formatRotationValues(values);
-            case VARIABLE:
-                return getRuntimeValue(values, "variable");
-            case SENSOR_POSITION_OF:
+                yield getRuntimeValue(values, "amount");
+            }
+            case PARAM_BOOLEAN -> getRuntimeValue(values, "toggle");
+            case PARAM_HAND -> getRuntimeValue(values, "hand");
+            case PARAM_COORDINATE -> formatCoordinateValues(values);
+            case PARAM_ROTATION -> formatRotationValues(values);
+            case VARIABLE -> getRuntimeValue(values, "variable");
+            case SENSOR_POSITION_OF -> {
                 if (isSensorPositionSingleAxisMode()) {
                     String amount = getRuntimeValue(values, "amount");
                     if (!amount.isEmpty()) {
-                        return amount;
+                        yield amount;
                     }
                     amount = getRuntimeValue(values, "value");
                     if (!amount.isEmpty()) {
-                        return amount;
+                        yield amount;
                     }
                 }
                 return formatCoordinateValues(values);
@@ -7443,58 +7190,56 @@ public class Node {
                 if (!block.isEmpty()) {
                     String state = getRuntimeValue(values, "state");
                     if (!state.isEmpty()) {
-                        return block + "[" + state + "]";
+                        yield block + "[" + state + "]";
                     }
-                    return block;
+                    yield block;
                 }
-                break;
+                yield formatCanonicalValueMap(values);
             }
-            case SENSOR_TARGETED_ENTITY: {
+            case SENSOR_TARGETED_ENTITY -> {
                 String entity = getRuntimeValue(values, "entity");
                 if (!entity.isEmpty()) {
                     String state = getRuntimeValue(values, "state");
                     if (!state.isEmpty()) {
-                        return entity + "[" + state + "]";
+                        yield entity + "[" + state + "]";
                     }
-                    return entity;
+                    yield entity;
                 }
-                break;
+                yield formatCanonicalValueMap(values);
             }
-            case SENSOR_LOOK_DIRECTION: {
+            case SENSOR_LOOK_DIRECTION -> {
                 String yaw = getRuntimeValue(values, "yaw");
                 String pitch = getRuntimeValue(values, "pitch");
                 if (!yaw.isEmpty() && !pitch.isEmpty()) {
-                    return yaw + " " + pitch;
+                    yield yaw + " " + pitch;
                 }
                 String amount = getRuntimeValue(values, "amount");
                 if (!amount.isEmpty()) {
-                    return amount;
+                    yield amount;
                 }
                 String direction = getRuntimeValue(values, "direction");
                 if (!direction.isEmpty()) {
-                    return direction;
+                    yield direction;
                 }
                 direction = getRuntimeValue(values, "side");
                 if (!direction.isEmpty()) {
-                    return direction;
+                    yield direction;
                 }
-                return getRuntimeValue(values, "face");
+                yield getRuntimeValue(values, "face");
             }
-            case SENSOR_TARGETED_BLOCK_FACE: {
+            case SENSOR_TARGETED_BLOCK_FACE -> {
                 String side = getRuntimeValue(values, "side");
                 if (!side.isEmpty()) {
-                    return side;
+                    yield side;
                 }
                 side = getRuntimeValue(values, "face");
                 if (!side.isEmpty()) {
-                    return side;
+                    yield side;
                 }
-                return getRuntimeValue(values, "text");
+                yield getRuntimeValue(values, "text");
             }
-            default:
-                break;
-        }
-        return formatCanonicalValueMap(values);
+            default -> formatCanonicalValueMap(values);
+        };
     }
 
     String formatCoordinateValues(Map<String, String> values) {
@@ -8059,22 +7804,13 @@ public class Node {
             return defaultSlot;
         }
         String value = parameter.getStringValue().trim().toLowerCase(Locale.ROOT);
-        switch (value) {
-            case "head":
-            case "helmet":
-                return EquipmentSlot.HEAD;
-            case "chest":
-            case "chestplate":
-                return EquipmentSlot.CHEST;
-            case "legs":
-            case "leggings":
-                return EquipmentSlot.LEGS;
-            case "feet":
-            case "boots":
-                return EquipmentSlot.FEET;
-            default:
-                return defaultSlot;
-        }
+        return switch (value) {
+            case "head", "helmet" -> EquipmentSlot.HEAD;
+            case "chest", "chestplate" -> EquipmentSlot.CHEST;
+            case "legs", "leggings" ->  EquipmentSlot.LEGS;
+            case "feet", "boots" ->  EquipmentSlot.FEET;
+            default -> defaultSlot;
+        };
     }
 
     int getIntParameter(String name, int defaultValue) {
@@ -9144,69 +8880,48 @@ public class Node {
             return false;
         }
 
-        boolean result = false;
-        switch (type) {
-            case OPERATOR_EQUALS:
-                result = evaluateOperatorEquals();
-                break;
-            case OPERATOR_NOT:
-                result = evaluateOperatorNot();
-                break;
-            case OPERATOR_BOOLEAN_NOT:
-                result = evaluateOperatorBooleanNot();
-                break;
-            case OPERATOR_BOOLEAN_OR:
-                result = evaluateOperatorBooleanOr();
-                break;
-            case OPERATOR_BOOLEAN_AND:
-                result = evaluateOperatorBooleanAnd();
-                break;
-            case OPERATOR_BOOLEAN_XOR:
-                result = evaluateOperatorBooleanXor();
-                break;
-            case OPERATOR_GREATER:
-                result = evaluateOperatorGreater();
-                break;
-            case OPERATOR_LESS:
-                result = evaluateOperatorLess();
-                break;
-            case SENSOR_TOUCHING_BLOCK: {
+        boolean result = switch (type) {
+            case OPERATOR_EQUALS -> evaluateOperatorEquals();
+            case OPERATOR_NOT -> evaluateOperatorNot();
+            case OPERATOR_BOOLEAN_NOT -> evaluateOperatorBooleanNot();
+            case OPERATOR_BOOLEAN_OR -> evaluateOperatorBooleanOr();
+            case OPERATOR_BOOLEAN_AND -> evaluateOperatorBooleanAnd();
+            case OPERATOR_BOOLEAN_XOR -> evaluateOperatorBooleanXor();
+            case OPERATOR_GREATER -> evaluateOperatorGreater();
+            case OPERATOR_LESS -> evaluateOperatorLess();
+            case SENSOR_TOUCHING_BLOCK -> {
                 String blockId = getStringParameter("Block", "stone");
                 Node parameterNode = resolveSensorParameterNode(getAttachedParameter(), 0);
                 if (parameterNode != null) {
                     if (!providesTrait(parameterNode, NodeValueTrait.BLOCK)) {
                         sendIncompatibleParameterMessage(parameterNode);
-                        break;
+                        yield false;
                     }
                     List<BlockSelection> selections = resolveBlocksFromParameter(parameterNode);
                     if (!selections.isEmpty()) {
-                        result = isTouchingBlock(selections);
-                        break;
+                        yield isTouchingBlock(selections);
                     }
                 }
-                result = evaluateSensorCondition(SensorConditionType.TOUCHING_BLOCK, blockId, null, 0, 0, 0);
-                break;
+                yield evaluateSensorCondition(SensorConditionType.TOUCHING_BLOCK, blockId, null, 0, 0, 0);
             }
-            case SENSOR_TOUCHING_ENTITY: {
+            case SENSOR_TOUCHING_ENTITY -> {
                 String entityId = getStringParameter("Entity", "zombie");
                 Node parameterNode = resolveSensorParameterNode(getAttachedParameter(), 0);
                 if (parameterNode != null) {
                     if (!providesTrait(parameterNode, NodeValueTrait.ENTITY)) {
                         sendIncompatibleParameterMessage(parameterNode);
-                        break;
+                        yield false;
                     }
                     String nodeEntity = getParameterString(parameterNode, "Entity");
                     if (nodeEntity != null && !nodeEntity.isEmpty()) {
                         entityId = nodeEntity;
                     }
                     String state = getEntityParameterState(parameterNode);
-                    result = isTouchingEntity(entityId, state);
-                    break;
+                    yield isTouchingEntity(entityId, state);
                 }
-                result = evaluateSensorCondition(SensorConditionType.TOUCHING_ENTITY, null, entityId, 0, 0, 0);
-                break;
+                yield evaluateSensorCondition(SensorConditionType.TOUCHING_ENTITY, null, entityId, 0, 0, 0);
             }
-            case SENSOR_AT_COORDINATES: {
+            case SENSOR_AT_COORDINATES -> {
                 int x = getIntParameter("X", 0);
                 int y = getIntParameter("Y", 64);
                 int z = getIntParameter("Z", 0);
@@ -9214,7 +8929,7 @@ public class Node {
                 if (parameterNode != null) {
                     if (!providesTrait(parameterNode, NodeValueTrait.COORDINATE)) {
                         sendIncompatibleParameterMessage(parameterNode);
-                        break;
+                        yield false;
                     }
                     Optional<Vec3d> resolved = resolvePositionTarget(parameterNode, null, null);
                     if (resolved.isPresent()) {
@@ -9228,53 +8943,34 @@ public class Node {
                         z = parseNodeInt(parameterNode, "Z", z);
                     }
                 }
-                result = evaluateSensorCondition(SensorConditionType.AT_COORDINATES, null, null, x, y, z);
-                break;
+                yield evaluateSensorCondition(SensorConditionType.AT_COORDINATES, null, null, x, y, z);
             }
-            case SENSOR_TARGETED_BLOCK:
-                result = getTargetedBlockState().isPresent();
-                break;
-            case SENSOR_TARGETED_ENTITY:
-                result = getTargetedEntity().isPresent();
-                break;
-            case SENSOR_LOOK_DIRECTION:
-                result = getLookDirection().isPresent();
-                break;
-            case SENSOR_CURRENT_HAND:
-                result = getCurrentHotbarSlot().isPresent();
-                break;
-            case SENSOR_TARGETED_BLOCK_FACE:
-                result = getTargetedBlockFace().isPresent();
-                break;
-            case SENSOR_IS_DAYTIME:
-                result = isDaytime();
-                break;
-            case SENSOR_IS_RAINING:
-                result = isRaining();
-                break;
-            case SENSOR_GUI_FILLED:
-                result = isOpenGuiFilled();
-                break;
-            case SENSOR_HEALTH_BELOW: {
+            case SENSOR_TARGETED_BLOCK -> getTargetedBlockState().isPresent();
+            case SENSOR_TARGETED_ENTITY -> getTargetedEntity().isPresent();
+            case SENSOR_LOOK_DIRECTION -> getLookDirection().isPresent();
+            case SENSOR_CURRENT_HAND -> getCurrentHotbarSlot().isPresent();
+            case SENSOR_TARGETED_BLOCK_FACE -> getTargetedBlockFace().isPresent();
+            case SENSOR_IS_DAYTIME -> isDaytime();
+            case SENSOR_IS_RAINING -> isRaining();
+            case SENSOR_GUI_FILLED -> isOpenGuiFilled();
+            case SENSOR_HEALTH_BELOW -> {
                 double amount = MathHelper.clamp(getDoubleParameter("Amount", 10.0), 0.0, 40.0);
                 Node amountParameter = getAttachedParameterOfType(NodeType.PARAM_AMOUNT, NodeType.OPERATOR_RANDOM, NodeType.OPERATOR_MOD);
                 if (amountParameter != null) {
                     amount = MathHelper.clamp(parseNodeDouble(amountParameter, "Amount", amount), 0.0, 40.0);
                 }
-                result = isHealthBelow(amount);
-                break;
+                yield isHealthBelow(amount);
             }
-            case SENSOR_HUNGER_BELOW: {
+            case SENSOR_HUNGER_BELOW -> {
                 int amount = MathHelper.clamp(getIntParameter("Amount", 10), 0, 20);
                 Node amountParameter = getAttachedParameterOfType(NodeType.PARAM_AMOUNT, NodeType.OPERATOR_RANDOM, NodeType.OPERATOR_MOD);
                 if (amountParameter != null) {
                     double parsed = parseNodeDouble(amountParameter, "Amount", amount);
                     amount = MathHelper.clamp((int) Math.round(parsed), 0, 20);
                 }
-                result = isHungerBelow(amount);
-                break;
+                yield isHungerBelow(amount);
             }
-            case SENSOR_ITEM_IN_INVENTORY: {
+            case SENSOR_ITEM_IN_INVENTORY -> {
                 String itemId = getStringParameter("Item", "stone");
                 boolean useAmount = isAmountInputEnabled();
                 int requiredAmount = Math.max(1, getIntParameter("Amount", 1));
@@ -9301,17 +8997,15 @@ public class Node {
                         for (String candidate : nodeItems) {
                             if (useAmount ? hasItemAmountInInventory(candidate, requiredAmount) : hasItemInInventory(candidate)) {
                                 hasAny = true;
-                                break;
+                                yield false;
                             }
                         }
-                        result = hasAny;
-                        break;
+                        yield hasAny;
                     }
                 }
-                result = useAmount ? hasItemAmountInInventory(itemId, requiredAmount) : hasItemInInventory(itemId);
-                break;
+                yield useAmount ? hasItemAmountInInventory(itemId, requiredAmount) : hasItemInInventory(itemId);
             }
-            case SENSOR_ITEM_IN_SLOT: {
+            case SENSOR_ITEM_IN_SLOT -> {
                 Node itemNode = resolveSensorParameterNode(getAttachedParameter(0), 0);
                 Node slotNode = resolveSensorParameterNode(getAttachedParameter(1), 1);
                 if (itemNode == null || slotNode == null) {
@@ -9319,18 +9013,15 @@ public class Node {
                     if (client != null) {
                         sendNodeErrorMessage(client, type.getDisplayName() + " requires an item and slot parameter.");
                     }
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (!providesTrait(itemNode, NodeValueTrait.ITEM)) {
                     sendIncompatibleParameterMessage(itemNode);
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (!providesTrait(slotNode, NodeValueTrait.INVENTORY_SLOT)) {
                     sendIncompatibleParameterMessage(slotNode);
-                    result = false;
-                    break;
+                    yield false;
                 }
                 List<String> itemIds = resolveItemIdsFromParameter(itemNode);
                 if (itemIds.isEmpty()) {
@@ -9338,13 +9029,11 @@ public class Node {
                     if (client != null) {
                         sendNodeErrorMessage(client, "No item specified for " + type.getDisplayName() + ".");
                     }
-                    result = false;
-                    break;
+                    yield false;
                 }
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                 if (client == null || client.player == null) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 PlayerInventory inventory = client.player.getInventory();
                 ScreenHandler handler = client.player.currentScreenHandler;
@@ -9353,66 +9042,52 @@ public class Node {
                 SlotResolution resolved = resolveInventorySlot(handler, inventory, slotValue, selectionType);
                 if (resolved == null || resolved.slot == null) {
                     sendNodeErrorMessage(client, type.getDisplayName() + " requires a valid slot selection.");
-                    result = false;
-                    break;
+                    yield false;
                 }
                 ItemStack stack = resolved.slot.getStack();
                 if (stack == null || stack.isEmpty()) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 boolean useAmount = isAmountInputEnabled();
                 int requiredAmount = Math.max(1, getIntParameter("Amount", 1));
                 boolean matchesItem = stackMatchesAnyItem(stack, itemIds);
-                result = matchesItem && (!useAmount || stack.getCount() >= requiredAmount);
-                break;
+                yield matchesItem && (!useAmount || stack.getCount() >= requiredAmount);
             }
-            case SENSOR_SLOT_ITEM_COUNT: {
+            case SENSOR_SLOT_ITEM_COUNT -> {
                 Node slotNode = resolveSensorParameterNode(getAttachedParameter(0), 0);
                 if (slotNode == null || !providesTrait(slotNode, NodeValueTrait.INVENTORY_SLOT)) {
                     net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                     if (client != null) {
                         sendNodeErrorMessage(client, type.getDisplayName() + " requires an inventory slot parameter.");
                     }
-                    result = false;
-                    break;
+                    yield false;
                 }
-                result = resolveInventorySlotCount(slotNode).isPresent();
-                break;
+                yield resolveInventorySlotCount(slotNode).isPresent();
             }
-            case SENSOR_IS_SWIMMING:
-                result = isSwimming();
-                break;
-            case SENSOR_IS_IN_LAVA:
-                result = isInLava();
-                break;
-            case SENSOR_IS_UNDERWATER:
-                result = isUnderwater();
-                break;
-            case SENSOR_IS_FALLING: {
+            case SENSOR_IS_SWIMMING ->  isSwimming();
+            case SENSOR_IS_IN_LAVA ->  isInLava();
+            case SENSOR_IS_UNDERWATER ->  isUnderwater();
+            case SENSOR_IS_FALLING -> {
                 double distance = Math.max(0.0, getDoubleParameter("Distance", 2.0));
-                result = isFalling(distance);
-                break;
+                yield isFalling(distance);
             }
-            case SENSOR_KEY_PRESSED: {
+            case SENSOR_KEY_PRESSED -> {
                 String key = getStringParameter("Key", "space");
                 Node parameterNode = resolveSensorParameterNode(getAttachedParameter(), 0);
                 if (parameterNode != null) {
                     if (!providesTrait(parameterNode, NodeValueTrait.KEY)) {
                         sendIncompatibleParameterMessage(parameterNode);
-                        break;
+                        yield false;
                     }
                     String parameterKey = getParameterString(parameterNode, "Key");
                     if (parameterKey != null && !parameterKey.isEmpty()) {
                         key = parameterKey;
                     }
                 }
-                result = isKeyPressed(key);
-                break;
+                yield isKeyPressed(key);
             }
-            case SENSOR_IS_RENDERED: {
+            case SENSOR_IS_RENDERED -> {
                 String resourceId = getStringParameter("Resource", "stone");
-                boolean handled = false;
                 Node parameterNode = resolveSensorParameterNode(getAttachedParameter(), 0);
                 if (parameterNode != null) {
                     if (providesTrait(parameterNode, NodeValueTrait.ITEM)) {
@@ -9424,8 +9099,7 @@ public class Node {
                         String nodeEntity = getParameterString(parameterNode, "Entity");
                         if (nodeEntity != null && !nodeEntity.isEmpty()) {
                             String state = getEntityParameterState(parameterNode);
-                            result = isEntityRendered(nodeEntity, state);
-                            handled = true;
+                            yield isEntityRendered(nodeEntity, state);
                         }
                     } else if (providesTrait(parameterNode, NodeValueTrait.PLAYER)) {
                         String nodePlayer = getParameterString(parameterNode, "Player");
@@ -9441,14 +9115,10 @@ public class Node {
                         sendIncompatibleParameterMessage(parameterNode);
                     }
                 }
-                if (!handled) {
-                    result = isResourceRendered(resourceId);
-                }
-                break;
+                yield isResourceRendered(resourceId);
             }
-            case SENSOR_IS_VISIBLE: {
+            case SENSOR_IS_VISIBLE -> {
                 String resourceId = getStringParameter("Resource", "stone");
-                boolean handled = false;
                 Node parameterNode = resolveSensorParameterNode(getAttachedParameter(), 0);
                 if (parameterNode != null) {
                     if (providesTrait(parameterNode, NodeValueTrait.ITEM)) {
@@ -9460,8 +9130,7 @@ public class Node {
                         String nodeEntity = getParameterString(parameterNode, "Entity");
                         if (nodeEntity != null && !nodeEntity.isEmpty()) {
                             String state = getEntityParameterState(parameterNode);
-                            result = isEntityVisible(nodeEntity, state);
-                            handled = true;
+                            yield isEntityVisible(nodeEntity, state);
                         }
                     } else if (providesTrait(parameterNode, NodeValueTrait.PLAYER)) {
                         String nodePlayer = getParameterString(parameterNode, "Player");
@@ -9477,51 +9146,41 @@ public class Node {
                         sendIncompatibleParameterMessage(parameterNode);
                     }
                 }
-                if (!handled) {
-                    result = isResourceVisible(resourceId);
-                }
-                break;
+                yield isResourceVisible(resourceId);
             }
-            case SENSOR_VILLAGER_TRADE: {
+            case SENSOR_VILLAGER_TRADE -> {
                 ensureVillagerTradeNumberParameter();
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                 if (client == null) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 net.minecraft.client.gui.screen.Screen currentScreen = client.currentScreen;
                 if (!(currentScreen instanceof net.minecraft.client.gui.screen.ingame.MerchantScreen)) {
                     sendNodeErrorMessage(client, "No villager trading screen is open.");
-                    result = false;
-                    break;
+                    yield false;
                 }
                 net.minecraft.client.gui.screen.ingame.MerchantScreen merchantScreen =
                     (net.minecraft.client.gui.screen.ingame.MerchantScreen) currentScreen;
                 net.minecraft.screen.MerchantScreenHandler screenHandler = merchantScreen.getScreenHandler();
                 if (screenHandler == null) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 net.minecraft.village.TradeOfferList tradeOffers = screenHandler.getRecipes();
                 if (tradeOffers == null || tradeOffers.isEmpty()) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (shouldUseLegacyVillagerTradeSelection()) {
-                    result = findTradeIndexFromLegacySelection(tradeOffers, false, false) >= 0;
-                    break;
+                    yield findTradeIndexFromLegacySelection(tradeOffers, false, false) >= 0;
                 }
                 int selectedTradeNumber = getConfiguredVillagerTradeNumber();
                 int tradeIndex = selectedTradeNumber - 1;
-                result = tradeIndex >= 0 && tradeIndex < tradeOffers.size() && tradeOffers.get(tradeIndex) != null;
-                break;
+                yield tradeIndex >= 0 && tradeIndex < tradeOffers.size() && tradeOffers.get(tradeIndex) != null;
             }
-            case SENSOR_IN_STOCK: {
+            case SENSOR_IN_STOCK -> {
                 ensureVillagerTradeNumberParameter();
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                 if (client == null) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 net.minecraft.client.gui.screen.Screen currentScreen = client.currentScreen;
                 if (!(currentScreen instanceof net.minecraft.client.gui.screen.ingame.MerchantScreen)) {
@@ -9535,27 +9194,23 @@ public class Node {
                     (net.minecraft.client.gui.screen.ingame.MerchantScreen) currentScreen;
                 net.minecraft.screen.MerchantScreenHandler screenHandler = merchantScreen.getScreenHandler();
                 if (screenHandler == null) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 net.minecraft.village.TradeOfferList tradeOffers = screenHandler.getRecipes();
                 if (tradeOffers == null || tradeOffers.isEmpty()) {
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (shouldUseLegacyVillagerTradeSelection()) {
-                    result = findTradeIndexFromLegacySelection(tradeOffers, true, false) >= 0;
-                    break;
+                    yield findTradeIndexFromLegacySelection(tradeOffers, true, false) >= 0;
                 }
                 int selectedTradeNumber = getConfiguredVillagerTradeNumber();
                 int tradeIndex = selectedTradeNumber - 1;
-                result = tradeIndex >= 0
+                yield tradeIndex >= 0
                     && tradeIndex < tradeOffers.size()
                     && tradeOffers.get(tradeIndex) != null
                     && !tradeOffers.get(tradeIndex).isDisabled();
-                break;
             }
-            case SENSOR_CHAT_MESSAGE: {
+            case SENSOR_CHAT_MESSAGE -> {
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                 Node playerNode = resolveSensorParameterNode(getAttachedParameter(0), 0);
                 Node messageNode = resolveSensorParameterNode(getAttachedParameter(1), 1);
@@ -9563,18 +9218,15 @@ public class Node {
                     if (client != null) {
                         sendNodeErrorMessage(client, type.getDisplayName() + " requires a user and message parameter.");
                     }
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (!providesTrait(playerNode, NodeValueTrait.PLAYER)) {
                     sendIncompatibleParameterMessage(playerNode);
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (!providesTrait(messageNode, NodeValueTrait.MESSAGE)) {
                     sendIncompatibleParameterMessage(messageNode);
-                    result = false;
-                    break;
+                    yield false;
                 }
                 String playerName = getParameterString(playerNode, "Player");
                 String messageText = getParameterString(messageNode, "Text");
@@ -9590,8 +9242,7 @@ public class Node {
                 double seconds = useAmount
                     ? Math.max(0.0, getDoubleParameter("Amount", 10.0))
                     : ChatMessageTracker.getMaxRetentionSeconds();
-                result = ChatMessageTracker.hasRecentMessage(playerName, messageText, seconds, anyPlayer, anyMessage);
-                break;
+                yield ChatMessageTracker.hasRecentMessage(playerName, messageText, seconds, anyPlayer, anyMessage);
             }
             case SENSOR_JOINED_SERVER: {
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
@@ -9600,44 +9251,34 @@ public class Node {
                     if (client != null) {
                         sendNodeErrorMessage(client, type.getDisplayName() + " requires a user parameter.");
                     }
-                    result = false;
-                    break;
+                    yield false;
                 }
                 if (!providesTrait(playerNode, NodeValueTrait.PLAYER)) {
                     sendIncompatibleParameterMessage(playerNode);
-                    result = false;
-                    break;
+                    yield false;
                 }
                 String playerName = getParameterString(playerNode, "Player");
                 boolean anyPlayer = isAnyPlayerValue(playerName);
                 if (!anyPlayer && isSelfPlayerValue(playerName) && client != null && client.player != null) {
                     playerName = GameProfileCompatibilityBridge.getName(client.player.getGameProfile());
                 }
-                result = ServerJoinTracker.hasRecentJoin(playerName, ServerJoinTracker.getRetentionSeconds(), anyPlayer);
-                break;
+                yield ServerJoinTracker.hasRecentJoin(playerName, ServerJoinTracker.getRetentionSeconds(), anyPlayer);
             }
-            case SENSOR_FABRIC_EVENT: {
+            case SENSOR_FABRIC_EVENT -> {
                 String eventName = getParameterString(this, "Event");
                 if (eventName == null || eventName.trim().isEmpty()) {
-                    result = false;
-                    break;
+                yield false;
                 }
                 double seconds = FabricEventTracker.getMaxRetentionSeconds();
                 String trimmed = eventName.trim();
-                if (trimmed.isEmpty() || "Any".equalsIgnoreCase(trimmed)) {
-                    result = FabricEventTracker.hasAnyRecentEvent(seconds);
-                    break;
+                if ("Any".equalsIgnoreCase(trimmed)) {
+                    yield FabricEventTracker.hasAnyRecentEvent(seconds);
                 }
-                result = FabricEventTracker.hasRecentEvent(trimmed, seconds);
-                break;
+                yield FabricEventTracker.hasRecentEvent(trimmed, seconds);
             }
-            case SENSOR_ATTRIBUTE_DETECTION:
-                result = evaluateAttributeDetectionSensor();
-                break;
-            default:
-                result = false;
-                break;
-        }
+            case SENSOR_ATTRIBUTE_DETECTION -> evaluateAttributeDetectionSensor();
+            default -> false;
+        };
         result = adjustBooleanToggleResult(result);
         this.runtimeState.lastSensorResult = result;
         return result;
@@ -10670,16 +10311,12 @@ public class Node {
         if (type == null) {
             type = SensorConditionType.TOUCHING_BLOCK;
         }
-        switch (type) {
-            case TOUCHING_BLOCK:
-                return isTouchingBlock(blockId);
-            case TOUCHING_ENTITY:
-                return isTouchingEntity(entityId);
-            case AT_COORDINATES:
-                return isAtCoordinates(x, y, z);
-            default:
-                return false;
-        }
+        return switch (type) {
+            case TOUCHING_BLOCK -> isTouchingBlock(blockId);
+            case TOUCHING_ENTITY -> isTouchingEntity(entityId);
+            case AT_COORDINATES -> isAtCoordinates(x, y, z);
+            default -> false;
+        };
     }
     
     private boolean isTouchingBlock(String blockId) {
