@@ -173,41 +173,23 @@ public enum NodeMode {
      * Get the default mode for a node type
      */
     public static NodeMode getDefaultModeForNodeType(NodeType nodeType) {
-        switch (nodeType) {
-            case GOTO:
-            case TRAVEL:
-                return GOTO_XYZ;
-            case GOAL:
-                return GOAL_XYZ;
-            case COLLECT:
-                return COLLECT_SINGLE;
-            case BUILD:
-                return BUILD_PLAYER;
-            case EXPLORE:
-                return EXPLORE_CURRENT;
-            case FOLLOW:
-                return FOLLOW_PLAYER;
-            case CRAFT:
-                return CRAFT_PLAYER_GUI;
-            case OPEN_INVENTORY:
-                return PLAYER_GUI_OPEN;
-            case CLOSE_GUI:
-                return PLAYER_GUI_CLOSE;
-            case UI_UTILS:
-                return UI_UTILS_CLOSE_WITHOUT_PACKET;
-            case FARM:
-                return FARM_RANGE;
-            case STOP:
-                return STOP_NORMAL;
-            case WAIT:
-            case PARAM_DURATION:
-                return WAIT_SECONDS;
-            case SENSOR_POSITION_OF:
-                return SENSOR_POSITION_XYZ;
-            case SENSOR_LOOK_DIRECTION:
-                return SENSOR_LOOK_ROTATION;
-            default:
-                return null;
-        }
+			return switch (nodeType) {
+				case GOTO, TRAVEL -> GOTO_XYZ;
+				case GOAL -> GOAL_XYZ;
+				case COLLECT -> COLLECT_SINGLE;
+				case BUILD -> BUILD_PLAYER;
+				case EXPLORE -> EXPLORE_CURRENT;
+				case FOLLOW -> FOLLOW_PLAYER;
+				case CRAFT -> CRAFT_PLAYER_GUI;
+				case OPEN_INVENTORY -> PLAYER_GUI_OPEN;
+				case CLOSE_GUI -> PLAYER_GUI_CLOSE;
+				case UI_UTILS -> UI_UTILS_CLOSE_WITHOUT_PACKET;
+				case FARM -> FARM_RANGE;
+				case STOP -> STOP_NORMAL;
+				case WAIT, PARAM_DURATION -> WAIT_SECONDS;
+				case SENSOR_POSITION_OF -> SENSOR_POSITION_XYZ;
+				case SENSOR_LOOK_DIRECTION -> SENSOR_LOOK_ROTATION;
+				default -> null;
+			};
     }
 }
