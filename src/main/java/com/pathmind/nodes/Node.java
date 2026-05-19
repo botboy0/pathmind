@@ -5812,7 +5812,7 @@ public class Node {
         }
         boolean legacyZeroBasedSlots = false;
         for (Integer slotIndex : slotIndexes) {
-            if (slotIndex != null && slotIndex.intValue() == 0) {
+            if (slotIndex != null && slotIndex == 0) {
                 legacyZeroBasedSlots = true;
                 break;
             }
@@ -5822,7 +5822,7 @@ public class Node {
             if (slotIndex == null) {
                 continue;
             }
-            normalized.add(legacyZeroBasedSlots ? slotIndex.intValue() + 1 : slotIndex.intValue());
+            normalized.add(legacyZeroBasedSlots ? slotIndex + 1 : slotIndex);
         }
         return normalized;
     }
