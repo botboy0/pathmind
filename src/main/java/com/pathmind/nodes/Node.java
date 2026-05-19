@@ -160,15 +160,8 @@ public class Node {
     private static final String DIRECTION_MODE_CARDINAL = "cardinal";
     private static final String BOOLEAN_MODE_LITERAL = "literal";
     private static final String BOOLEAN_MODE_VARIABLE = "variable";
-    private static final String RECIPE_CACHE_FILE_NAME = "recipe_cache.json";
-    private static final int RECIPE_CACHE_VERSION = 2;
-    private static final int RECIPE_WARMUP_RECIPE_BATCH_SIZE = 8;
-    private static final int RECIPE_WARMUP_DISPLAY_BATCH_SIZE = 4;
-    private static final int RECIPE_WARMUP_SAVE_INTERVAL = 64;
-    private static final Gson RECIPE_CACHE_GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Object RECIPE_CACHE_LOCK = new Object();
+    @Deprecated
     private static volatile CachedRecipeBook cachedRecipeBook;
-    private static volatile RecipeCacheWarmupState recipeCacheWarmupState;
     static final int BODY_PADDING_NO_PARAMS = 10;
     static final int START_END_SIZE = 36;
     private static final String CHAT_MESSAGE_PREFIX = "\u00A74[\u00A7cPathmind\u00A74] \u00A77";
@@ -1078,6 +1071,19 @@ public class Node {
 
     public boolean shouldExecuteRepeatAttachedAction() {
         return type == NodeType.CONTROL_REPEAT && runtimeState.repeatExecuteAttachedAction;
+    }
+
+    public int getRepeatLoopCount() {
+        if (type != NodeType.CONTROL_REPEAT) {
+            return 0;
+        }
+        return Math.max(0, getIntParameter("Count", 1));
+    }
+
+    public void clearLoopRuntimeState() {
+        runtimeState.repeatRemainingIterations = 0;
+        runtimeState.repeatActive = false;
+        runtimeState.repeatExecuteAttachedAction = false;
     }
     
     public boolean isSocketClicked(int mouseX, int mouseY, int socketIndex, boolean isInput) {
@@ -4462,7 +4468,7 @@ public class Node {
         }
     }
 
-    private void sendIncompatibleParameterMessage(Node parameterNode) {
+    void sendIncompatibleParameterMessage(Node parameterNode) {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (client == null) {
             return;
@@ -5510,7 +5516,7 @@ public class Node {
         return craftCommandExecutor().displayFitsPlayerGrid(display, registryManager);
     }
 
-    void cacheRecipeForMode(CachedRecipeBook book,
+    void cacheRecipeForMode(NodeCraftCommandExecutor.CachedRecipeBook book,
                             Item targetItem,
                             CraftingRecipe recipe,
                             int outputCount,
@@ -5519,7 +5525,7 @@ public class Node {
         craftCommandExecutor().cacheRecipeForMode(book, targetItem, recipe, outputCount, mode, registryManager);
     }
 
-    void cacheDisplayForMode(CachedRecipeBook book,
+    void cacheDisplayForMode(NodeCraftCommandExecutor.CachedRecipeBook book,
                              Item targetItem,
                              int outputCount,
                              Object display,
@@ -5550,6 +5556,71 @@ public class Node {
 
     int mapPlayerInventorySlot(ScreenHandler handler, int inventorySlot) {
         return craftCommandExecutor().mapPlayerInventorySlot(handler, inventorySlot);
+    }
+
+    public static boolean warmRecipeCache(MinecraftClient client) {
+        return NodeCraftCommandExecutor.warmRecipeCache(client);
+    }
+
+    public static boolean hasUsableRecipeCache(MinecraftClient client) {
+        return NodeCraftCommandExecutor.hasUsableRecipeCache(client);
+    }
+
+    public static void resetRecipeCacheWarmup() {
+        cachedRecipeBook = null;
+        NodeCraftCommandExecutor.resetRecipeCacheWarmup();
+    }
+
+    public static boolean clearRecipeCache(MinecraftClient client) {
+        cachedRecipeBook = null;
+        return NodeCraftCommandExecutor.clearRecipeCache(client);
+    }
+
+    public static boolean isRecipeCacheWarmupInProgress(MinecraftClient client) {
+        return NodeCraftCommandExecutor.isRecipeCacheWarmupInProgress(client);
+    }
+
+    public static RecipeCacheWarmupProgress getRecipeCacheWarmupProgress(MinecraftClient client) {
+        NodeCraftCommandExecutor.RecipeCacheWarmupProgress progress =
+            NodeCraftCommandExecutor.getRecipeCacheWarmupProgress(client);
+        return progress == null ? null : new RecipeCacheWarmupProgress(progress.completed(), progress.total());
+    }
+
+    static boolean isRecipeCacheUsableForTests(Map<String, List<Map<String, Object>>> rawRecipesByOutput) {
+        return NodeCraftCommandExecutor.isRecipeCacheUsableForTests(rawRecipesByOutput);
+    }
+
+    static List<Integer> normalizeCachedRecipeSlotIndexesForTests(List<Integer> slotIndexes) {
+        return NodeCraftCommandExecutor.normalizeCachedRecipeSlotIndexesForTests(slotIndexes);
+    }
+
+    static List<Integer> planIngredientSourceSlotsForTests(List<TestIngredientStack> inventoryStacks,
+                                                           List<String> ingredientKeys) {
+        List<NodeCraftCommandExecutor.TestIngredientStack> executorStacks = new ArrayList<>();
+        if (inventoryStacks != null) {
+            for (TestIngredientStack stack : inventoryStacks) {
+                executorStacks.add(stack == null
+                    ? new NodeCraftCommandExecutor.TestIngredientStack("", 0)
+                    : new NodeCraftCommandExecutor.TestIngredientStack(stack.key(), stack.count()));
+            }
+        }
+        return NodeCraftCommandExecutor.planIngredientSourceSlotsForTests(executorStacks, ingredientKeys);
+    }
+
+    @Deprecated
+    static class CachedRecipeBook extends NodeCraftCommandExecutor.CachedRecipeBook {
+    }
+
+    static record TestIngredientStack(String key, int count) {
+    }
+
+    public record RecipeCacheWarmupProgress(int completed, int total) {
+        public float fraction() {
+            if (total <= 0) {
+                return 0.0f;
+            }
+            return Math.min(1.0f, Math.max(0.0f, completed / (float) total));
+        }
     }
 
     private NodeWorldActionCommandExecutor worldActionCommandExecutor() {
@@ -5798,1421 +5869,6 @@ public class Node {
         guiCommandExecutor().executePlayerGuiCommand(future, desiredMode);
     }
 
-    int normalizeCachedRecipeSlotIndex(int slotIndex, boolean legacyZeroBasedSlots) {
-        if (!legacyZeroBasedSlots) {
-            return slotIndex;
-        }
-        return slotIndex + 1;
-    }
-
-    static List<Integer> normalizeCachedRecipeSlotIndexesForTests(List<Integer> slotIndexes) {
-        if (slotIndexes == null || slotIndexes.isEmpty()) {
-            return List.of();
-        }
-        boolean legacyZeroBasedSlots = false;
-        for (Integer slotIndex : slotIndexes) {
-            if (slotIndex != null && slotIndex == 0) {
-                legacyZeroBasedSlots = true;
-                break;
-            }
-        }
-        List<Integer> normalized = new ArrayList<>(slotIndexes.size());
-        for (Integer slotIndex : slotIndexes) {
-            if (slotIndex == null) {
-                continue;
-            }
-            normalized.add(legacyZeroBasedSlots ? slotIndex + 1 : slotIndex);
-        }
-        return normalized;
-    }
-
-    static List<Integer> planIngredientSourceSlotsForTests(List<TestIngredientStack> inventoryStacks,
-                                                           List<String> ingredientKeys) {
-        List<NodeCraftCommandExecutor.TestIngredientStack> craftStacks = new ArrayList<>();
-        if (inventoryStacks != null) {
-            for (TestIngredientStack stack : inventoryStacks) {
-                craftStacks.add(stack == null
-                    ? new NodeCraftCommandExecutor.TestIngredientStack("", 0)
-                    : new NodeCraftCommandExecutor.TestIngredientStack(stack.key(), stack.count()));
-            }
-        }
-        return NodeCraftCommandExecutor.planIngredientSourceSlotsForTests(craftStacks, ingredientKeys);
-    }
-
-    static record TestIngredientStack(String key, int count) {
-    }
-
-    String getCachedRecipeSignature(CachedRecipe recipe) {
-        if (recipe == null) {
-            return "";
-        }
-        List<String> parts = new ArrayList<>();
-        if (recipe.grid != null) {
-            for (CachedGridIngredient ingredient : recipe.grid) {
-                if (ingredient == null) {
-                    continue;
-                }
-                List<String> ids = ingredient.itemIds != null ? new ArrayList<>(ingredient.itemIds) : List.of();
-                parts.add(ingredient.slotIndex + "=" + String.join("|", ids));
-            }
-        }
-        Collections.sort(parts);
-        return recipe.mode + ":" + recipe.outputCount + ":" + String.join(",", parts);
-    }
-
-    List<ItemStack> resolveIngredientStacksByTesting(Ingredient ingredient) {
-        List<ItemStack> stacks = new ArrayList<>();
-        if (ingredient == null) {
-            return stacks;
-        }
-        for (Item item : Registries.ITEM) {
-            if (item == null || item == Items.AIR) {
-                continue;
-            }
-            ItemStack stack = new ItemStack(item);
-            try {
-                if (ingredient.test(stack)) {
-                    stacks.add(stack);
-                }
-            } catch (RuntimeException ignored) {
-                // Skip items that trip custom ingredient checks.
-            }
-        }
-        return stacks;
-    }
-
-    Ingredient buildIngredientFromItemIds(List<String> itemIds) {
-        if (itemIds == null || itemIds.isEmpty()) {
-            return null;
-        }
-        List<Item> items = new ArrayList<>();
-        for (String idString : itemIds) {
-            Identifier id = Identifier.tryParse(idString);
-            if (id == null || !Registries.ITEM.containsId(id)) {
-                continue;
-            }
-            items.add(Registries.ITEM.get(id));
-        }
-        if (items.isEmpty()) {
-            return null;
-        }
-        return Ingredient.ofItems(items.toArray(new Item[0]));
-    }
-
-    CachedRecipeBook loadRecipeCache(net.minecraft.client.MinecraftClient client) {
-        synchronized (RECIPE_CACHE_LOCK) {
-            if (cachedRecipeBook != null) {
-                return cachedRecipeBook;
-            }
-            Path path = getRecipeCachePath(client);
-            if (path == null || !Files.exists(path)) {
-                cachedRecipeBook = new CachedRecipeBook();
-                return cachedRecipeBook;
-            }
-            try {
-                String json = Files.readString(path, StandardCharsets.UTF_8);
-                CachedRecipeBook loaded = RECIPE_CACHE_GSON.fromJson(json, CachedRecipeBook.class);
-                if (loaded == null || loaded.schemaVersion != RECIPE_CACHE_VERSION) {
-                    cachedRecipeBook = new CachedRecipeBook();
-                    return cachedRecipeBook;
-                }
-                if (loaded.recipesByOutput == null) {
-                    loaded.recipesByOutput = new HashMap<>();
-                }
-                cachedRecipeBook = loaded;
-                return cachedRecipeBook;
-            } catch (Exception e) {
-                cachedRecipeBook = new CachedRecipeBook();
-                return cachedRecipeBook;
-            }
-        }
-    }
-
-    void saveRecipeCache(net.minecraft.client.MinecraftClient client, CachedRecipeBook book) {
-        if (client == null || book == null) {
-            return;
-        }
-        synchronized (RECIPE_CACHE_LOCK) {
-            Path path = getRecipeCachePath(client);
-            if (path == null) {
-                return;
-            }
-            try {
-                boolean existed = Files.exists(path);
-                Path parent = path.getParent();
-                if (parent != null && !Files.exists(parent)) {
-                    Files.createDirectories(parent);
-                }
-                book.schemaVersion = RECIPE_CACHE_VERSION;
-                try {
-                    book.gameVersion = client.getGameVersion();
-                } catch (RuntimeException ignored) {
-                    book.gameVersion = null;
-                }
-                String json = RECIPE_CACHE_GSON.toJson(book);
-                Files.writeString(path, json, StandardCharsets.UTF_8);
-                if (!existed) {
-                    LOGGER.debug("Pathmind recipe cache created at {}", path.toAbsolutePath());
-                }
-            } catch (Exception ignored) {
-            }
-        }
-    }
-
-    private static Path getRecipeCachePath(net.minecraft.client.MinecraftClient client) {
-        return getPathmindDirectory(client).resolve(RECIPE_CACHE_FILE_NAME);
-    }
-
-    private static Path getPathmindDirectory(net.minecraft.client.MinecraftClient client) {
-        Path minecraftDirectory = null;
-        if (client != null && client.runDirectory != null) {
-            minecraftDirectory = client.runDirectory.toPath();
-        } else {
-            FabricLoader loader = FabricLoader.getInstance();
-            if (loader != null) {
-                minecraftDirectory = loader.getGameDir();
-            }
-        }
-        if (minecraftDirectory == null) {
-            minecraftDirectory = Paths.get(System.getProperty("user.home"), ".minecraft");
-        }
-        return minecraftDirectory.resolve("pathmind");
-    }
-
-    List<RecipeEntry<?>> getRecipeEntries(Object manager) {
-        List<RecipeEntry<?>> entries = new ArrayList<>();
-        if (manager == null) {
-            return entries;
-        }
-
-        List<String> preferredNames = List.of("values", "getRecipes", "getAllRecipes", "getAll");
-        for (String name : preferredNames) {
-            try {
-                java.lang.reflect.Method method = manager.getClass().getMethod(name);
-                method.setAccessible(true);
-                Object result = method.invoke(manager);
-                if (collectRecipeEntries(result, entries)) {
-                    return entries;
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // Try the next candidate.
-            }
-        }
-
-        for (java.lang.reflect.Method method : manager.getClass().getMethods()) {
-            if (method.getParameterCount() != 0) {
-                continue;
-            }
-            Class<?> returnType = method.getReturnType();
-            if (!Iterable.class.isAssignableFrom(returnType) && !java.util.Map.class.isAssignableFrom(returnType)) {
-                continue;
-            }
-            try {
-                method.setAccessible(true);
-                Object result = method.invoke(manager);
-                if (collectRecipeEntries(result, entries)) {
-                    return entries;
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // Keep scanning.
-            }
-        }
-
-        if (entries.isEmpty()) {
-            collectRecipeEntriesFromFields(manager, entries, 0, new java.util.IdentityHashMap<>());
-        }
-        return entries;
-    }
-
-    boolean collectRecipeEntries(Object result, List<RecipeEntry<?>> entries) {
-        if (result == null || entries == null) {
-            return false;
-        }
-        if (result instanceof RecipeEntry<?> entry) {
-            entries.add(entry);
-            return true;
-        }
-        if (result instanceof Iterable<?> iterable) {
-            boolean added = false;
-            for (Object item : iterable) {
-                if (item instanceof RecipeEntry<?> recipeEntry) {
-                    entries.add(recipeEntry);
-                    added = true;
-                } else if (item instanceof java.util.Map<?, ?> map) {
-                    if (collectRecipeEntries(map.values(), entries)) {
-                        added = true;
-                    }
-                } else if (item instanceof Iterable<?> nested) {
-                    if (collectRecipeEntries(nested, entries)) {
-                        added = true;
-                    }
-                }
-            }
-            return added;
-        }
-        if (result instanceof java.util.Iterator<?> iterator) {
-            boolean added = false;
-            while (iterator.hasNext()) {
-                Object item = iterator.next();
-                if (item instanceof RecipeEntry<?> recipeEntry) {
-                    entries.add(recipeEntry);
-                    added = true;
-                } else if (item instanceof java.util.Map<?, ?> map) {
-                    if (collectRecipeEntries(map.values(), entries)) {
-                        added = true;
-                    }
-                } else if (item instanceof Iterable<?> nested) {
-                    if (collectRecipeEntries(nested, entries)) {
-                        added = true;
-                    }
-                }
-            }
-            return added;
-        }
-        if (result instanceof java.util.Map<?, ?> map) {
-            return collectRecipeEntries(map.values(), entries);
-        }
-        // Handle container-like objects with values() or iterator() accessors.
-        try {
-            java.lang.reflect.Method valuesMethod = result.getClass().getMethod("values");
-            if (valuesMethod.getParameterCount() == 0) {
-                valuesMethod.setAccessible(true);
-                Object values = valuesMethod.invoke(result);
-                if (collectRecipeEntries(values, entries)) {
-                    return true;
-                }
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // Ignore missing values() method.
-        }
-        try {
-            java.lang.reflect.Method iteratorMethod = result.getClass().getMethod("iterator");
-            if (iteratorMethod.getParameterCount() == 0) {
-                iteratorMethod.setAccessible(true);
-                Object iter = iteratorMethod.invoke(result);
-                if (collectRecipeEntries(iter, entries)) {
-                    return true;
-                }
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // Ignore missing iterator() method.
-        }
-        return false;
-    }
-
-    void collectRecipeEntriesFromFields(Object manager,
-                                                List<RecipeEntry<?>> entries,
-                                                int depth,
-                                                java.util.IdentityHashMap<Object, Boolean> seen) {
-        if (manager == null || entries == null) {
-            return;
-        }
-        if (isJdkType(manager.getClass())) {
-            return;
-        }
-        if (depth > 3) {
-            return;
-        }
-        if (seen.put(manager, Boolean.TRUE) != null) {
-            return;
-        }
-        for (java.lang.reflect.Field field : getAllFields(manager.getClass())) {
-            try {
-                Object accessTarget = java.lang.reflect.Modifier.isStatic(field.getModifiers()) ? null : manager;
-                if (!field.canAccess(accessTarget)) {
-                    try {
-                        field.setAccessible(true);
-                    } catch (RuntimeException ignored) {
-                        continue;
-                    }
-                }
-                Object value = field.get(accessTarget);
-                if (value == null || seen.containsKey(value)) {
-                    continue;
-                }
-                if (isJdkType(value.getClass())) {
-                    continue;
-                }
-                if (collectRecipeEntries(value, entries)) {
-                    continue;
-                }
-                // Dive into nested containers (common in recipe managers).
-                if (value instanceof java.util.Map<?, ?> map) {
-                    Object crafting = map.get(RecipeType.CRAFTING);
-                    if (collectRecipeEntries(crafting, entries)) {
-                        continue;
-                    }
-                    for (Object nested : map.values()) {
-                        collectRecipeEntriesFromFields(nested, entries, depth + 1, seen);
-                    }
-                } else if (value instanceof Iterable<?> iterable) {
-                    for (Object nested : iterable) {
-                        collectRecipeEntriesFromFields(nested, entries, depth + 1, seen);
-                    }
-                } else {
-                    collectRecipeEntriesFromFields(value, entries, depth + 1, seen);
-                }
-            } catch (IllegalAccessException ignored) {
-                // Skip inaccessible fields.
-            }
-        }
-    }
-
-    private List<java.lang.reflect.Field> getAllFields(Class<?> type) {
-        List<java.lang.reflect.Field> fields = new ArrayList<>();
-        Class<?> current = type;
-        while (current != null && current != Object.class) {
-            if (isJdkType(current)) {
-                break;
-            }
-            fields.addAll(Arrays.asList(current.getDeclaredFields()));
-            current = current.getSuperclass();
-        }
-        return fields;
-    }
-
-    private boolean isJdkType(Class<?> type) {
-        if (type == null) {
-            return true;
-        }
-        Package pkg = type.getPackage();
-        String name = pkg != null ? pkg.getName() : "";
-        return name.startsWith("java.")
-            || name.startsWith("javax.")
-            || name.startsWith("jdk.")
-            || name.startsWith("sun.")
-            || name.startsWith("com.sun.");
-    }
-
-    List<Object> getRecipeManagers(net.minecraft.client.MinecraftClient client) {
-        List<Object> managers = new ArrayList<>();
-        if (client == null) {
-            return managers;
-        }
-        MinecraftServer server = client.getServer();
-        if (server != null) {
-            RecipeManager manager = server.getRecipeManager();
-            if (manager != null) {
-                managers.add(manager);
-            }
-        }
-        if (client.getNetworkHandler() != null) {
-            try {
-                java.lang.reflect.Method method = client.getNetworkHandler().getClass().getMethod("getRecipeManager");
-                method.setAccessible(true);
-                Object result = method.invoke(client.getNetworkHandler());
-                if (result != null && !managers.contains(result)) {
-                    managers.add(result);
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // Ignore network handlers without recipe managers.
-            }
-        }
-        if (client.world != null) {
-            try {
-                RecipeManager manager = client.world.getRecipeManager();
-                if (manager != null && !managers.contains(manager)) {
-                    managers.add(manager);
-                }
-            } catch (RuntimeException ignored) {
-                // Ignore client worlds without a recipe manager.
-            }
-        }
-        return managers;
-    }
-
-    static class CraftingSummary {
-        final int produced;
-        final String failureMessage;
-
-        CraftingSummary(int produced, String failureMessage) {
-            this.produced = produced;
-            this.failureMessage = failureMessage;
-        }
-    }
-
-    static class CachedRecipeBook {
-        int schemaVersion = RECIPE_CACHE_VERSION;
-        String gameVersion;
-        Map<String, List<CachedRecipe>> recipesByOutput = new HashMap<>();
-    }
-
-    static class CachedRecipe {
-        String mode;
-        int outputCount;
-        List<CachedGridIngredient> grid = new ArrayList<>();
-    }
-
-    static class CachedGridIngredient {
-        int slotIndex;
-        List<String> itemIds = new ArrayList<>();
-    }
-
-    private static class RecipeCacheWarmupState {
-        private final Path cachePath;
-        private final CachedRecipeBook book;
-        private final Object registryManager;
-        private final Object serverRegistryManager;
-        private final List<RecipeEntry<?>> craftingEntries;
-        private final List<RecipeResultCollection> recipeCollections;
-        private final int totalDisplayEntries;
-        private int recipeIndex;
-        private int collectionIndex;
-        private int displayIndex;
-        private boolean dirty;
-        private int unsavedChanges;
-
-        RecipeCacheWarmupState(Path cachePath,
-                               CachedRecipeBook book,
-                               Object registryManager,
-                               Object serverRegistryManager,
-                               List<RecipeEntry<?>> craftingEntries,
-                               List<RecipeResultCollection> recipeCollections,
-                               int totalDisplayEntries) {
-            this.cachePath = cachePath;
-            this.book = book;
-            this.registryManager = registryManager;
-            this.serverRegistryManager = serverRegistryManager;
-            this.craftingEntries = craftingEntries != null ? craftingEntries : List.of();
-            this.recipeCollections = recipeCollections != null ? recipeCollections : List.of();
-            this.totalDisplayEntries = Math.max(0, totalDisplayEntries);
-        }
-
-        boolean matches(net.minecraft.client.MinecraftClient client) {
-            return Objects.equals(cachePath, getRecipeCachePath(client));
-        }
-
-        int getCompletedUnits() {
-            return Math.min(getTotalUnits(), recipeIndex + getCompletedDisplayEntries());
-        }
-
-        int getTotalUnits() {
-            return craftingEntries.size() + totalDisplayEntries;
-        }
-
-        private int getCompletedDisplayEntries() {
-            int completed = 0;
-            for (int i = 0; i < collectionIndex && i < recipeCollections.size(); i++) {
-                RecipeResultCollection collection = recipeCollections.get(i);
-                List<?> entries = collection != null ? RecipeCompatibilityBridge.getAllRecipesFromCollection(collection) : null;
-                completed += entries != null ? entries.size() : 0;
-            }
-            completed += displayIndex;
-            return Math.min(completed, totalDisplayEntries);
-        }
-    }
-
-    public record RecipeCacheWarmupProgress(int completed, int total) {
-        public float fraction() {
-            if (total <= 0) {
-                return 0.0f;
-            }
-            return Math.max(0.0f, Math.min(1.0f, completed / (float) total));
-        }
-    }
-
-    public static boolean warmRecipeCache(net.minecraft.client.MinecraftClient client) {
-        if (client == null || client.getServer() == null) {
-            return false;
-        }
-        Node node = new Node(NodeType.CRAFT, 0, 0);
-        return node.warmRecipeCacheInternal(client);
-    }
-
-    public static boolean hasUsableRecipeCache(net.minecraft.client.MinecraftClient client) {
-        if (client == null) {
-            return false;
-        }
-        Node node = new Node(NodeType.CRAFT, 0, 0);
-        return node.hasUsableRecipeCacheInternal(client);
-    }
-
-    public static void resetRecipeCacheWarmup() {
-        synchronized (RECIPE_CACHE_LOCK) {
-            cachedRecipeBook = null;
-            recipeCacheWarmupState = null;
-        }
-    }
-
-    public static boolean clearRecipeCache(net.minecraft.client.MinecraftClient client) {
-        synchronized (RECIPE_CACHE_LOCK) {
-            cachedRecipeBook = null;
-            recipeCacheWarmupState = null;
-
-            Path path = getRecipeCachePath(client);
-            if (path == null) {
-                return false;
-            }
-
-            try {
-                return Files.deleteIfExists(path);
-            } catch (IOException e) {
-                LOGGER.warn("Failed to clear Pathmind cache file at {}", path.toAbsolutePath(), e);
-                return false;
-            }
-        }
-    }
-
-    public static boolean isRecipeCacheWarmupInProgress(net.minecraft.client.MinecraftClient client) {
-        RecipeCacheWarmupState state = recipeCacheWarmupState;
-        return state != null && state.matches(client);
-    }
-
-    public static RecipeCacheWarmupProgress getRecipeCacheWarmupProgress(net.minecraft.client.MinecraftClient client) {
-        RecipeCacheWarmupState state = recipeCacheWarmupState;
-        if (state == null || !state.matches(client)) {
-            return null;
-        }
-        int total = state.getTotalUnits();
-        if (total <= 0) {
-            return null;
-        }
-        return new RecipeCacheWarmupProgress(state.getCompletedUnits(), total);
-    }
-
-    private boolean warmRecipeCacheInternal(net.minecraft.client.MinecraftClient client) {
-        if (client == null || client.getServer() == null) {
-            return false;
-        }
-        RecipeCacheWarmupState state = recipeCacheWarmupState;
-        if (state == null || !state.matches(client)) {
-            state = createRecipeCacheWarmupState(client);
-            recipeCacheWarmupState = state;
-        }
-        if (state == null) {
-            return false;
-        }
-
-        int recipesProcessed = 0;
-        while (recipesProcessed < RECIPE_WARMUP_RECIPE_BATCH_SIZE && state.recipeIndex < state.craftingEntries.size()) {
-            RecipeEntry<?> entry = state.craftingEntries.get(state.recipeIndex++);
-            processWarmupRecipeEntry(state, entry);
-            recipesProcessed++;
-        }
-
-        int displaysProcessed = 0;
-        while (displaysProcessed < RECIPE_WARMUP_DISPLAY_BATCH_SIZE && state.collectionIndex < state.recipeCollections.size()) {
-            RecipeResultCollection collection = state.recipeCollections.get(state.collectionIndex);
-            List<?> entries = collection != null ? RecipeCompatibilityBridge.getAllRecipesFromCollection(collection) : null;
-            if (entries == null || entries.isEmpty() || state.displayIndex >= entries.size()) {
-                state.collectionIndex++;
-                state.displayIndex = 0;
-                continue;
-            }
-            Object entry = entries.get(state.displayIndex++);
-            processWarmupDisplayEntry(state, entry);
-            displaysProcessed++;
-        }
-
-        if (state.dirty && state.unsavedChanges >= RECIPE_WARMUP_SAVE_INTERVAL) {
-            saveRecipeCache(client, state.book);
-            state.unsavedChanges = 0;
-            state.dirty = false;
-        }
-
-        if (state.recipeIndex < state.craftingEntries.size() || state.collectionIndex < state.recipeCollections.size()) {
-            return false;
-        }
-
-        if (state.dirty || state.unsavedChanges > 0) {
-            saveRecipeCache(client, state.book);
-            state.unsavedChanges = 0;
-            state.dirty = false;
-        }
-        recipeCacheWarmupState = null;
-        return state.book.recipesByOutput != null && !state.book.recipesByOutput.isEmpty();
-    }
-
-    private boolean hasUsableRecipeCacheInternal(net.minecraft.client.MinecraftClient client) {
-        Path path = getRecipeCachePath(client);
-        if (path == null || !Files.exists(path)) {
-            return false;
-        }
-        CachedRecipeBook book = loadRecipeCache(client);
-        return isRecipeCacheUsable(book);
-    }
-
-    static boolean isRecipeCacheUsableForTests(Map<String, List<Map<String, Object>>> rawRecipesByOutput) {
-        CachedRecipeBook book = new CachedRecipeBook();
-        book.recipesByOutput = new HashMap<>();
-        if (rawRecipesByOutput != null) {
-            for (Map.Entry<String, List<Map<String, Object>>> entry : rawRecipesByOutput.entrySet()) {
-                List<CachedRecipe> recipes = new ArrayList<>();
-                if (entry.getValue() != null) {
-                    for (Map<String, Object> rawRecipe : entry.getValue()) {
-                        if (rawRecipe == null) {
-                            continue;
-                        }
-                        CachedRecipe recipe = new CachedRecipe();
-                        Object mode = rawRecipe.get("mode");
-                        if (mode instanceof String modeString) {
-                            recipe.mode = modeString;
-                        }
-                        Object outputCount = rawRecipe.get("outputCount");
-                        if (outputCount instanceof Number number) {
-                            recipe.outputCount = number.intValue();
-                        }
-                        Object rawGrid = rawRecipe.get("grid");
-                        if (rawGrid instanceof List<?> gridList) {
-                            for (Object rawIngredient : gridList) {
-                                if (!(rawIngredient instanceof Map<?, ?> ingredientMap)) {
-                                    continue;
-                                }
-                                CachedGridIngredient ingredient = new CachedGridIngredient();
-                                Object slotIndex = ingredientMap.get("slotIndex");
-                                if (slotIndex instanceof Number number) {
-                                    ingredient.slotIndex = number.intValue();
-                                }
-                                Object itemIds = ingredientMap.get("itemIds");
-                                if (itemIds instanceof List<?> ids) {
-                                    for (Object id : ids) {
-                                        if (id instanceof String idString) {
-                                            ingredient.itemIds.add(idString);
-                                        }
-                                    }
-                                }
-                                recipe.grid.add(ingredient);
-                            }
-                        }
-                        recipes.add(recipe);
-                    }
-                }
-                book.recipesByOutput.put(entry.getKey(), recipes);
-            }
-        }
-        return isRecipeCacheUsable(book);
-    }
-
-    private static boolean isRecipeCacheUsable(CachedRecipeBook book) {
-        if (book == null || book.schemaVersion != RECIPE_CACHE_VERSION || book.recipesByOutput == null || book.recipesByOutput.isEmpty()) {
-            return false;
-        }
-        for (Map.Entry<String, List<CachedRecipe>> entry : book.recipesByOutput.entrySet()) {
-            if (entry == null || entry.getKey() == null || entry.getKey().trim().isEmpty()) {
-                continue;
-            }
-            List<CachedRecipe> recipes = entry.getValue();
-            if (recipes == null || recipes.isEmpty()) {
-                continue;
-            }
-            for (CachedRecipe recipe : recipes) {
-                if (recipe == null || recipe.mode == null || recipe.mode.trim().isEmpty() || recipe.outputCount <= 0) {
-                    continue;
-                }
-                if (recipe.grid == null || recipe.grid.isEmpty()) {
-                    continue;
-                }
-                boolean hasIngredient = false;
-                for (CachedGridIngredient ingredient : recipe.grid) {
-                    if (ingredient == null || ingredient.itemIds == null || ingredient.itemIds.isEmpty()) {
-                        continue;
-                    }
-                    boolean hasValidId = false;
-                    for (String itemId : ingredient.itemIds) {
-                        if (itemId != null && !itemId.trim().isEmpty()) {
-                            hasValidId = true;
-                            break;
-                        }
-                    }
-                    if (hasValidId) {
-                        hasIngredient = true;
-                        break;
-                    }
-                }
-                if (hasIngredient) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private RecipeCacheWarmupState createRecipeCacheWarmupState(net.minecraft.client.MinecraftClient client) {
-        if (client == null || client.getServer() == null) {
-            return null;
-        }
-        if (hasUsableRecipeCacheInternal(client)) {
-            return null;
-        }
-        RecipeManager manager = client.getServer().getRecipeManager();
-        if (manager == null) {
-            return null;
-        }
-        CachedRecipeBook book = loadRecipeCache(client);
-        if (book == null) {
-            return null;
-        }
-        List<RecipeEntry<?>> craftingEntries = getCraftingRecipeEntries(manager);
-        Object registryManager = client.world;
-        if (registryManager == null) {
-            registryManager = client.getServer().getRegistryManager();
-        }
-        List<RecipeResultCollection> collections = List.of();
-        if (client.player != null && client.player.getRecipeBook() instanceof ClientRecipeBook clientRecipeBook) {
-            List<RecipeResultCollection> orderedResults = clientRecipeBook.getOrderedResults();
-            if (orderedResults != null && !orderedResults.isEmpty()) {
-                collections = new ArrayList<>(orderedResults);
-            }
-        }
-        boolean hasExistingCache = book.recipesByOutput != null && !book.recipesByOutput.isEmpty();
-        if (craftingEntries.isEmpty() && collections.isEmpty() && !hasExistingCache) {
-            return null;
-        }
-        int totalDisplayEntries = countRecipeDisplayEntries(collections);
-        return new RecipeCacheWarmupState(
-            getRecipeCachePath(client),
-            book,
-            registryManager,
-            client.getServer().getRegistryManager(),
-            new ArrayList<>(craftingEntries),
-            collections,
-            totalDisplayEntries
-        );
-    }
-
-    private int countRecipeDisplayEntries(List<RecipeResultCollection> collections) {
-        if (collections == null || collections.isEmpty()) {
-            return 0;
-        }
-        int total = 0;
-        for (RecipeResultCollection collection : collections) {
-            List<?> entries = collection != null ? RecipeCompatibilityBridge.getAllRecipesFromCollection(collection) : null;
-            if (entries != null) {
-                total += entries.size();
-            }
-        }
-        return total;
-    }
-
-    private void processWarmupRecipeEntry(RecipeCacheWarmupState state, RecipeEntry<?> entry) {
-        if (state == null || entry == null || !(entry.value() instanceof CraftingRecipe craftingRecipe)) {
-            return;
-        }
-        ItemStack output = getRecipeOutput(craftingRecipe, state.serverRegistryManager);
-        if ((output == null || output.isEmpty()) && state.registryManager != state.serverRegistryManager) {
-            output = getRecipeOutput(craftingRecipe, state.registryManager);
-        }
-        if (output == null || output.isEmpty()) {
-            return;
-        }
-        cacheRecipeForMode(state.book, output.getItem(), craftingRecipe, output.getCount(), NodeMode.CRAFT_CRAFTING_TABLE, state.registryManager);
-        if (recipeFitsPlayerGrid(craftingRecipe)) {
-            cacheRecipeForMode(state.book, output.getItem(), craftingRecipe, output.getCount(), NodeMode.CRAFT_PLAYER_GUI, state.registryManager);
-        }
-        state.dirty = true;
-        state.unsavedChanges++;
-    }
-
-    private void processWarmupDisplayEntry(RecipeCacheWarmupState state, Object entry) {
-        if (state == null || entry == null) {
-            return;
-        }
-        Object display = RecipeCompatibilityBridge.getDisplayFromEntry(entry);
-        if (!RecipeCompatibilityBridge.isCraftingDisplay(display)) {
-            return;
-        }
-        ItemStack output = getDisplayOutput(display, state.registryManager);
-        if (output == null || output.isEmpty()) {
-            return;
-        }
-        cacheDisplayForMode(state.book, output.getItem(), output.getCount(), display, NodeMode.CRAFT_CRAFTING_TABLE, state.registryManager);
-        if (displayFitsPlayerGrid(display, state.registryManager)) {
-            cacheDisplayForMode(state.book, output.getItem(), output.getCount(), display, NodeMode.CRAFT_PLAYER_GUI, state.registryManager);
-        }
-        state.dirty = true;
-        state.unsavedChanges++;
-    }
-
-    static class GridIngredient {
-        private final int slotIndex;
-        private final Ingredient ingredient;
-        private final boolean allowEmpty;
-
-        GridIngredient(int slotIndex, Ingredient ingredient, boolean allowEmpty) {
-            this.slotIndex = slotIndex;
-            this.ingredient = ingredient;
-            this.allowEmpty = allowEmpty;
-        }
-
-        int slotIndex() {
-            return slotIndex;
-        }
-
-        Ingredient ingredient() {
-            return ingredient;
-        }
-
-        boolean allowEmpty() {
-            return allowEmpty;
-        }
-    }
-
-    static class CraftingAttemptResult {
-        final int produced;
-        final String errorMessage;
-
-        CraftingAttemptResult(int produced, String errorMessage) {
-            this.produced = produced;
-            this.errorMessage = errorMessage;
-        }
-    }
-    
-    private void executeWaitCommand(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        double baseDuration = Math.max(0.0, getDoubleParameter("Duration", 1.0));
-        Double attachedDurationSeconds = runtimeState.runtimeParameterData != null ? runtimeState.runtimeParameterData.durationSeconds : null;
-
-        final double waitSeconds;
-        NodeMode waitMode = mode != null ? mode : NodeMode.WAIT_SECONDS;
-        if (attachedDurationSeconds != null) {
-            waitSeconds = attachedDurationSeconds;
-        } else {
-            double unitSeconds = switch (waitMode) {
-                case WAIT_TICKS -> 0.05;
-                case WAIT_MINUTES -> 60.0;
-                case WAIT_HOURS -> 3600.0;
-                default -> 1.0;
-            };
-            waitSeconds = baseDuration * unitSeconds;
-        }
-        ExecutionManager manager = ExecutionManager.getInstance();
-        Integer executionId = manager.getCurrentExecutionId();
-
-        new Thread(() -> {
-            try {
-                String nodeId = getId();
-                long waitMs = (long) (waitSeconds * 1000);
-
-                while (true) {
-                    if (shouldAbortForRepeatUntilGuard()) {
-                        future.complete(null);
-                        return;
-                    }
-                    if (!manager.isExecutionActiveOnNode(executionId, nodeId)) {
-                        future.complete(null);
-                        return;
-                    }
-                    if (manager.getExecutionNodeDuration(executionId) >= waitMs) {
-                        future.complete(null);
-                        return;
-                    }
-                    Thread.sleep(CONTROL_POLL_INTERVAL_MS);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                future.completeExceptionally(e);
-            }
-        }, "Pathmind-Wait").start();
-    }
-    
-    private void executeControlRepeat(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        int count = Math.max(0, getIntParameter("Count", 1));
-        if (!runtimeState.repeatActive) {
-            runtimeState.repeatRemainingIterations = count;
-            runtimeState.repeatActive = true;
-        }
-        if (runtimeState.repeatRemainingIterations > 0) {
-            runtimeState.repeatRemainingIterations--;
-            runtimeState.repeatExecuteAttachedAction = true;
-            setNextOutputSocket(0);
-        } else {
-            runtimeState.repeatRemainingIterations = 0;
-            runtimeState.repeatActive = false;
-            runtimeState.repeatExecuteAttachedAction = false;
-            setNextOutputSocket(0);
-        }
-        future.complete(null);
-    }
-    
-    private void executeControlRepeatUntil(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        boolean conditionMet = evaluateConditionFromParameters();
-        if (conditionMet) {
-            runtimeState.repeatRemainingIterations = 0;
-            runtimeState.repeatActive = false;
-            setNextOutputSocket(1);
-        } else {
-            runtimeState.repeatActive = true;
-            setNextOutputSocket(0);
-        }
-        future.complete(null);
-    }
-
-    private void executeControlWaitUntil(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        if (evaluateConditionFromParameters()) {
-            setNextOutputSocket(0);
-            future.complete(null);
-            return;
-        }
-        ExecutionManager manager = ExecutionManager.getInstance();
-        Integer executionId = manager.getCurrentExecutionId();
-
-        new Thread(() -> {
-            try {
-                String nodeId = getId();
-                while (true) {
-                    if (shouldAbortForRepeatUntilGuard()) {
-                        future.complete(null);
-                        return;
-                    }
-                    if (!manager.isExecutionActiveOnNode(executionId, nodeId)) {
-                        future.complete(null);
-                        return;
-                    }
-                    if (evaluateConditionFromParameters()) {
-                        setNextOutputSocket(0);
-                        future.complete(null);
-                        return;
-                    }
-                    Thread.sleep(CONTROL_POLL_INTERVAL_MS);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                future.completeExceptionally(e);
-            }
-        }, "Pathmind-Wait-Until").start();
-    }
-
-    private void executeControlForever(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        runtimeState.repeatActive = true;
-        setNextOutputSocket(0);
-        future.complete(null);
-    }
-
-    private void executeControlIf(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        boolean condition = evaluateConditionFromParameters();
-        setNextOutputSocket(condition ? 0 : NO_OUTPUT);
-        future.complete(null);
-    }
-
-    private void executeControlIfElse(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        boolean condition = evaluateConditionFromParameters();
-        setNextOutputSocket(condition ? 0 : 1);
-        future.complete(null);
-    }
-
-    private void executeControlFork(CompletableFuture<Void> future) {
-        future.complete(null);
-    }
-
-    private void executeControlJoinAny(CompletableFuture<Void> future) {
-        future.complete(null);
-    }
-
-    private void executeControlJoinAll(CompletableFuture<Void> future) {
-        future.complete(null);
-    }
-
-    private void executeMessageCommand(CompletableFuture<Void> future) {
-        if (preprocessAttachedParameter(EnumSet.noneOf(ParameterUsage.class), future) == ParameterHandlingResult.COMPLETE) {
-            return;
-        }
-        List<String> lines = getMessageLines();
-        if (lines == null || lines.isEmpty()) {
-            lines = Collections.singletonList("Hello World");
-        }
-
-        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        if (client != null && client.player != null) {
-            long delayMs = 120L;
-            int[] sent = {0};
-            for (int i = 0; i < lines.size(); i++) {
-                String raw = lines.get(i);
-                String text = raw == null ? "" : raw.trim();
-                text = resolveRuntimeVariablesInText(text);
-                if (text.isEmpty()) {
-                    continue;
-                }
-                String sendText = text;
-                long scheduledDelay = sent[0] * delayMs;
-                MESSAGE_SCHEDULER.schedule(() -> {
-                    MinecraftClient.getInstance().execute(() -> {
-                        MinecraftClient currentClient = MinecraftClient.getInstance();
-                        if (currentClient.player != null) {
-                            if (isMessageClientSide()) {
-                                currentClient.player.sendMessage(Text.literal(sendText), false);
-                            } else if (currentClient.player.networkHandler != null) {
-                                boolean isCommand = sendText.startsWith("/");
-                                if (isCommand) {
-                                    String cmd = sendText.length() > 1 ? sendText.substring(1) : "";
-                                    if (!cmd.isEmpty()) {
-                                        currentClient.player.networkHandler.sendChatCommand(cmd);
-                                    }
-                                } else {
-                                    currentClient.player.networkHandler.sendChatMessage(sendText);
-                                }
-                            }
-                        }
-                    });
-                }, scheduledDelay, TimeUnit.MILLISECONDS);
-                sent[0]++;
-            }
-            long completionDelay = Math.max(0, (sent[0] - 1) * delayMs + delayMs);
-            MESSAGE_SCHEDULER.schedule(() -> {
-                future.complete(null);
-            }, completionDelay, TimeUnit.MILLISECONDS);
-        } else {
-            System.err.println("Unable to send message: client or player not available");
-            future.complete(null);
-        }
-    }
-
-    private String resolveRuntimeVariablesInText(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return raw;
-        }
-        Node startNode = getOwningStartNode();
-        if (startNode == null && getParentControl() != null) {
-            startNode = getParentControl().getOwningStartNode();
-        }
-        ExecutionManager manager = ExecutionManager.getInstance();
-        StringBuilder output = new StringBuilder(raw.length());
-        int index = 0;
-        boolean containsStructuredReplacement = false;
-        while (index < raw.length()) {
-            char current = raw.charAt(index);
-            if (current == '~') {
-                RuntimeVariableInlineMatch match = findInlineRuntimeVariableReference(raw, index, manager, startNode);
-                if (match != null) {
-                    String replacement = formatRuntimeVariableValue(match.variable);
-                    if (replacement != null && !replacement.isEmpty()) {
-                        output.append(replacement);
-                        if (replacement.indexOf(' ') >= 0 || replacement.indexOf('\t') >= 0 || replacement.indexOf('\n') >= 0) {
-                            containsStructuredReplacement = true;
-                        }
-                        index = match.endIndex;
-                        continue;
-                    }
-                    output.append(raw, index, match.endIndex);
-                    index = match.endIndex;
-                    continue;
-                }
-            }
-            output.append(current);
-            index++;
-        }
-        String resolved = output.toString();
-        if (containsStructuredReplacement) {
-            return resolved;
-        }
-        Double evaluated = evaluateNumericExpression(resolved);
-        if (evaluated != null) {
-            return formatEvaluatedNumericText(evaluated);
-        }
-        return resolved;
-    }
-
-    private static String formatEvaluatedNumericText(double value) {
-        if (!Double.isFinite(value)) {
-            return Double.toString(value);
-        }
-        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
-    }
-
-    private RuntimeVariableInlineMatch findInlineRuntimeVariableReference(String raw, int tildeIndex,
-                                                                          ExecutionManager manager, Node startNode) {
-        if (raw == null || manager == null || tildeIndex < 0 || tildeIndex >= raw.length() || raw.charAt(tildeIndex) != '~') {
-            return null;
-        }
-        int nameStart = tildeIndex + 1;
-        if (nameStart >= raw.length()) {
-            return null;
-        }
-        RuntimeVariableInlineMatch bestMatch = null;
-        Set<String> candidateNames = collectRuntimeVariableNamesForParsing(manager, startNode);
-        for (String candidateName : candidateNames) {
-            if (candidateName == null || candidateName.isEmpty()) {
-                continue;
-            }
-            if (!raw.regionMatches(nameStart, candidateName, 0, candidateName.length())) {
-                continue;
-            }
-            int endIndex = nameStart + candidateName.length();
-            if (endIndex < raw.length()) {
-                char boundary = raw.charAt(endIndex);
-                if (!Character.isWhitespace(boundary) && !isInlineMathOperator(boundary)) {
-                    continue;
-                }
-            }
-            ExecutionManager.RuntimeVariable variable = resolveRuntimeVariableForName(manager, startNode, candidateName);
-            if (variable == null) {
-                continue;
-            }
-            if (bestMatch == null || candidateName.length() > bestMatch.name.length()) {
-                bestMatch = new RuntimeVariableInlineMatch(candidateName, endIndex, variable);
-            }
-        }
-        return bestMatch;
-    }
-
-    private Set<String> collectRuntimeVariableNamesForParsing(ExecutionManager manager, Node startNode) {
-        Set<String> names = new LinkedHashSet<>();
-        if (manager == null) {
-            return names;
-        }
-        names.addAll(manager.getKnownRuntimeVariableNames());
-        if (startNode != null) {
-            for (ExecutionManager.RuntimeVariableEntry entry : manager.getRuntimeVariableEntries()) {
-                if (entry == null || entry.getStartNodeId() == null || !startNode.getId().equals(entry.getStartNodeId())) {
-                    continue;
-                }
-                String name = entry.getName();
-                if (name != null && !name.trim().isEmpty()) {
-                    names.add(name.trim());
-                }
-            }
-        }
-        return names;
-    }
-
-    private ExecutionManager.RuntimeVariable resolveRuntimeVariableForName(ExecutionManager manager, Node startNode, String name) {
-        if (manager == null || name == null || name.trim().isEmpty()) {
-            return null;
-        }
-        String trimmedName = name.trim();
-        if (startNode != null) {
-            ExecutionManager.RuntimeVariable direct = manager.getRuntimeVariable(startNode, trimmedName);
-            if (direct != null) {
-                return direct;
-            }
-        }
-        ExecutionManager.RuntimeVariable anyActive = manager.getRuntimeVariableFromAnyActiveChain(trimmedName);
-        if (anyActive != null) {
-            return anyActive;
-        }
-        ExecutionManager.RuntimeVariable match = null;
-        for (ExecutionManager.RuntimeVariableEntry entry : manager.getRuntimeVariableEntries()) {
-            if (entry == null) {
-                continue;
-            }
-            String entryName = entry.getName();
-            if (entryName == null) {
-                continue;
-            }
-            if (!entryName.trim().equals(trimmedName)) {
-                continue;
-            }
-            if (match != null) {
-                return null;
-            }
-            match = entry.getVariable();
-        }
-        return match;
-    }
-
-    private String formatRuntimeVariableValue(ExecutionManager.RuntimeVariable variable) {
-        if (variable == null) {
-            return "";
-        }
-        Map<String, String> values = variable.getValues();
-        if (values.isEmpty()) {
-            return "";
-        }
-        NodeType valueType = variable.getType();
-        if (valueType == null) {
-            return "";
-        }
-        return switch (valueType) {
-            case PARAM_BLOCK, PARAM_PLACE_TARGET -> getRuntimeValue(values, "block");
-            case PARAM_ITEM, PARAM_VILLAGER_TRADE -> getRuntimeValue(values, "item");
-            case PARAM_ENTITY ->  getRuntimeValue(values, "entity");
-            case PARAM_PLAYER -> getRuntimeValue(values, "player");
-            case PARAM_WAYPOINT -> getRuntimeValue(values, "waypoint");
-            case PARAM_SCHEMATIC -> getRuntimeValue(values, "schematic");
-            case PARAM_INVENTORY_SLOT, SENSOR_CURRENT_HAND -> getRuntimeValue(values, "slot");
-            case SENSOR_IS_ON_GROUND, PARAM_DISTANCE, SENSOR_DISTANCE_BETWEEN -> getRuntimeValue(values, "distance");
-            case PARAM_DURATION -> getRuntimeValue(values, "duration");
-            case PARAM_RANGE, PARAM_CLOSEST -> getRuntimeValue(values, "range");
-            case PARAM_BLOCK_FACE -> {
-                String face = getRuntimeValue(values, "face");
-                if (!face.isEmpty()) {
-                    yield face;
-                }
-                face = getRuntimeValue(values, "side");
-                if (!face.isEmpty()) {
-                    yield face;
-                }
-                yield getRuntimeValue(values, "direction");
-            }
-            case PARAM_DIRECTION -> {
-                String yaw = getRuntimeValue(values, "yaw");
-                String pitch = getRuntimeValue(values, "pitch");
-                if (!yaw.isEmpty() && !pitch.isEmpty()) {
-                    yield yaw + " " + pitch;
-                }
-                String direction = getRuntimeValue(values, "direction");
-                if (!direction.isEmpty()) {
-                    yield direction;
-                }
-                direction = getRuntimeValue(values, "side");
-                if (!direction.isEmpty()) {
-                    yield direction;
-                }
-                yield getRuntimeValue(values, "face");
-            }
-            case PARAM_AMOUNT, SENSOR_SLOT_ITEM_COUNT -> getRuntimeValue(values, "amount");
-            case LIST_LENGTH -> {
-                String length = getRuntimeValue(values, "count");
-                if (!length.isEmpty()) {
-                    yield length;
-                }
-                length = getRuntimeValue(values, "value");
-                if (!length.isEmpty()) {
-                    yield length;
-                }
-                yield getRuntimeValue(values, "amount");
-            }
-            case OPERATOR_RANDOM -> {
-                String value = getRuntimeValue(values, "value");
-                if (!value.isEmpty()) {
-                    yield value;
-                }
-                yield getRuntimeValue(values, "amount");
-            }
-            case PARAM_BOOLEAN -> getRuntimeValue(values, "toggle");
-            case PARAM_HAND -> getRuntimeValue(values, "hand");
-            case PARAM_COORDINATE -> formatCoordinateValues(values);
-            case PARAM_ROTATION -> formatRotationValues(values);
-            case VARIABLE -> getRuntimeValue(values, "variable");
-            case SENSOR_POSITION_OF -> {
-                if (isSensorPositionSingleAxisMode()) {
-                    String amount = getRuntimeValue(values, "amount");
-                    if (!amount.isEmpty()) {
-                        yield amount;
-                    }
-                    amount = getRuntimeValue(values, "value");
-                    if (!amount.isEmpty()) {
-                        yield amount;
-                    }
-                }
-                 yield formatCoordinateValues(values);
-            }
-            case SENSOR_TARGETED_BLOCK -> {
-                String block = getRuntimeValue(values, "block");
-                if (!block.isEmpty()) {
-                    String state = getRuntimeValue(values, "state");
-                    if (!state.isEmpty()) {
-                        yield block + "[" + state + "]";
-                    }
-                    yield block;
-                }
-                yield formatCanonicalValueMap(values);
-            }
-            case SENSOR_TARGETED_ENTITY -> {
-                String entity = getRuntimeValue(values, "entity");
-                if (!entity.isEmpty()) {
-                    String state = getRuntimeValue(values, "state");
-                    if (!state.isEmpty()) {
-                        yield entity + "[" + state + "]";
-                    }
-                    yield entity;
-                }
-                yield formatCanonicalValueMap(values);
-            }
-            case SENSOR_LOOK_DIRECTION -> {
-                String yaw = getRuntimeValue(values, "yaw");
-                String pitch = getRuntimeValue(values, "pitch");
-                if (!yaw.isEmpty() && !pitch.isEmpty()) {
-                    yield yaw + " " + pitch;
-                }
-                String amount = getRuntimeValue(values, "amount");
-                if (!amount.isEmpty()) {
-                    yield amount;
-                }
-                String direction = getRuntimeValue(values, "direction");
-                if (!direction.isEmpty()) {
-                    yield direction;
-                }
-                direction = getRuntimeValue(values, "side");
-                if (!direction.isEmpty()) {
-                    yield direction;
-                }
-                yield getRuntimeValue(values, "face");
-            }
-            case SENSOR_TARGETED_BLOCK_FACE -> {
-                String side = getRuntimeValue(values, "side");
-                if (!side.isEmpty()) {
-                    yield side;
-                }
-                side = getRuntimeValue(values, "face");
-                if (!side.isEmpty()) {
-                    yield side;
-                }
-                yield getRuntimeValue(values, "text");
-            }
-            default -> formatCanonicalValueMap(values);
-        };
-    }
-
-    String formatCoordinateValues(Map<String, String> values) {
-        String x = getRuntimeValue(values, "x");
-        String y = getRuntimeValue(values, "y");
-        String z = getRuntimeValue(values, "z");
-        if (x.isEmpty() || y.isEmpty() || z.isEmpty()) {
-            return "";
-        }
-        return x + " " + y + " " + z;
-    }
-
-    String formatRotationValues(Map<String, String> values) {
-        String yaw = getRuntimeValue(values, "yaw");
-        String pitch = getRuntimeValue(values, "pitch");
-        if (yaw.isEmpty() || pitch.isEmpty()) {
-            return "";
-        }
-        return yaw + " " + pitch;
-    }
-
-    String getRuntimeValue(Map<String, String> values, String key) {
-        if (values == null || key == null) {
-            return "";
-        }
-        String direct = values.get(key);
-        if (direct != null && !direct.trim().isEmpty()) {
-            return direct.trim();
-        }
-        String lowerKey = key.toLowerCase(Locale.ROOT);
-        if (!lowerKey.equals(key)) {
-            String lower = values.get(lowerKey);
-            if (lower != null && !lower.trim().isEmpty()) {
-                return lower.trim();
-            }
-        }
-        String normalizedKey = normalizeParameterKey(key);
-        for (Map.Entry<String, String> entry : values.entrySet()) {
-            if (entry == null || entry.getKey() == null) {
-                continue;
-            }
-            if (!normalizeParameterKey(entry.getKey()).equals(normalizedKey)) {
-                continue;
-            }
-            String candidate = entry.getValue();
-            if (candidate != null && !candidate.trim().isEmpty()) {
-                return candidate.trim();
-            }
-        }
-        return "";
-    }
-
     private boolean isInlineVariableChar(char character) {
         return Character.isLetterOrDigit(character) || character == '_' || character == '-';
     }
@@ -7255,12 +5911,80 @@ public class Node {
         textIoCommandExecutor().executeWriteSignCommand(future);
     }
 
+    private void executeMessageCommand(CompletableFuture<Void> future) {
+        textIoCommandExecutor().executeMessageCommand(future);
+    }
+
+    String resolveRuntimeVariablesInText(String raw) {
+        return textIoCommandExecutor().resolveRuntimeVariablesInText(raw);
+    }
+
+    String formatRuntimeVariableValue(ExecutionManager.RuntimeVariable variable) {
+        return textIoCommandExecutor().formatRuntimeVariableValue(variable);
+    }
+
+    ExecutionManager.RuntimeVariable resolveRuntimeVariableForName(ExecutionManager manager, Node startNode, String name) {
+        return textIoCommandExecutor().resolveRuntimeVariableForName(manager, startNode, name);
+    }
+
+    String formatCoordinateValues(Map<String, String> values) {
+        return textIoCommandExecutor().formatCoordinateValues(values);
+    }
+
+    String formatRotationValues(Map<String, String> values) {
+        return textIoCommandExecutor().formatRotationValues(values);
+    }
+
+    String getRuntimeValue(Map<String, String> values, String key) {
+        return textIoCommandExecutor().getRuntimeValue(values, key);
+    }
+
     NodeNavigationCommandExecutor navigationCommandExecutor() {
         return new NodeNavigationCommandExecutor(this);
     }
 
     private NodeFlowCommandExecutor flowCommandExecutor() {
         return new NodeFlowCommandExecutor(this);
+    }
+
+    private void executeWaitCommand(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeWaitCommand(future);
+    }
+
+    private void executeControlRepeat(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlRepeat(future);
+    }
+
+    private void executeControlRepeatUntil(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlRepeatUntil(future);
+    }
+
+    private void executeControlWaitUntil(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlWaitUntil(future);
+    }
+
+    private void executeControlForever(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlForever(future);
+    }
+
+    private void executeControlIf(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlIf(future);
+    }
+
+    private void executeControlIfElse(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlIfElse(future);
+    }
+
+    private void executeControlFork(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlFork(future);
+    }
+
+    private void executeControlJoinAny(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlJoinAny(future);
+    }
+
+    private void executeControlJoinAll(CompletableFuture<Void> future) {
+        flowCommandExecutor().executeControlJoinAll(future);
     }
 
     private void executeGotoCommand(CompletableFuture<Void> future) {
@@ -7371,219 +6095,8 @@ public class Node {
         return inventoryCommandExecutor().resolveInventorySlot(handler, inventory, slotValue, selectionType);
     }
 
-    private boolean resolveUseParameterSelection(Node parameterNode, CompletableFuture<Void> future) {
-        if (parameterNode == null) {
-            return false;
-        }
-        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        if (client == null || client.player == null) {
-            if (future != null && !future.isDone()) {
-                future.completeExceptionally(new RuntimeException("Minecraft client not available"));
-            }
-            return false;
-        }
-        if (runtimeState.runtimeParameterData == null) {
-            runtimeState.runtimeParameterData = new RuntimeParameterData();
-        }
-
-        PlayerInventory inventory = client.player.getInventory();
-        EnumSet<NodeValueTrait> traits = parameterNode.getProvidedTraits();
-        boolean isListItem = parameterNode.getType() == NodeType.LIST_ITEM;
-        boolean treatAsItem = traits.contains(NodeValueTrait.ITEM)
-            || (isListItem && runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetItemId != null);
-        if (traits.contains(NodeValueTrait.BLOCK)) {
-            {
-                String rawBlock = getParameterString(parameterNode, "Block");
-                boolean anySelection = isAnySelectionValue(rawBlock);
-                List<BlockSelection> selections = resolveBlocksFromParameter(parameterNode);
-                if (selections.isEmpty() && !anySelection) {
-                    sendParameterSearchFailure("No block selected on parameter for " + type.getDisplayName() + ".", future);
-                    return false;
-                }
-
-                ItemSearchResult result = null;
-                if (anySelection) {
-                    result = findFirstBlockItemSlot(inventory);
-                } else {
-                    result = findUseBlockSlot(inventory, selections);
-                }
-
-                if (result == null) {
-                    String reference = anySelection ? "block" : selections.stream()
-                        .map(BlockSelection::getBlockIdString)
-                        .filter(id -> !id.isEmpty())
-                        .findFirst()
-                        .orElse("block");
-                    sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
-                    return false;
-                }
-                runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
-                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                runtimeState.runtimeParameterData.targetItem = result.item();
-                runtimeState.runtimeParameterData.targetItemId = result.itemId();
-                return true;
-            }
-        }
-        if (treatAsItem) {
-            List<String> itemIds;
-            if (isListItem && runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetItemId != null) {
-                itemIds = java.util.Collections.singletonList(runtimeState.runtimeParameterData.targetItemId);
-            } else {
-                itemIds = resolveItemIdsFromParameter(parameterNode);
-            }
-            if (itemIds.isEmpty()) {
-                sendParameterSearchFailure("No item selected on parameter for " + type.getDisplayName() + ".", future);
-                return false;
-            }
-                ItemSearchResult result = findUseItemSlot(inventory, itemIds);
-                if (result == null) {
-                    String reference = String.join(", ", itemIds);
-                    sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
-                    return false;
-                }
-                runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
-                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                runtimeState.runtimeParameterData.targetItem = result.item();
-                runtimeState.runtimeParameterData.targetItemId = result.itemId();
-                return true;
-        }
-        if (traits.contains(NodeValueTrait.INVENTORY_SLOT)) {
-                SlotSelectionType selectionType = resolveInventorySlotSelectionType(parameterNode);
-                if (selectionType == SlotSelectionType.GUI_CONTAINER) {
-                    sendNodeErrorMessage(client, "Use node can only use player inventory slots.");
-                    if (future != null && !future.isDone()) {
-                        future.complete(null);
-                    }
-                    return false;
-                }
-                int slotValue = clampInventorySlot(inventory, parseNodeInt(parameterNode, "Slot", 0));
-                runtimeState.runtimeParameterData.slotIndex = slotValue;
-                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                return true;
-        }
-        sendIncompatibleParameterMessage(parameterNode);
-        return false;
-    }
-
-    private record ItemSearchResult(int slotIndex, Item item, String itemId) {
-    }
-
-    private ItemSearchResult findUseItemSlot(PlayerInventory inventory, List<String> itemIds) {
-        if (inventory == null || itemIds == null || itemIds.isEmpty()) {
-            return null;
-        }
-        for (String candidateId : itemIds) {
-            Identifier identifier = Identifier.tryParse(candidateId);
-            if (identifier == null || !Registries.ITEM.containsId(identifier)) {
-                continue;
-            }
-            Item candidateItem = Registries.ITEM.get(identifier);
-            int slot = findAccessibleSlotWithItem(inventory, candidateItem);
-            if (slot >= 0) {
-                return new ItemSearchResult(slot, candidateItem, candidateId);
-            }
-        }
-        return null;
-    }
-
-    private ItemSearchResult findUseBlockSlot(PlayerInventory inventory, List<BlockSelection> selections) {
-        if (inventory == null || selections == null || selections.isEmpty()) {
-            return null;
-        }
-        for (BlockSelection selection : selections) {
-            if (selection == null || selection.getBlock() == null) {
-                continue;
-            }
-            Item candidateItem = selection.getBlock().asItem();
-            if (candidateItem == null || candidateItem == Items.AIR) {
-                continue;
-            }
-            int slot = findAccessibleSlotWithItem(inventory, candidateItem);
-            if (slot >= 0) {
-                Identifier id = Registries.ITEM.getId(candidateItem);
-                String itemId = id.toString();
-                return new ItemSearchResult(slot, candidateItem, itemId);
-            }
-        }
-        return null;
-    }
-
-    private ItemSearchResult findFirstBlockItemSlot(PlayerInventory inventory) {
-        if (inventory == null) {
-            return null;
-        }
-        int limit = Math.min(PlayerInventory.MAIN_SIZE, inventory.size());
-        for (int slot = 0; slot < limit; slot++) {
-            ItemStack stack = inventory.getStack(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            Item item = stack.getItem();
-            if (item instanceof BlockItem) {
-                Identifier id = Registries.ITEM.getId(item);
-                String itemId = id.toString();
-                return new ItemSearchResult(slot, item, itemId);
-            }
-        }
-        int offhandIndex = getOffhandInventoryIndex(inventory);
-        if (offhandIndex >= 0 && offhandIndex < inventory.size()) {
-            ItemStack offhandStack = inventory.getStack(offhandIndex);
-            if (!offhandStack.isEmpty()) {
-                Item item = offhandStack.getItem();
-                if (item instanceof BlockItem) {
-                    Identifier id = Registries.ITEM.getId(item);
-                    String itemId = id != null ? id.toString() : "";
-                    return new ItemSearchResult(offhandIndex, item, itemId);
-                }
-            }
-        }
-        return null;
-    }
-
-    private int findAccessibleSlotWithItem(PlayerInventory inventory, Item item) {
-        if (inventory == null || item == null) {
-            return -1;
-        }
-        for (int slot = 0; slot < PlayerInventory.MAIN_SIZE && slot < inventory.size(); slot++) {
-            ItemStack stack = inventory.getStack(slot);
-            if (!stack.isEmpty() && stack.isOf(item)) {
-                return slot;
-            }
-        }
-        int offhandIndex = getOffhandInventoryIndex(inventory);
-        if (offhandIndex >= 0 && offhandIndex < inventory.size()) {
-            ItemStack offhandStack = inventory.getStack(offhandIndex);
-            if (!offhandStack.isEmpty() && offhandStack.isOf(item)) {
-                return offhandIndex;
-            }
-        }
-        return -1;
-    }
-
-    int findFirstSlotWithItem(PlayerInventory inventory, Item item) {
-        if (inventory == null || item == null) {
-            return -1;
-        }
-        for (int i = 0; i < inventory.size(); i++) {
-            ItemStack stack = inventory.getStack(i);
-            if (!stack.isEmpty() && stack.isOf(item)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    int findFirstNonEmptySlot(PlayerInventory inventory) {
-        if (inventory == null) {
-            return -1;
-        }
-        for (int i = 0; i < inventory.size(); i++) {
-            ItemStack stack = inventory.getStack(i);
-            if (!stack.isEmpty()) {
-                return i;
-            }
-        }
-        return -1;
+    boolean resolveUseParameterSelection(Node parameterNode, CompletableFuture<Void> future) {
+        return inventoryCommandExecutor().resolveUseParameterSelection(parameterNode, future);
     }
 
     private void applyCrouchState(net.minecraft.client.MinecraftClient client, boolean active) {
@@ -7861,7 +6374,7 @@ public class Node {
         return true;
     }
 
-    private static boolean isInlineMathOperator(char c) {
+    static boolean isInlineMathOperator(char c) {
         return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
     }
 
@@ -8039,7 +6552,7 @@ public class Node {
         }
     }
 
-    private static Double evaluateNumericExpression(String value) {
+    static Double evaluateNumericExpression(String value) {
         if (value == null) {
             return null;
         }
@@ -8189,18 +6702,6 @@ public class Node {
             }
             index++;
             return true;
-        }
-    }
-
-    private static final class RuntimeVariableInlineMatch {
-        private final String name;
-        private final int endIndex;
-        private final ExecutionManager.RuntimeVariable variable;
-
-        private RuntimeVariableInlineMatch(String name, int endIndex, ExecutionManager.RuntimeVariable variable) {
-            this.name = name;
-            this.endIndex = endIndex;
-            this.variable = variable;
         }
     }
 
@@ -9784,7 +8285,7 @@ public class Node {
         return canonical;
     }
 
-    private String formatCanonicalValueMap(Map<String, String> values) {
+    String formatCanonicalValueMap(Map<String, String> values) {
         Map<String, String> canonical = canonicalizeValueMap(values);
         if (canonical.isEmpty()) {
             return "";

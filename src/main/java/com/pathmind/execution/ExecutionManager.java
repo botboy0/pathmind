@@ -448,6 +448,75 @@ public class ExecutionManager {
         return names;
     }
 
+    private CompletableFuture<Void> runLoopAttachedAction(
+        Node controlNode,
+        Node actionNode,
+        ChainController controller,
+        int executionId,
+        Node repeatUntilGuard,
+        LoopContinuation continuation
+    ) {
+        CompletableFuture<Void> loopDone = new CompletableFuture<>();
+        runLoopAttachedActionIteration(
+            controlNode,
+            actionNode,
+            controller,
+            executionId,
+            repeatUntilGuard,
+            continuation,
+            loopDone
+        );
+        return loopDone.whenComplete((ignored, throwable) -> controlNode.clearLoopRuntimeState());
+    }
+
+    private void runLoopAttachedActionIteration(
+        Node controlNode,
+        Node actionNode,
+        ChainController controller,
+        int executionId,
+        Node repeatUntilGuard,
+        LoopContinuation continuation,
+        CompletableFuture<Void> loopDone
+    ) {
+        if (loopDone.isDone()) {
+            return;
+        }
+        if (cancelRequested || controller == null || controller.cancelRequested) {
+            loopDone.complete(null);
+            return;
+        }
+
+        Node guard = continuation.guardForIteration(controlNode, repeatUntilGuard);
+        if (!continuation.shouldRunNextIteration(controlNode, controller)) {
+            loopDone.complete(null);
+            return;
+        }
+
+        runChain(actionNode, controller, executionId, guard).whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+                loopDone.completeExceptionally(throwable);
+                return;
+            }
+            runLoopAttachedActionIteration(
+                controlNode,
+                actionNode,
+                controller,
+                executionId,
+                repeatUntilGuard,
+                continuation,
+                loopDone
+            );
+        });
+    }
+
+    private interface LoopContinuation {
+        boolean shouldRunNextIteration(Node controlNode, ChainController controller);
+
+        default Node guardForIteration(Node controlNode, Node repeatUntilGuard) {
+            return repeatUntilGuard;
+        }
+    }
+
     public void executeGraph(List<Node> nodes, List<NodeConnection> connections) {
         executeGraphInternal(nodes, connections, true);
     }
@@ -1647,47 +1716,60 @@ public class ExecutionManager {
 
             if (attachedAction != null) {
                 if (type == NodeType.CONTROL_FOREVER && nextSocket != Node.NO_OUTPUT) {
-                    return runChain(attachedAction, controller, executionId, repeatUntilGuard)
-                        .thenCompose(ignored -> {
-                            if (cancelRequested || controller.cancelRequested) {
-                                return CompletableFuture.completedFuture(null);
-                            }
-                            return runChain(currentNode, controller, executionId, repeatUntilGuard);
-                        });
+                    return runLoopAttachedAction(
+                        currentNode,
+                        attachedAction,
+                        controller,
+                        executionId,
+                        repeatUntilGuard,
+                        (controlNode, loopController) -> true
+                    );
                 }
 
-                if (((type == NodeType.CONTROL_REPEAT && currentNode.shouldExecuteRepeatAttachedAction())
-                    || type == NodeType.CONTROL_REPEAT_UNTIL) && nextSocket == 0) {
-                    if (type == NodeType.CONTROL_REPEAT_UNTIL) {
-                        controller.pendingRepeatUntilExitControl = null;
-                    }
-                    Node actionGuard = type == NodeType.CONTROL_REPEAT_UNTIL ? currentNode : repeatUntilGuard;
-                    return runChain(attachedAction, controller, executionId, actionGuard)
-                        .thenCompose(ignored -> {
-                            if (cancelRequested || controller.cancelRequested) {
-                                return CompletableFuture.completedFuture(null);
+                if (type == NodeType.CONTROL_REPEAT
+                    && currentNode.shouldExecuteRepeatAttachedAction()
+                    && nextSocket == 0) {
+                    AtomicInteger remaining = new AtomicInteger(currentNode.getRepeatLoopCount());
+                    return runLoopAttachedAction(
+                        currentNode,
+                        attachedAction,
+                        controller,
+                        executionId,
+                        repeatUntilGuard,
+                        (controlNode, loopController) -> remaining.getAndDecrement() > 0
+                    ).thenCompose(ignored ->
+                        continueFromOutputSocket(currentNode, controller, executionId, repeatUntilGuard, 0)
+                    );
+                }
+
+                if (type == NodeType.CONTROL_REPEAT_UNTIL && nextSocket == 0) {
+                    controller.pendingRepeatUntilExitControl = null;
+                    return runLoopAttachedAction(
+                        currentNode,
+                        attachedAction,
+                        controller,
+                        executionId,
+                        repeatUntilGuard,
+                        new LoopContinuation() {
+                            @Override
+                            public boolean shouldRunNextIteration(Node controlNode, ChainController loopController) {
+                                return !controlNode.isRepeatUntilConditionMetForPolling();
                             }
-                            if (type == NodeType.CONTROL_REPEAT_UNTIL
-                                && controller.pendingRepeatUntilExitControl == currentNode) {
-                                controller.pendingRepeatUntilExitControl = null;
-                                int exitSocket = getRepeatUntilExitOutputSocket(currentNode);
-                                List<NodeConnection> graphConnections = controller != null
-                                    && controller.graphConnections != null
-                                    && !controller.graphConnections.isEmpty()
-                                    ? snapshotList(controller.graphConnections)
-                                    : activeConnections;
-                                NodeConnection exitConnection = getNextConnectedConnection(
-                                    currentNode,
-                                    graphConnections,
-                                    exitSocket);
-                                if (exitConnection != null) {
-                                    return runChain(exitConnection.getInputNode(), controller, executionId, repeatUntilGuard,
-                                        exitConnection.getInputSocket());
-                                }
-                                return CompletableFuture.completedFuture(null);
+
+                            @Override
+                            public Node guardForIteration(Node controlNode, Node outerRepeatUntilGuard) {
+                                return controlNode;
                             }
-                            return runChain(currentNode, controller, executionId, repeatUntilGuard);
-                        });
+                        }
+                    ).thenCompose(ignored ->
+                        continueFromOutputSocket(
+                            currentNode,
+                            controller,
+                            executionId,
+                            repeatUntilGuard,
+                            getRepeatUntilExitOutputSocket(currentNode)
+                        )
+                    );
                 }
             }
         }

@@ -20,6 +20,7 @@ import java.lang.reflect.Constructor;
 import java.nio.file.Files;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -739,6 +740,122 @@ class ExecutionManagerValidationTest {
             manager, ifElse, controller, 1, null, 1);
 
         assertTrue(future.isDone());
+    }
+
+    @Test
+    void foreverLoopRepeatsAttachedActionWithoutReEnteringControlNode() throws Exception {
+        CountingNode forever = new CountingNode(NodeType.CONTROL_FOREVER);
+        CountingNode action = new CountingNode(NodeType.MESSAGE);
+        action.stopManagerAfterExecutions(manager, 3);
+        assertTrue(forever.attachActionNode(action));
+        forever.setNextOutputSocket(0);
+
+        CompletableFuture<Void> future = invokeContinueFromNode(forever);
+
+        future.get(1, TimeUnit.SECONDS);
+        assertEquals(0, forever.executionCount());
+        assertEquals(3, action.executionCount());
+    }
+
+    @Test
+    void repeatLoopRepeatsAttachedActionWithoutReEnteringControlNode() throws Exception {
+        CountingNode repeat = new CountingNode(NodeType.CONTROL_REPEAT);
+        repeat.getParameter("Count").setStringValue("3");
+        CountingNode action = new CountingNode(NodeType.MESSAGE);
+        assertTrue(repeat.attachActionNode(action));
+
+        Method executeControlRepeat = Node.class.getDeclaredMethod("executeControlRepeat", CompletableFuture.class);
+        executeControlRepeat.setAccessible(true);
+        executeControlRepeat.invoke(repeat, new CompletableFuture<Void>());
+
+        CompletableFuture<Void> future = invokeContinueFromNode(repeat);
+
+        future.get(1, TimeUnit.SECONDS);
+        assertEquals(0, repeat.executionCount());
+        assertEquals(3, action.executionCount());
+        assertTrue(!repeat.shouldExecuteRepeatAttachedAction());
+    }
+
+    @Test
+    void repeatUntilLoopRepeatsAttachedActionWithoutReEnteringControlNode() throws Exception {
+        AtomicInteger actionCount = new AtomicInteger();
+        RepeatUntilCountingNode repeatUntil = new RepeatUntilCountingNode(() -> actionCount.get() >= 3);
+        CountingNode action = new CountingNode(NodeType.MESSAGE, actionCount);
+        assertTrue(repeatUntil.attachActionNode(action));
+        repeatUntil.setNextOutputSocket(0);
+
+        CompletableFuture<Void> future = invokeContinueFromNode(repeatUntil);
+
+        future.get(1, TimeUnit.SECONDS);
+        assertEquals(0, repeatUntil.executionCount());
+        assertEquals(3, action.executionCount());
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<Void> invokeContinueFromNode(Node node) throws Exception {
+        Field cancelRequestedField = ExecutionManager.class.getDeclaredField("cancelRequested");
+        cancelRequestedField.setAccessible(true);
+        cancelRequestedField.set(manager, false);
+
+        Class<?> controllerClass = Arrays.stream(ExecutionManager.class.getDeclaredClasses())
+            .filter(candidate -> "ChainController".equals(candidate.getSimpleName()))
+            .findFirst()
+            .orElseThrow();
+        Constructor<?> constructor = controllerClass.getDeclaredConstructor(Node.class, int.class);
+        constructor.setAccessible(true);
+        Object controller = constructor.newInstance(node, 1);
+
+        Method continueFromNode = ExecutionManager.class.getDeclaredMethod(
+            "continueFromNode", Node.class, controllerClass, int.class, Node.class, int.class);
+        continueFromNode.setAccessible(true);
+        return (CompletableFuture<Void>) continueFromNode.invoke(manager, node, controller, 1, null, -1);
+    }
+
+    private static class CountingNode extends Node {
+        private final AtomicInteger executions;
+        private ExecutionManager managerToStop;
+        private int stopAfterExecutions;
+
+        CountingNode(NodeType type) {
+            this(type, new AtomicInteger());
+        }
+
+        CountingNode(NodeType type, AtomicInteger executions) {
+            super(type, 0, 0);
+            this.executions = executions;
+        }
+
+        void stopManagerAfterExecutions(ExecutionManager manager, int count) {
+            this.managerToStop = manager;
+            this.stopAfterExecutions = count;
+        }
+
+        int executionCount() {
+            return executions.get();
+        }
+
+        @Override
+        public CompletableFuture<Void> execute(int executionId) {
+            int count = executions.incrementAndGet();
+            if (managerToStop != null && count >= stopAfterExecutions) {
+                managerToStop.requestStopAll();
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private static final class RepeatUntilCountingNode extends CountingNode {
+        private final java.util.function.BooleanSupplier condition;
+
+        RepeatUntilCountingNode(java.util.function.BooleanSupplier condition) {
+            super(NodeType.CONTROL_REPEAT_UNTIL);
+            this.condition = condition;
+        }
+
+        @Override
+        public boolean isRepeatUntilConditionMetForPolling() {
+            return condition.getAsBoolean();
+        }
     }
 
     private void setCachedSettingsForTests() throws Exception {

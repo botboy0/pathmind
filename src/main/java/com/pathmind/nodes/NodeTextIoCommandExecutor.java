@@ -1,6 +1,7 @@
 package com.pathmind.nodes;
 
 import com.pathmind.util.PlayerInventoryBridge;
+import com.pathmind.execution.ExecutionManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen;
 import net.minecraft.client.gui.screen.ingame.BookEditScreen;
@@ -13,14 +14,22 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.BookUpdateC2SPacket;
 import net.minecraft.text.RawFilteredPair;
+import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 final class NodeTextIoCommandExecutor {
     private final Node owner;
@@ -644,6 +653,436 @@ final class NodeTextIoCommandExecutor {
         });
     }
 
+    void executeMessageCommand(CompletableFuture<Void> future) {
+        if (preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        List<String> lines = getMessageLines();
+        if (lines == null || lines.isEmpty()) {
+            lines = Collections.singletonList("Hello World");
+        }
+
+        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+        if (client != null && client.player != null) {
+            long delayMs = 120L;
+            int[] sent = {0};
+            for (int i = 0; i < lines.size(); i++) {
+                String raw = lines.get(i);
+                String text = raw == null ? "" : raw.trim();
+                text = resolveRuntimeVariablesInText(text);
+                if (text.isEmpty()) {
+                    continue;
+                }
+                String sendText = text;
+                long scheduledDelay = sent[0] * delayMs;
+                Node.MESSAGE_SCHEDULER.schedule(() -> {
+                    MinecraftClient.getInstance().execute(() -> {
+                        MinecraftClient currentClient = MinecraftClient.getInstance();
+                        if (currentClient.player != null) {
+                            if (isMessageClientSide()) {
+                                currentClient.player.sendMessage(Text.literal(sendText), false);
+                            } else if (currentClient.player.networkHandler != null) {
+                                boolean isCommand = sendText.startsWith("/");
+                                if (isCommand) {
+                                    String cmd = sendText.length() > 1 ? sendText.substring(1) : "";
+                                    if (!cmd.isEmpty()) {
+                                        currentClient.player.networkHandler.sendChatCommand(cmd);
+                                    }
+                                } else {
+                                    currentClient.player.networkHandler.sendChatMessage(sendText);
+                                }
+                            }
+                        }
+                    });
+                }, scheduledDelay, TimeUnit.MILLISECONDS);
+                sent[0]++;
+            }
+            long completionDelay = Math.max(0, (sent[0] - 1) * delayMs + delayMs);
+            Node.MESSAGE_SCHEDULER.schedule(() -> {
+                future.complete(null);
+            }, completionDelay, TimeUnit.MILLISECONDS);
+        } else {
+            System.err.println("Unable to send message: client or player not available");
+            future.complete(null);
+        }
+    }
+
+    String resolveRuntimeVariablesInText(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return raw;
+        }
+        Node startNode = owner.getOwningStartNode();
+        if (startNode == null && owner.getParentControl() != null) {
+            startNode = owner.getParentControl().getOwningStartNode();
+        }
+        ExecutionManager manager = ExecutionManager.getInstance();
+        StringBuilder output = new StringBuilder(raw.length());
+        int index = 0;
+        boolean containsStructuredReplacement = false;
+        while (index < raw.length()) {
+            char current = raw.charAt(index);
+            if (current == '~') {
+                RuntimeVariableInlineMatch match = findInlineRuntimeVariableReference(raw, index, manager, startNode);
+                if (match != null) {
+                    String replacement = formatRuntimeVariableValue(match.variable);
+                    if (replacement != null && !replacement.isEmpty()) {
+                        output.append(replacement);
+                        if (replacement.indexOf(' ') >= 0 || replacement.indexOf('\t') >= 0 || replacement.indexOf('\n') >= 0) {
+                            containsStructuredReplacement = true;
+                        }
+                        index = match.endIndex;
+                        continue;
+                    }
+                    output.append(raw, index, match.endIndex);
+                    index = match.endIndex;
+                    continue;
+                }
+            }
+            output.append(current);
+            index++;
+        }
+        String resolved = output.toString();
+        if (containsStructuredReplacement) {
+            return resolved;
+        }
+        Double evaluated = Node.evaluateNumericExpression(resolved);
+        if (evaluated != null) {
+            return formatEvaluatedNumericText(evaluated);
+        }
+        return resolved;
+    }
+
+    private static String formatEvaluatedNumericText(double value) {
+        if (!Double.isFinite(value)) {
+            return Double.toString(value);
+        }
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    private RuntimeVariableInlineMatch findInlineRuntimeVariableReference(String raw, int tildeIndex,
+                                                                          ExecutionManager manager, Node startNode) {
+        if (raw == null || manager == null || tildeIndex < 0 || tildeIndex >= raw.length() || raw.charAt(tildeIndex) != '~') {
+            return null;
+        }
+        int nameStart = tildeIndex + 1;
+        if (nameStart >= raw.length()) {
+            return null;
+        }
+        RuntimeVariableInlineMatch bestMatch = null;
+        Set<String> candidateNames = collectRuntimeVariableNamesForParsing(manager, startNode);
+        for (String candidateName : candidateNames) {
+            if (candidateName == null || candidateName.isEmpty()) {
+                continue;
+            }
+            if (!raw.regionMatches(nameStart, candidateName, 0, candidateName.length())) {
+                continue;
+            }
+            int endIndex = nameStart + candidateName.length();
+            if (endIndex < raw.length()) {
+                char boundary = raw.charAt(endIndex);
+                if (!Character.isWhitespace(boundary) && !Node.isInlineMathOperator(boundary)) {
+                    continue;
+                }
+            }
+            ExecutionManager.RuntimeVariable variable = resolveRuntimeVariableForName(manager, startNode, candidateName);
+            if (variable == null) {
+                continue;
+            }
+            if (bestMatch == null || candidateName.length() > bestMatch.name.length()) {
+                bestMatch = new RuntimeVariableInlineMatch(candidateName, endIndex, variable);
+            }
+        }
+        return bestMatch;
+    }
+
+    private Set<String> collectRuntimeVariableNamesForParsing(ExecutionManager manager, Node startNode) {
+        Set<String> names = new LinkedHashSet<>();
+        if (manager == null) {
+            return names;
+        }
+        names.addAll(manager.getKnownRuntimeVariableNames());
+        if (startNode != null) {
+            for (ExecutionManager.RuntimeVariableEntry entry : manager.getRuntimeVariableEntries()) {
+                if (entry == null || entry.getStartNodeId() == null || !startNode.getId().equals(entry.getStartNodeId())) {
+                    continue;
+                }
+                String name = entry.getName();
+                if (name != null && !name.trim().isEmpty()) {
+                    names.add(name.trim());
+                }
+            }
+        }
+        return names;
+    }
+
+    ExecutionManager.RuntimeVariable resolveRuntimeVariableForName(ExecutionManager manager, Node startNode, String name) {
+        if (manager == null || name == null || name.trim().isEmpty()) {
+            return null;
+        }
+        String trimmedName = name.trim();
+        if (startNode != null) {
+            ExecutionManager.RuntimeVariable direct = manager.getRuntimeVariable(startNode, trimmedName);
+            if (direct != null) {
+                return direct;
+            }
+        }
+        ExecutionManager.RuntimeVariable anyActive = manager.getRuntimeVariableFromAnyActiveChain(trimmedName);
+        if (anyActive != null) {
+            return anyActive;
+        }
+        ExecutionManager.RuntimeVariable match = null;
+        for (ExecutionManager.RuntimeVariableEntry entry : manager.getRuntimeVariableEntries()) {
+            if (entry == null) {
+                continue;
+            }
+            String entryName = entry.getName();
+            if (entryName == null) {
+                continue;
+            }
+            if (!entryName.trim().equals(trimmedName)) {
+                continue;
+            }
+            if (match != null) {
+                return null;
+            }
+            match = entry.getVariable();
+        }
+        return match;
+    }
+
+    String formatRuntimeVariableValue(ExecutionManager.RuntimeVariable variable) {
+        if (variable == null) {
+            return "";
+        }
+        Map<String, String> values = variable.getValues();
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        NodeType valueType = variable.getType();
+        if (valueType == null) {
+            return "";
+        }
+        switch (valueType) {
+            case PARAM_BLOCK:
+            case PARAM_PLACE_TARGET:
+                return getRuntimeValue(values, "block");
+            case PARAM_ITEM:
+            case PARAM_VILLAGER_TRADE:
+                return getRuntimeValue(values, "item");
+            case PARAM_ENTITY:
+                return getRuntimeValue(values, "entity");
+            case PARAM_PLAYER:
+                return getRuntimeValue(values, "player");
+            case PARAM_WAYPOINT:
+                return getRuntimeValue(values, "waypoint");
+            case PARAM_SCHEMATIC:
+                return getRuntimeValue(values, "schematic");
+            case PARAM_INVENTORY_SLOT:
+                return getRuntimeValue(values, "slot");
+            case SENSOR_CURRENT_HAND:
+                return getRuntimeValue(values, "slot");
+            case SENSOR_IS_ON_GROUND:
+                return getRuntimeValue(values, "distance");
+            case PARAM_DURATION:
+                return getRuntimeValue(values, "duration");
+            case PARAM_RANGE:
+            case PARAM_CLOSEST:
+                return getRuntimeValue(values, "range");
+            case PARAM_DISTANCE:
+                return getRuntimeValue(values, "distance");
+            case PARAM_BLOCK_FACE: {
+                String face = getRuntimeValue(values, "face");
+                if (!face.isEmpty()) {
+                    return face;
+                }
+                face = getRuntimeValue(values, "side");
+                if (!face.isEmpty()) {
+                    return face;
+                }
+                return getRuntimeValue(values, "direction");
+            }
+            case PARAM_DIRECTION: {
+                String yaw = getRuntimeValue(values, "yaw");
+                String pitch = getRuntimeValue(values, "pitch");
+                if (!yaw.isEmpty() && !pitch.isEmpty()) {
+                    return yaw + " " + pitch;
+                }
+                String direction = getRuntimeValue(values, "direction");
+                if (!direction.isEmpty()) {
+                    return direction;
+                }
+                direction = getRuntimeValue(values, "side");
+                if (!direction.isEmpty()) {
+                    return direction;
+                }
+                return getRuntimeValue(values, "face");
+            }
+            case PARAM_AMOUNT:
+                return getRuntimeValue(values, "amount");
+            case LIST_LENGTH: {
+                String length = getRuntimeValue(values, "count");
+                if (!length.isEmpty()) {
+                    return length;
+                }
+                length = getRuntimeValue(values, "value");
+                if (!length.isEmpty()) {
+                    return length;
+                }
+                return getRuntimeValue(values, "amount");
+            }
+            case SENSOR_SLOT_ITEM_COUNT:
+                return getRuntimeValue(values, "amount");
+            case OPERATOR_RANDOM:
+                String value = getRuntimeValue(values, "value");
+                if (!value.isEmpty()) {
+                    return value;
+                }
+                return getRuntimeValue(values, "amount");
+            case PARAM_BOOLEAN:
+                return getRuntimeValue(values, "toggle");
+            case PARAM_HAND:
+                return getRuntimeValue(values, "hand");
+            case PARAM_COORDINATE:
+                return formatCoordinateValues(values);
+            case PARAM_ROTATION:
+                return formatRotationValues(values);
+            case VARIABLE:
+                return getRuntimeValue(values, "variable");
+            case SENSOR_POSITION_OF:
+                if (owner.isSensorPositionSingleAxisMode()) {
+                    String amount = getRuntimeValue(values, "amount");
+                    if (!amount.isEmpty()) {
+                        return amount;
+                    }
+                    amount = getRuntimeValue(values, "value");
+                    if (!amount.isEmpty()) {
+                        return amount;
+                    }
+                }
+                return formatCoordinateValues(values);
+            case SENSOR_DISTANCE_BETWEEN:
+                return getRuntimeValue(values, "distance");
+            case SENSOR_TARGETED_BLOCK: {
+                String block = getRuntimeValue(values, "block");
+                if (!block.isEmpty()) {
+                    String state = getRuntimeValue(values, "state");
+                    if (!state.isEmpty()) {
+                        return block + "[" + state + "]";
+                    }
+                    return block;
+                }
+                break;
+            }
+            case SENSOR_TARGETED_ENTITY: {
+                String entity = getRuntimeValue(values, "entity");
+                if (!entity.isEmpty()) {
+                    String state = getRuntimeValue(values, "state");
+                    if (!state.isEmpty()) {
+                        return entity + "[" + state + "]";
+                    }
+                    return entity;
+                }
+                break;
+            }
+            case SENSOR_LOOK_DIRECTION: {
+                String yaw = getRuntimeValue(values, "yaw");
+                String pitch = getRuntimeValue(values, "pitch");
+                if (!yaw.isEmpty() && !pitch.isEmpty()) {
+                    return yaw + " " + pitch;
+                }
+                String amount = getRuntimeValue(values, "amount");
+                if (!amount.isEmpty()) {
+                    return amount;
+                }
+                String direction = getRuntimeValue(values, "direction");
+                if (!direction.isEmpty()) {
+                    return direction;
+                }
+                direction = getRuntimeValue(values, "side");
+                if (!direction.isEmpty()) {
+                    return direction;
+                }
+                return getRuntimeValue(values, "face");
+            }
+            case SENSOR_TARGETED_BLOCK_FACE: {
+                String side = getRuntimeValue(values, "side");
+                if (!side.isEmpty()) {
+                    return side;
+                }
+                side = getRuntimeValue(values, "face");
+                if (!side.isEmpty()) {
+                    return side;
+                }
+                return getRuntimeValue(values, "text");
+            }
+            default:
+                break;
+        }
+        return owner.formatCanonicalValueMap(values);
+    }
+
+    String formatCoordinateValues(Map<String, String> values) {
+        String x = getRuntimeValue(values, "x");
+        String y = getRuntimeValue(values, "y");
+        String z = getRuntimeValue(values, "z");
+        if (x.isEmpty() || y.isEmpty() || z.isEmpty()) {
+            return "";
+        }
+        return x + " " + y + " " + z;
+    }
+
+    String formatRotationValues(Map<String, String> values) {
+        String yaw = getRuntimeValue(values, "yaw");
+        String pitch = getRuntimeValue(values, "pitch");
+        if (yaw.isEmpty() || pitch.isEmpty()) {
+            return "";
+        }
+        return yaw + " " + pitch;
+    }
+
+    String getRuntimeValue(Map<String, String> values, String key) {
+        if (values == null || key == null) {
+            return "";
+        }
+        String direct = values.get(key);
+        if (direct != null && !direct.trim().isEmpty()) {
+            return direct.trim();
+        }
+        String lowerKey = key.toLowerCase(Locale.ROOT);
+        if (!lowerKey.equals(key)) {
+            String lower = values.get(lowerKey);
+            if (lower != null && !lower.trim().isEmpty()) {
+                return lower.trim();
+            }
+        }
+        String normalizedKey = Node.normalizeParameterKey(key);
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (entry == null || entry.getKey() == null) {
+                continue;
+            }
+            if (!Node.normalizeParameterKey(entry.getKey()).equals(normalizedKey)) {
+                continue;
+            }
+            String candidate = entry.getValue();
+            if (candidate != null && !candidate.trim().isEmpty()) {
+                return candidate.trim();
+            }
+        }
+        return "";
+    }
+
+    private static final class RuntimeVariableInlineMatch {
+        private final String name;
+        private final int endIndex;
+        private final ExecutionManager.RuntimeVariable variable;
+
+        private RuntimeVariableInlineMatch(String name, int endIndex, ExecutionManager.RuntimeVariable variable) {
+            this.name = name;
+            this.endIndex = endIndex;
+            this.variable = variable;
+        }
+    }
+
     private Node.ParameterHandlingResult preprocessAttachedParameter(EnumSet<Node.ParameterUsage> usages, CompletableFuture<Void> future) {
         return owner.preprocessAttachedParameter(usages, future);
     }
@@ -658,6 +1097,14 @@ final class NodeTextIoCommandExecutor {
 
     private String getBookText() {
         return owner.getBookText();
+    }
+
+    private List<String> getMessageLines() {
+        return owner.getMessageLines();
+    }
+
+    private boolean isMessageClientSide() {
+        return owner.isMessageClientSide();
     }
 
     private void sendNodeErrorMessage(MinecraftClient client, String message) {

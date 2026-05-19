@@ -9234,7 +9234,7 @@ public class NodeGraph {
     }
 
     public void startParameterEditing(Node node, int index) {
-        if (node == null || !rendersInlineParameters(node) || node.hasPopupEditButton()
+        if (node == null || !canEditInlineParameterFields(node)
             || index < 0 || index >= node.getParameters().size()) {
             stopParameterEditing(false);
             return;
@@ -12864,7 +12864,7 @@ public class NodeGraph {
     }
 
     public int getParameterFieldIndexAt(Node node, int screenX, int screenY) {
-        if (node == null || !rendersInlineParameters(node) || node.hasPopupEditButton()) {
+        if (node == null || !canEditInlineParameterFields(node)) {
             return -1;
         }
         int worldX = screenToWorldX(screenX);
@@ -12899,6 +12899,13 @@ public class NodeGraph {
             fieldTop += PARAMETER_INPUT_HEIGHT + PARAMETER_INPUT_GAP;
         }
         return -1;
+    }
+
+    private boolean canEditInlineParameterFields(Node node) {
+        if (node == null || !rendersInlineParameters(node)) {
+            return false;
+        }
+        return !node.hasPopupEditButton() || node.getType() == NodeType.PARAM_INVENTORY_SLOT;
     }
 
     private int getInlineParameterFieldTop(Node node, int index) {

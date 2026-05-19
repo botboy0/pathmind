@@ -6,6 +6,7 @@ import com.pathmind.data.PresetManager;
 import com.pathmind.execution.ExecutionManager;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,6 +137,180 @@ final class NodeFlowCommandExecutor {
 
     void executeStopAllNode(CompletableFuture<Void> future) {
         ExecutionManager.getInstance().requestStopAll();
+        future.complete(null);
+    }
+        void executeWaitCommand(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        double baseDuration = Math.max(0.0, owner.getDoubleParameter("Duration", 1.0));
+        Double attachedDurationSeconds = owner.runtimeState().runtimeParameterData != null ? owner.runtimeState().runtimeParameterData.durationSeconds : null;
+
+        final double waitSeconds;
+        NodeMode waitMode = owner.getMode() != null ? owner.getMode() : NodeMode.WAIT_SECONDS;
+        if (attachedDurationSeconds != null) {
+            waitSeconds = attachedDurationSeconds;
+        } else {
+            double unitSeconds;
+            switch (waitMode) {
+                case WAIT_TICKS:
+                    unitSeconds = 0.05;
+                    break;
+                case WAIT_MINUTES:
+                    unitSeconds = 60.0;
+                    break;
+                case WAIT_HOURS:
+                    unitSeconds = 3600.0;
+                    break;
+                case WAIT_SECONDS:
+                default:
+                    unitSeconds = 1.0;
+                    break;
+            }
+            waitSeconds = baseDuration * unitSeconds;
+        }
+        ExecutionManager manager = ExecutionManager.getInstance();
+        Integer executionId = manager.getCurrentExecutionId();
+
+        new Thread(() -> {
+            try {
+                String nodeId = owner.getId();
+                long waitMs = (long) (waitSeconds * 1000);
+
+                while (true) {
+                    if (owner.shouldAbortForRepeatUntilGuard()) {
+                        future.complete(null);
+                        return;
+                    }
+                    if (!manager.isExecutionActiveOnNode(executionId, nodeId)) {
+                        future.complete(null);
+                        return;
+                    }
+                    if (manager.getExecutionNodeDuration(executionId) >= waitMs) {
+                        future.complete(null);
+                        return;
+                    }
+                    Thread.sleep(Node.CONTROL_POLL_INTERVAL_MS);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                future.completeExceptionally(e);
+            }
+        }, "Pathmind-Wait").start();
+    }
+    
+    void executeControlRepeat(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        int count = Math.max(0, owner.getIntParameter("Count", 1));
+        if (!owner.runtimeState().repeatActive) {
+            owner.runtimeState().repeatRemainingIterations = count;
+            owner.runtimeState().repeatActive = true;
+        }
+        if (owner.runtimeState().repeatRemainingIterations > 0) {
+            owner.runtimeState().repeatRemainingIterations--;
+            owner.runtimeState().repeatExecuteAttachedAction = true;
+            owner.setNextOutputSocket(0);
+        } else {
+            owner.runtimeState().repeatRemainingIterations = 0;
+            owner.runtimeState().repeatActive = false;
+            owner.runtimeState().repeatExecuteAttachedAction = false;
+            owner.setNextOutputSocket(0);
+        }
+        future.complete(null);
+    }
+    
+    void executeControlRepeatUntil(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        boolean conditionMet = owner.evaluateConditionFromParameters();
+        if (conditionMet) {
+            owner.runtimeState().repeatRemainingIterations = 0;
+            owner.runtimeState().repeatActive = false;
+            owner.setNextOutputSocket(1);
+        } else {
+            owner.runtimeState().repeatActive = true;
+            owner.setNextOutputSocket(0);
+        }
+        future.complete(null);
+    }
+
+    void executeControlWaitUntil(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        if (owner.evaluateConditionFromParameters()) {
+            owner.setNextOutputSocket(0);
+            future.complete(null);
+            return;
+        }
+        ExecutionManager manager = ExecutionManager.getInstance();
+        Integer executionId = manager.getCurrentExecutionId();
+
+        new Thread(() -> {
+            try {
+                String nodeId = owner.getId();
+                while (true) {
+                    if (owner.shouldAbortForRepeatUntilGuard()) {
+                        future.complete(null);
+                        return;
+                    }
+                    if (!manager.isExecutionActiveOnNode(executionId, nodeId)) {
+                        future.complete(null);
+                        return;
+                    }
+                    if (owner.evaluateConditionFromParameters()) {
+                        owner.setNextOutputSocket(0);
+                        future.complete(null);
+                        return;
+                    }
+                    Thread.sleep(Node.CONTROL_POLL_INTERVAL_MS);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                future.completeExceptionally(e);
+            }
+        }, "Pathmind-Wait-Until").start();
+    }
+
+    void executeControlForever(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        owner.runtimeState().repeatActive = true;
+        owner.setNextOutputSocket(0);
+        future.complete(null);
+    }
+
+    void executeControlIf(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        boolean condition = owner.evaluateConditionFromParameters();
+        owner.setNextOutputSocket(condition ? 0 : Node.NO_OUTPUT);
+        future.complete(null);
+    }
+
+    void executeControlIfElse(CompletableFuture<Void> future) {
+        if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {
+            return;
+        }
+        boolean condition = owner.evaluateConditionFromParameters();
+        owner.setNextOutputSocket(condition ? 0 : 1);
+        future.complete(null);
+    }
+
+    void executeControlFork(CompletableFuture<Void> future) {
+        future.complete(null);
+    }
+
+    void executeControlJoinAny(CompletableFuture<Void> future) {
+        future.complete(null);
+    }
+
+    void executeControlJoinAll(CompletableFuture<Void> future) {
         future.complete(null);
     }
 }
