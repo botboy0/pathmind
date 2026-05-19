@@ -2543,7 +2543,7 @@ public class Node {
             String primary = entityValue;
             List<String> parts = splitMultiValueList(entityValue);
             if (!parts.isEmpty()) {
-                primary = parts.get(0);
+                primary = parts.getFirst();
             }
             String sanitized = sanitizeResourceId(primary);
             if (sanitized == null || sanitized.isEmpty()) {
@@ -3395,7 +3395,7 @@ public class Node {
         if (bookPages.isEmpty()) {
             bookPages.add("");
         }
-        bookText = bookPages.get(0);
+        bookText = bookPages.getFirst();
     }
 
     private void ensureBookPageCapacity(int pageNumber) {
@@ -4953,7 +4953,7 @@ public class Node {
 
     private int findTradeIndexFromLegacySelection(net.minecraft.village.TradeOfferList tradeOffers, boolean requireInStock, boolean requireAffordable) {
         List<Integer> matches = findTradeIndexesFromLegacySelection(tradeOffers, requireInStock, requireAffordable);
-        return matches.isEmpty() ? -1 : matches.get(0);
+        return matches.isEmpty() ? -1 : matches.getFirst();
     }
 
     private boolean hasMultipleVillagerTradeSelections(Node parameterNode) {
@@ -7907,7 +7907,7 @@ public class Node {
         String primaryEntity = entityRaw;
         List<String> parts = splitMultiValueList(entityRaw);
         if (!parts.isEmpty()) {
-            primaryEntity = parts.get(0);
+            primaryEntity = parts.getFirst();
         }
         String sanitized = sanitizeResourceId(primaryEntity);
         String normalized = sanitized != null && !sanitized.isEmpty()
@@ -8567,7 +8567,7 @@ public class Node {
             searchBox,
             entity -> entity != null && uuid.equals(entity.getUuid())
         );
-        return matches.isEmpty() ? null : matches.get(0);
+        return matches.isEmpty() ? null : matches.getFirst();
     }
 
     private List<Entity> findEntitiesByType(net.minecraft.client.MinecraftClient client, EntityType<?> entityType, double range, String state) {
@@ -9159,7 +9159,7 @@ public class Node {
                     : ChatMessageTracker.getMaxRetentionSeconds();
                 yield ChatMessageTracker.hasRecentMessage(playerName, messageText, seconds, anyPlayer, anyMessage);
             }
-            case SENSOR_JOINED_SERVER: {
+            case SENSOR_JOINED_SERVER -> {
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                 Node playerNode = resolveSensorParameterNode(getAttachedParameter(0), 0);
                 if (playerNode == null) {
