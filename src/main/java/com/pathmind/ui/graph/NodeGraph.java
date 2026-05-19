@@ -802,7 +802,7 @@ public class NodeGraph {
                         Node outputTarget = outputConn.getInputNode();
                         int outputSocket = outputConn.getInputSocket();
 
-                        connections.add(new NodeConnection(inputSource, outputTarget, inputSocket, outputSocket));
+                        addConnectionReplacingConflicts(inputSource, outputTarget, inputSocket, outputSocket);
                     }
                 }
             }
@@ -1366,8 +1366,8 @@ public class NodeGraph {
         }
 
         connections.remove(connection);
-        connections.add(new NodeConnection(source, node, connection.getOutputSocket(), 0));
-        connections.add(new NodeConnection(node, target, 0, connection.getInputSocket()));
+        addConnectionReplacingConflicts(source, node, connection.getOutputSocket(), 0);
+        addConnectionReplacingConflicts(node, target, 0, connection.getInputSocket());
         invalidateConnectionIndex();
         invalidateRenderCaches();
         return true;
@@ -2198,30 +2198,11 @@ public class NodeGraph {
             if (hoveredNode != null && hoveredSocket != -1) {
                 if (isOutputSocket && hoveredSocketIsInput) {
                     captureUndoStateForConnectionChange(disconnectedConnection);
-                    // Remove any existing incoming connection to the target socket
-                    connections.removeIf(conn ->
-                        conn.getInputNode() == hoveredNode && conn.getInputSocket() == hoveredSocket
-                    );
-
-                    // Ensure only one outgoing connection per source socket
-                    connections.removeIf(conn ->
-                        conn.getOutputNode() == connectionSourceNode && conn.getOutputSocket() == connectionSourceSocket
-                    );
-
-                    // Connect output to input
-                    NodeConnection newConnection = new NodeConnection(connectionSourceNode, hoveredNode, connectionSourceSocket, hoveredSocket);
-                    connections.add(newConnection);
+                    addConnectionReplacingConflicts(connectionSourceNode, hoveredNode, connectionSourceSocket, hoveredSocket);
                     connectionChanged = true;
                 } else if (!isOutputSocket && !hoveredSocketIsInput) {
                     captureUndoStateForConnectionChange(disconnectedConnection);
-                    // Remove any existing outgoing connection from the target socket
-                    connections.removeIf(conn -> 
-                        conn.getOutputNode() == hoveredNode && conn.getOutputSocket() == hoveredSocket
-                    );
-                    
-                    // Connect input to output (reverse connection)
-                    NodeConnection newConnection = new NodeConnection(hoveredNode, connectionSourceNode, hoveredSocket, connectionSourceSocket);
-                    connections.add(newConnection);
+                    addConnectionReplacingConflicts(hoveredNode, connectionSourceNode, hoveredSocket, connectionSourceSocket);
                     connectionChanged = true;
                 } else {
                     // Invalid connection - restore original
@@ -2249,6 +2230,19 @@ public class NodeGraph {
         hoveredSocket = -1;
         disconnectedConnection = null;
         connectionDragMoved = false;
+    }
+
+    private void addConnectionReplacingConflicts(Node outputNode, Node inputNode, int outputSocket, int inputSocket) {
+        if (outputNode == null || inputNode == null || outputNode == inputNode) {
+            return;
+        }
+        connections.removeIf(conn ->
+            conn.getInputNode() == inputNode && conn.getInputSocket() == inputSocket
+        );
+        connections.removeIf(conn ->
+            conn.getOutputNode() == outputNode && conn.getOutputSocket() == outputSocket
+        );
+        connections.add(new NodeConnection(outputNode, inputNode, outputSocket, inputSocket));
     }
 
     private void restoreDisconnectedConnection() {
@@ -2841,8 +2835,7 @@ public class NodeGraph {
             }
             // Validate connection (output can only connect to input)
             if (isInput && connectionSourceNode != targetNode) {
-                // Create new connection
-                connections.add(new NodeConnection(connectionSourceNode, targetNode, connectionSourceSocket, targetSocket));
+                addConnectionReplacingConflicts(connectionSourceNode, targetNode, connectionSourceSocket, targetSocket);
                 stopDraggingConnection();
                 return true;
             }
@@ -14712,13 +14705,7 @@ public class NodeGraph {
                 if (outputNode.isSensorNode() || inputNode.isSensorNode()) {
                     continue;
                 }
-                NodeConnection connection = new NodeConnection(
-                    outputNode,
-                    inputNode,
-                    connData.getOutputSocket(),
-                    connData.getInputSocket()
-                );
-                connections.add(connection);
+                addConnectionReplacingConflicts(outputNode, inputNode, connData.getOutputSocket(), connData.getInputSocket());
             } else {
                 System.err.println("Failed to restore connection: missing node(s)");
             }

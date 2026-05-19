@@ -101,6 +101,34 @@ class NodeGraphPersistenceTest {
     }
 
     @Test
+    void convertToConnectionsKeepsOnlyOneIncomingConnectionPerInputSocket() {
+        NodeGraphData data = new NodeGraphData(
+            List.of(
+                new NodeGraphData.NodeData("start", NodeType.START, null, 0, 0, List.of()),
+                new NodeGraphData.NodeData("travel", NodeType.TRAVEL, null, 0, 0, List.of()),
+                new NodeGraphData.NodeData("walk", NodeType.WALK, null, 0, 0, List.of()),
+                new NodeGraphData.NodeData("break", NodeType.BREAK, null, 0, 0, List.of())
+            ),
+            List.of(
+                new NodeGraphData.ConnectionData("start", "travel", 0, 0),
+                new NodeGraphData.ConnectionData("break", "walk", 0, 0),
+                new NodeGraphData.ConnectionData("travel", "walk", 0, 0),
+                new NodeGraphData.ConnectionData("walk", "break", 0, 0)
+            )
+        );
+
+        List<Node> restoredNodes = NodeGraphPersistence.convertToNodes(data);
+        Map<String, Node> byId = restoredNodes.stream().collect(Collectors.toMap(Node::getId, Function.identity()));
+        List<NodeConnection> restoredConnections = NodeGraphPersistence.convertToConnections(data, byId);
+
+        assertEquals(3, restoredConnections.size());
+        assertTrue(restoredConnections.stream().anyMatch(conn ->
+            conn.getOutputNode() == byId.get("travel") && conn.getInputNode() == byId.get("walk")));
+        assertFalse(restoredConnections.stream().anyMatch(conn ->
+            conn.getOutputNode() == byId.get("break") && conn.getInputNode() == byId.get("walk")));
+    }
+
+    @Test
     void waitNodeSupportsSameModeSelectionAsDurationParameter() {
         Node wait = new Node(NodeType.WAIT, 10, 20);
 

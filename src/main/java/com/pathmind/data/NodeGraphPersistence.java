@@ -714,19 +714,33 @@ public class NodeGraphPersistence {
                 if (outputNode.isSensorNode() || inputNode.isSensorNode()) {
                     continue;
                 }
-                NodeConnection connection = new NodeConnection(
+                addConnectionReplacingConflicts(
+                    connections,
                     outputNode,
                     inputNode,
                     connData.getOutputSocket(),
                     connData.getInputSocket()
                 );
-                connections.add(connection);
             } else {
                 System.err.println("Failed to restore connection: missing node(s)");
             }
         }
 
         return connections;
+    }
+
+    private static void addConnectionReplacingConflicts(List<NodeConnection> connections, Node outputNode, Node inputNode,
+                                                        int outputSocket, int inputSocket) {
+        if (connections == null || outputNode == null || inputNode == null || outputNode == inputNode) {
+            return;
+        }
+        connections.removeIf(conn ->
+            conn.getInputNode() == inputNode && conn.getInputSocket() == inputSocket
+        );
+        connections.removeIf(conn ->
+            conn.getOutputNode() == outputNode && conn.getOutputSocket() == outputSocket
+        );
+        connections.add(new NodeConnection(outputNode, inputNode, outputSocket, inputSocket));
     }
 
     /**
