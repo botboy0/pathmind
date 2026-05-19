@@ -1031,19 +1031,11 @@ public class Node {
         if (isSensorNode() || isParameterNode() || isStickyNote()) {
             return 0;
         }
-        if (type == NodeType.STOP_ALL) {
-            return 0;
-        }
-        if (type == NodeType.CONTROL_FOREVER) {
-            return 0;
-        }
-        if (type == NodeType.CONTROL_IF_ELSE) {
-            return 2;
-        }
-        if (type == NodeType.CONTROL_FORK) {
-            return 2;
-        }
-        return 1;
+        return switch (type) {
+            case NodeType.STOP_ALL, NodeType.CONTROL_FOREVER -> 0;
+            case NodeType.CONTROL_IF_ELSE, NodeType.CONTROL_FORK -> 2;
+            default -> 1;
+        };
     }
 
     public int getOutputSocketColor(int socketIndex) {
@@ -1258,16 +1250,12 @@ public class Node {
         if (type != NodeType.SENSOR_POSITION_OF) {
             return "";
         }
-        if (mode == NodeMode.SENSOR_POSITION_X) {
-            return "X";
-        }
-        if (mode == NodeMode.SENSOR_POSITION_Y) {
-            return "Y";
-        }
-        if (mode == NodeMode.SENSOR_POSITION_Z) {
-            return "Z";
-        }
-        return "";
+        return switch (mode) {
+            case NodeMode.SENSOR_POSITION_X -> "X";
+            case NodeMode.SENSOR_POSITION_Y -> "Y";
+            case NodeMode.SENSOR_POSITION_Z -> "Z";
+            default -> "";
+        };
     }
 
     public boolean isSensorLookSingleAxisMode() {
@@ -1282,13 +1270,11 @@ public class Node {
         if (type != NodeType.SENSOR_LOOK_DIRECTION) {
             return "";
         }
-        if (mode == NodeMode.SENSOR_LOOK_YAW) {
-            return "Yaw";
-        }
-        if (mode == NodeMode.SENSOR_LOOK_PITCH) {
-            return "Pitch";
-        }
-        return "";
+        return switch (mode) {
+            case NodeMode.SENSOR_LOOK_YAW -> "Yaw";
+            case NodeMode.SENSOR_LOOK_PITCH -> "Pitch";
+            default -> "";
+        };
     }
 
     public NodeType getResolvedValueType() {
@@ -1473,78 +1459,33 @@ public class Node {
         if (usesVillagerTradeNumberField()) {
             return "Number";
         }
-        if (type == NodeType.USE || type == NodeType.SWING) {
-            return "Hold Duration";
-        }
-        if (type == NodeType.SENSOR_CHAT_MESSAGE) {
-            return "Seconds";
-        }
-        if (type == NodeType.SENSOR_HEALTH_BELOW) {
-            return "Health";
-        }
-        if (type == NodeType.SENSOR_HUNGER_BELOW) {
-            return "Hunger";
-        }
-        if (type == NodeType.WAIT) {
-            NodeMode waitMode = mode != null ? mode : NodeMode.WAIT_SECONDS;
-            switch (waitMode) {
-                case WAIT_TICKS:
-                    return "Ticks";
-                case WAIT_MINUTES:
-                    return "Minutes";
-                case WAIT_HOURS:
-                    return "Hours";
-                case WAIT_SECONDS:
-                default:
-                    return "Seconds";
-            }
-        }
-        if (type == NodeType.PARAM_DURATION) {
-            NodeMode waitMode = mode != null ? mode : NodeMode.WAIT_SECONDS;
-            switch (waitMode) {
-                case WAIT_TICKS:
-                    return "Ticks";
-                case WAIT_MINUTES:
-                    return "Minutes";
-                case WAIT_HOURS:
-                    return "Hours";
-                case WAIT_SECONDS:
-                default:
-                    return "Seconds";
-            }
-        }
-        if (type == NodeType.CONTROL_REPEAT) {
-            return "Times";
-        }
-        return "Amount";
+        return switch (type) {
+           case NodeType.USE, NodeType.SWING -> "Hold Duration";
+            case NodeType.SENSOR_CHAT_MESSAGE -> "Seconds";
+            case NodeType.SENSOR_HEALTH_BELOW -> "Health";
+            case NodeType.SENSOR_HUNGER_BELOW -> "Hunger";
+            case NodeType.WAIT, NodeType.PARAM_DURATION ->
+                switch (mode == null ? NodeMode.WAIT_SECONDS : mode) {
+                    case WAIT_TICKS -> "Ticks";
+                    case WAIT_MINUTES -> "Minutes";
+                    case WAIT_HOURS -> "Hours";
+                    default -> "Seconds";
+                };
+            case NodeType.CONTROL_REPEAT -> "TImes";
+            default -> "Amount";
+        };
     }
 
     public String getAmountParameterKey() {
         if (usesVillagerTradeNumberField()) {
             return "Number";
         }
-        if (type == NodeType.MOVE_ITEM) {
-            return "Count";
-        }
-        if (type == NodeType.CONTROL_REPEAT) {
-            return "Count";
-        }
-        if (type == NodeType.WAIT) {
-            return "Duration";
-        }
-        if (type == NodeType.PARAM_DURATION) {
-            return "Duration";
-        }
-        if (type == NodeType.USE) {
-            return "UseDurationSeconds";
-        }
-        if (type == NodeType.SWING) {
-            return "Duration";
-        }
-        if (type == NodeType.DROP_ITEM) {
-            return "Count";
-        }
-        return "Amount";
+        return switch (type) {
+            case NodeType.MOVE_ITEM, NodeType.CONTROL_REPEAT, NodeType.DROP_ITEM -> "Count";
+            case NodeType.WAIT, NodeType.PARAM_DURATION, NodeType.SWING -> "Duration";
+            case NodeType.USE -> "UseDurationSeconds";
+            default -> "Amount";
+        };
     }
 
     public int getAmountFieldHeight() {
@@ -4635,37 +4576,40 @@ public class Node {
     }
 
     static int parseNodeInt(Node node, String name, int defaultValue) {
-        if (node != null && node.getType() == NodeType.OPERATOR_RANDOM) {
-            double min = node.getDoubleParameter("Min", 0.0);
-            double max = node.getDoubleParameter("Max", 1.0);
-            return (int) Math.round(node.generateRandomValueWithRounding(min, max));
-        }
-        if (node != null && node.getType() == NodeType.OPERATOR_MOD) {
-            return (int) Math.round(node.resolveModValue().orElse((double) defaultValue));
-        }
-        if (node != null && node.getType() == NodeType.LIST_LENGTH) {
-            return node.resolveListLengthValue(node).orElse(defaultValue);
-        }
-        if (node != null && node.getType() == NodeType.VARIABLE) {
-            String variableName = getParameterString(node, "Variable");
-            Node resolved = node.resolveVariableValueNode(node, 0, null);
-            if (resolved == null) {
+        NodeType nodeType = node.getType();
+        switch (nodeType) {
+            case NodeType.OPERATOR_RANDOM -> {
+              double min = node.getDoubleParameter("Min", 0.0);
+              double max = node.getDoubleParameter("Max", 1.0);
+              return (int) Math.round(node.generateRandomValueWithRounding(min, max));
+            }
+            case NodeType.OPERATOR_MOD -> {
+              return (int) Math.round(node.resolveModValue().orElse((double) defaultValue));
+            }
+            case NodeType.LIST_LENGTH -> {
+              return node.resolveListLengthValue(node).orElse(defaultValue);
+            }
+            case NodeType.VARIABLE -> {
+              String variableName = getParameterString(node, "Variable");
+              Node resolved = node.resolveVariableValueNode(node, 0, null);
+              if (resolved == null) {
                 return defaultValue;
-            }
-            if (resolved.getType() == NodeType.PARAM_INVENTORY_SLOT) {
+              }
+              if (resolved.getType() == NodeType.PARAM_INVENTORY_SLOT) {
                 return parseNodeInt(resolved, name, defaultValue);
-            }
-            Optional<Double> value = node.resolveComparableNumber(resolved);
-            if (value.isPresent()) {
+              }
+              Optional<Double> value = node.resolveComparableNumber(resolved);
+              if (value.isPresent()) {
                 return (int) Math.round(value.get());
             }
             net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
             if (client != null && variableName != null && !variableName.trim().isEmpty()) {
                 node.sendNodeErrorMessage(client, "Variable \"" + variableName.trim() + "\" is not a numeric value.");
+              }
+              return defaultValue;
             }
-            return defaultValue;
-        }
-        String value = getParameterString(node, name);
+      }
+			String value = getParameterString(node, name);
         if (value == null || value.isEmpty()) {
             return defaultValue;
         }
@@ -4685,39 +4629,42 @@ public class Node {
     }
 
     static double parseNodeDouble(Node node, String name, double defaultValue) {
-        if (node != null && node.getType() == NodeType.OPERATOR_RANDOM) {
-            double min = node.getDoubleParameter("Min", 0.0);
-            double max = node.getDoubleParameter("Max", 1.0);
-            return node.generateRandomValueWithRounding(min, max);
-        }
-        if (node != null && node.getType() == NodeType.OPERATOR_MOD) {
-            return node.resolveModValue().orElse(defaultValue);
-        }
-        if (node != null && node.getType() == NodeType.LIST_LENGTH) {
-            Optional<Integer> length = node.resolveListLengthValue(node);
-            if (length.isPresent()) {
-                return length.get();
+        NodeType nodeType = node.getType();
+        switch (nodeType) {
+            case NodeType.OPERATOR_RANDOM -> {
+                double min = node.getDoubleParameter("Min", 0.0);
+                double max = node.getDoubleParameter("Max", 1.0);
+                return node.generateRandomValueWithRounding(min, max);
             }
-        }
-        if (node != null && node.getType() == NodeType.VARIABLE) {
-            String variableName = getParameterString(node, "Variable");
-            Node resolved = node.resolveVariableValueNode(node, 0, null);
-            if (resolved == null) {
+            case NodeType.OPERATOR_MOD -> {
+                return node.resolveModValue().orElse(defaultValue);
+            }
+            case NodeType.LIST_LENGTH -> {
+                Optional<Integer> length = node.resolveListLengthValue(node);
+                if (length.isPresent()) {
+                    return length.get();
+                }
+            }
+            case NodeType.VARIABLE -> {
+                String variableName = getParameterString(node, "Variable");
+                Node resolved = node.resolveVariableValueNode(node, 0, null);
+                if (resolved == null) {
+                    return defaultValue;
+                }
+                if (resolved.getType() == NodeType.PARAM_INVENTORY_SLOT) {
+                    return parseNodeDouble(resolved, name, defaultValue);
+                }
+                Optional<Double> value = node.resolveComparableNumber(resolved);
+                if (value.isPresent()) {
+                    return value.get();
+                }
+                net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+                if (client != null && variableName != null && !variableName.trim().isEmpty()) {
+                    node.sendNodeErrorMessage(client, "Variable \"" + variableName.trim() + "\" is not a numeric value.");
+                }
                 return defaultValue;
             }
-            if (resolved.getType() == NodeType.PARAM_INVENTORY_SLOT) {
-                return parseNodeDouble(resolved, name, defaultValue);
-            }
-            Optional<Double> value = node.resolveComparableNumber(resolved);
-            if (value.isPresent()) {
-                return value.get();
-            }
-            net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-            if (client != null && variableName != null && !variableName.trim().isEmpty()) {
-                node.sendNodeErrorMessage(client, "Variable \"" + variableName.trim() + "\" is not a numeric value.");
-            }
-            return defaultValue;
-        }
+        };
         String value = getParameterString(node, name);
         if (value == null || value.isEmpty()) {
             return defaultValue;
