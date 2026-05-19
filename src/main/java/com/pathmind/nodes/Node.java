@@ -2799,16 +2799,10 @@ public class Node {
                 }
                 BlockState state = targetState.get();
                 Identifier id = Registries.BLOCK.getId(state.getBlock());
-                if (id == null) {
-                    break;
-                }
                 String blockId = "minecraft".equals(id.getNamespace()) ? id.getPath() : id.toString();
                 String stateValue = BlockSelection.describeState(state);
                 values.put("Block", blockId);
                 values.put(normalizeParameterKey("Block"), blockId);
-                if (stateValue == null) {
-                    stateValue = "";
-                }
                 values.put("State", stateValue);
                 values.put(normalizeParameterKey("State"), stateValue);
             }
@@ -2819,21 +2813,14 @@ public class Node {
                 }
                 Entity entity = targetedEntity.get();
                 Identifier id = Registries.ENTITY_TYPE.getId(entity.getType());
-                if (id == null) {
-                    break;
-                }
                 String entityId = "minecraft".equals(id.getNamespace()) ? id.getPath() : id.toString();
                 values.put("Entity", entityId);
                 values.put(normalizeParameterKey("Entity"), entityId);
                 String stateValue = EntityStateOptions.describe(entity);
-                if (stateValue == null) {
-                    stateValue = "";
-                }
                 values.put("State", stateValue);
                 values.put(normalizeParameterKey("State"), stateValue);
-                break;
             }
-            case SENSOR_LOOK_DIRECTION: {
+            case SENSOR_LOOK_DIRECTION -> {
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client != null && client.player != null) {
                     float yaw = client.player.getYaw();
@@ -2988,7 +2975,7 @@ public class Node {
             return false;
         }
         NodeMode[] modes = NodeMode.getModesForNodeType(type);
-        return modes != null && modes.length > 0;
+        return modes.length > 0;
     }
 
     public boolean hasMessageInputFields() {
@@ -3156,10 +3143,7 @@ public class Node {
             return false;
         }
         messageLines.remove(index);
-        if (messageLines.isEmpty()) {
-            messageLines.add("Hello World");
-        }
-        layoutState.clearMessageFieldContentWidthOverride();
+			layoutState.clearMessageFieldContentWidthOverride();
         recalculateDimensions();
         return true;
     }
@@ -3995,7 +3979,7 @@ public class Node {
             if (data != null) {
                 Identifier id = Registries.ENTITY_TYPE.getId(entity.getType());
                 data.targetEntity = entity;
-                data.targetEntityId = id != null ? id.toString() : null;
+                data.targetEntityId = id.toString();
                 data.targetBlockPos = entity.getBlockPos();
             }
             Vec3d pos = EntityCompatibilityBridge.getPos(entity);
@@ -4110,10 +4094,8 @@ public class Node {
                 continue;
             }
             Identifier candidateId = Registries.ENTITY_TYPE.getId(entity.getType());
-            if (candidateId == null || !targetIds.contains(candidateId)) {
-                continue;
-            }
-            if (!EntityStateOptions.matchesState(entity, state)) {
+            if (!targetIds.contains(candidateId)
+                || !EntityStateOptions.matchesState(entity, state)) {
                 continue;
             }
             double distance = entity.squaredDistanceTo(client.player);
@@ -4361,7 +4343,7 @@ public class Node {
                         data.resolvedPitch = clamped;
                     }
                 }
-                if (yaw != null || pitch != null) {
+                if (yaw != null) {
                     if (data != null) {
                         double distance = parseNodeDouble(parameterNode, "Distance", -1.0);
                         if (distance > 0.0) {
@@ -4601,9 +4583,9 @@ public class Node {
               Optional<Double> value = node.resolveComparableNumber(resolved);
               if (value.isPresent()) {
                 return (int) Math.round(value.get());
-            }
-            net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-            if (client != null && variableName != null && !variableName.trim().isEmpty()) {
+              }
+              MinecraftClient client = MinecraftClient.getInstance();
+              if (client != null && variableName != null && !variableName.trim().isEmpty()) {
                 node.sendNodeErrorMessage(client, "Variable \"" + variableName.trim() + "\" is not a numeric value.");
               }
               return defaultValue;
@@ -4690,7 +4672,7 @@ public class Node {
             return node.resolveBooleanFromNode(resolved).orElse(defaultValue);
         }
         String value = getParameterString(node, name);
-        if (value == null || value.isEmpty() || node == null) {
+        if (value == null || value.isEmpty()) {
             return defaultValue;
         }
         return node.resolveBooleanValueFromRaw(value, false).orElse(defaultValue);
@@ -4965,7 +4947,7 @@ public class Node {
             return "none@0";
         }
         Identifier id = Registries.ITEM.getId(stack.getItem());
-        String itemId = id != null ? id.toString() : "unknown";
+        String itemId = id.toString();
         return itemId + "@" + stack.getCount();
     }
 
@@ -5979,11 +5961,7 @@ public class Node {
     }
 
     private static Path getRecipeCachePath(net.minecraft.client.MinecraftClient client) {
-        Path base = getPathmindDirectory(client);
-        if (base == null) {
-            return null;
-        }
-        return base.resolve(RECIPE_CACHE_FILE_NAME);
+        return getPathmindDirectory(client).resolve(RECIPE_CACHE_FILE_NAME);
     }
 
     private static Path getPathmindDirectory(net.minecraft.client.MinecraftClient client) {
@@ -6217,7 +6195,7 @@ public class Node {
         MinecraftServer server = client.getServer();
         if (server != null) {
             RecipeManager manager = server.getRecipeManager();
-            if (manager != null && !managers.contains(manager)) {
+            if (manager != null) {
                 managers.add(manager);
             }
         }
@@ -7049,7 +7027,7 @@ public class Node {
             return "";
         }
         Map<String, String> values = variable.getValues();
-        if (values == null || values.isEmpty()) {
+        if (values.isEmpty()) {
             return "";
         }
         NodeType valueType = variable.getType();
@@ -7129,10 +7107,9 @@ public class Node {
                         yield amount;
                     }
                 }
-                return formatCoordinateValues(values);
-            case SENSOR_DISTANCE_BETWEEN:
-                return getRuntimeValue(values, "distance");
-            case SENSOR_TARGETED_BLOCK: {
+                 yield formatCoordinateValues(values);
+            }
+            case SENSOR_TARGETED_BLOCK -> {
                 String block = getRuntimeValue(values, "block");
                 if (!block.isEmpty()) {
                     String state = getRuntimeValue(values, "state");
@@ -7428,7 +7405,7 @@ public class Node {
                 }
 
                 ItemSearchResult result = null;
-                if (anySelection || selections.isEmpty()) {
+                if (anySelection) {
                     result = findFirstBlockItemSlot(inventory);
                 } else {
                     result = findUseBlockSlot(inventory, selections);
@@ -7437,7 +7414,7 @@ public class Node {
                 if (result == null) {
                     String reference = anySelection ? "block" : selections.stream()
                         .map(BlockSelection::getBlockIdString)
-                        .filter(id -> id != null && !id.isEmpty())
+                        .filter(id -> !id.isEmpty())
                         .findFirst()
                         .orElse("block");
                     sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
@@ -7527,7 +7504,7 @@ public class Node {
             int slot = findAccessibleSlotWithItem(inventory, candidateItem);
             if (slot >= 0) {
                 Identifier id = Registries.ITEM.getId(candidateItem);
-                String itemId = id != null ? id.toString() : selection.getBlockIdString();
+                String itemId = id.toString();
                 return new ItemSearchResult(slot, candidateItem, itemId);
             }
         }
@@ -7547,7 +7524,7 @@ public class Node {
             Item item = stack.getItem();
             if (item instanceof BlockItem) {
                 Identifier id = Registries.ITEM.getId(item);
-                String itemId = id != null ? id.toString() : "";
+                String itemId = id.toString();
                 return new ItemSearchResult(slot, item, itemId);
             }
         }
@@ -8279,7 +8256,7 @@ public class Node {
                 }
                 EntityType<?> candidateType = entity.getType();
                 boolean sameType = candidateType == entityType;
-                if (!sameType && targetTypeId != null) {
+                if (!sameType) {
                     Identifier candidateId = Registries.ENTITY_TYPE.getId(candidateType);
                     sameType = targetTypeId.equals(candidateId);
                 }
@@ -8403,10 +8380,8 @@ public class Node {
             if (data != null) {
                 data.targetEntity = entity;
                 Identifier entityId = Registries.ENTITY_TYPE.getId(entity.getType());
-                if (entityId != null) {
-                    data.targetEntityId = entityId.toString();
-                }
-            }
+							  data.targetEntityId = entityId.toString();
+						}
 
             NodeType elementType = list.getElementType();
             if (elementType == NodeType.PARAM_ITEM && entity instanceof ItemEntity itemEntity) {
@@ -8414,14 +8389,12 @@ public class Node {
                 if (stack != null && !stack.isEmpty()) {
                     Item item = stack.getItem();
                     Identifier itemId = Registries.ITEM.getId(item);
-                    if (itemId != null) {
-                        if (data != null) {
-                            data.targetItem = item;
-                            data.targetItemId = itemId.toString();
-                        }
-                        setParameterValueAndPropagate("Item", itemId.toString());
-                    }
-                }
+									  if (data != null) {
+										    data.targetItem = item;
+										    data.targetItemId = itemId.toString();
+									  }
+									setParameterValueAndPropagate("Item", itemId.toString());
+								}
             } else if (elementType == NodeType.PARAM_PLAYER && entity instanceof AbstractClientPlayerEntity player) {
                 String name = GameProfileCompatibilityBridge.getName(player.getGameProfile());
                 if (name != null && !name.trim().isEmpty()) {
@@ -8429,10 +8402,8 @@ public class Node {
                 }
             } else if (elementType == NodeType.PARAM_ENTITY) {
                 Identifier typeId = Registries.ENTITY_TYPE.getId(entity.getType());
-                if (typeId != null) {
-                    setParameterValueAndPropagate("Entity", typeId.toString());
-                }
-            }
+							  setParameterValueAndPropagate("Entity", typeId.toString());
+						}
 
             return entity;
         } catch (IllegalArgumentException ex) {
@@ -9131,11 +9102,8 @@ public class Node {
                 }
                 net.minecraft.client.gui.screen.Screen currentScreen = client.currentScreen;
                 if (!(currentScreen instanceof net.minecraft.client.gui.screen.ingame.MerchantScreen)) {
-                    if (client != null) {
-                        sendNodeErrorMessage(client, "No villager trading screen is open.");
-                    }
-                    result = false;
-                    break;
+                    sendNodeErrorMessage(client, "No villager trading screen is open.");
+                    yield false;
                 }
                 net.minecraft.client.gui.screen.ingame.MerchantScreen merchantScreen =
                     (net.minecraft.client.gui.screen.ingame.MerchantScreen) currentScreen;
@@ -9458,9 +9426,6 @@ public class Node {
             return "";
         }
         Identifier id = Registries.ENTITY_TYPE.getId(entity.getType());
-        if (id == null) {
-            return "";
-        }
         return "minecraft".equals(id.getNamespace()) ? id.getPath() : id.toString();
     }
 
@@ -9469,9 +9434,7 @@ public class Node {
             return "";
         }
         Identifier id = Registries.ITEM.getId(stack.getItem());
-        if (id == null) {
-            return "";
-        }
+
         return "minecraft".equals(id.getNamespace()) ? id.getPath() : id.toString();
     }
 
@@ -9736,7 +9699,7 @@ public class Node {
         Node snapshot = new Node(snapshotType, 0, 0);
         snapshot.setSocketsHidden(true);
         Map<String, String> values = runtimeVariable.getValues();
-        if (values != null && !values.isEmpty()) {
+        if (!values.isEmpty()) {
             snapshot.applyParameterValuesFromMap(values);
         }
         return snapshot;
@@ -9831,7 +9794,7 @@ public class Node {
         }
         StringBuilder builder = new StringBuilder();
         for (Map.Entry<String, String> entry : canonical.entrySet()) {
-            if (builder.length() > 0) {
+            if (!builder.isEmpty()) {
                 builder.append(", ");
             }
             builder.append(entry.getKey()).append('=').append(entry.getValue());
