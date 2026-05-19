@@ -111,78 +111,62 @@ public enum NodeMode {
      * Get all modes for a specific node type
      */
     public static NodeMode[] getModesForNodeType(NodeType nodeType) {
-        switch (nodeType) {
-            case GOTO:
-            case TRAVEL:
-                return new NodeMode[]{
-                    GOTO_XYZ, GOTO_XZ, GOTO_Y, GOTO_BLOCK
-                };
-            case GOAL:
-                return new NodeMode[]{
-                    GOAL_XYZ, GOAL_XZ, GOAL_Y, GOAL_CURRENT, GOAL_CLEAR
-                };
-            case COLLECT:
-                return new NodeMode[]{
-                    COLLECT_SINGLE, COLLECT_MULTIPLE
-                };
-            case BUILD:
-                return new NodeMode[]{
-                    BUILD_PLAYER, BUILD_XYZ
-                };
-            case EXPLORE:
-                return new NodeMode[]{
-                    EXPLORE_CURRENT, EXPLORE_XYZ, EXPLORE_FILTER
-                };
-            case FOLLOW:
-                return new NodeMode[]{
-                    FOLLOW_PLAYER, FOLLOW_PLAYERS, FOLLOW_ENTITIES, FOLLOW_ENTITY_TYPE
-                };
-            case CRAFT:
-                return new NodeMode[]{
-                    CRAFT_PLAYER_GUI, CRAFT_CRAFTING_TABLE
-                };
-            case UI_UTILS:
-                return new NodeMode[]{
-                    UI_UTILS_CLOSE_WITHOUT_PACKET,
-                    UI_UTILS_CLOSE_SIGN_WITHOUT_PACKET,
-                    UI_UTILS_DESYNC,
-                    UI_UTILS_ENABLE_DELAY_PACKETS,
-                    UI_UTILS_FLUSH_DELAYED_PACKETS,
-                    UI_UTILS_SAVE_GUI,
-                    UI_UTILS_RESTORE_GUI,
-                    UI_UTILS_DISCONNECT,
-                    UI_UTILS_DISCONNECT_AND_SEND,
-                    UI_UTILS_COPY_TITLE_JSON,
-                    UI_UTILS_FABRICATE_CLICK_SLOT,
-                    UI_UTILS_FABRICATE_BUTTON_CLICK,
-                    UI_UTILS_SET_ENABLED,
-                    UI_UTILS_SET_BYPASS_RESOURCE_PACK,
-                    UI_UTILS_SET_FORCE_DENY_RESOURCE_PACK
-                };
-            case FARM:
-                return new NodeMode[]{
-                    FARM_RANGE, FARM_WAYPOINT
-                };
-            case STOP:
-                return new NodeMode[]{
-                    STOP_NORMAL, STOP_CANCEL, STOP_FORCE
-                };
-            case WAIT:
-            case PARAM_DURATION:
-                return new NodeMode[]{
-                    WAIT_SECONDS, WAIT_TICKS, WAIT_MINUTES, WAIT_HOURS
-                };
-            case SENSOR_POSITION_OF:
-                return new NodeMode[]{
-                    SENSOR_POSITION_X, SENSOR_POSITION_Y, SENSOR_POSITION_Z, SENSOR_POSITION_XYZ
-                };
-            case SENSOR_LOOK_DIRECTION:
-                return new NodeMode[]{
-                    SENSOR_LOOK_YAW, SENSOR_LOOK_PITCH, SENSOR_LOOK_ROTATION
-                };
-            default:
-                return new NodeMode[0];
-        }
+			return switch (nodeType) {
+				case GOTO, TRAVEL -> new NodeMode[]{
+						GOTO_XYZ, GOTO_XZ, GOTO_Y, GOTO_BLOCK
+				};
+				case GOAL -> new NodeMode[]{
+						GOAL_XYZ, GOAL_XZ, GOAL_Y, GOAL_CURRENT, GOAL_CLEAR
+				};
+				case COLLECT -> new NodeMode[]{
+						COLLECT_SINGLE, COLLECT_MULTIPLE
+				};
+				case BUILD -> new NodeMode[]{
+						BUILD_PLAYER, BUILD_XYZ
+				};
+				case EXPLORE -> new NodeMode[]{
+						EXPLORE_CURRENT, EXPLORE_XYZ, EXPLORE_FILTER
+				};
+				case FOLLOW -> new NodeMode[]{
+						FOLLOW_PLAYER, FOLLOW_PLAYERS, FOLLOW_ENTITIES, FOLLOW_ENTITY_TYPE
+				};
+				case CRAFT -> new NodeMode[]{
+						CRAFT_PLAYER_GUI, CRAFT_CRAFTING_TABLE
+				};
+				case UI_UTILS -> new NodeMode[]{
+						UI_UTILS_CLOSE_WITHOUT_PACKET,
+						UI_UTILS_CLOSE_SIGN_WITHOUT_PACKET,
+						UI_UTILS_DESYNC,
+						UI_UTILS_ENABLE_DELAY_PACKETS,
+						UI_UTILS_FLUSH_DELAYED_PACKETS,
+						UI_UTILS_SAVE_GUI,
+						UI_UTILS_RESTORE_GUI,
+						UI_UTILS_DISCONNECT,
+						UI_UTILS_DISCONNECT_AND_SEND,
+						UI_UTILS_COPY_TITLE_JSON,
+						UI_UTILS_FABRICATE_CLICK_SLOT,
+						UI_UTILS_FABRICATE_BUTTON_CLICK,
+						UI_UTILS_SET_ENABLED,
+						UI_UTILS_SET_BYPASS_RESOURCE_PACK,
+						UI_UTILS_SET_FORCE_DENY_RESOURCE_PACK
+				};
+				case FARM -> new NodeMode[]{
+						FARM_RANGE, FARM_WAYPOINT
+				};
+				case STOP -> new NodeMode[]{
+						STOP_NORMAL, STOP_CANCEL, STOP_FORCE
+				};
+				case WAIT, PARAM_DURATION -> new NodeMode[]{
+						WAIT_SECONDS, WAIT_TICKS, WAIT_MINUTES, WAIT_HOURS
+				};
+				case SENSOR_POSITION_OF -> new NodeMode[]{
+						SENSOR_POSITION_X, SENSOR_POSITION_Y, SENSOR_POSITION_Z, SENSOR_POSITION_XYZ
+				};
+				case SENSOR_LOOK_DIRECTION -> new NodeMode[]{
+						SENSOR_LOOK_YAW, SENSOR_LOOK_PITCH, SENSOR_LOOK_ROTATION
+				};
+				default -> new NodeMode[0];
+			};
     }
     
     /**
