@@ -731,25 +731,18 @@ public class Node {
     }
 
     public boolean canAcceptParameter() {
-        if (!NodeCompatibility.canHostSlot(type, NodeSlotType.PARAMETER)) {
+        if (!NodeCompatibility.canHostSlot(type, NodeSlotType.PARAMETER)
+                || (usesVillagerTradeNumberField())
+                || !NodeTraitRegistry.canHostParameter(type)) {
             return false;
         }
-        if (usesVillagerTradeNumberField()) {
-            return false;
-        }
-        if (!NodeTraitRegistry.canHostParameter(type)) {
-            return false;
-        }
-        if (isParameterNode()
-            && type != NodeType.OPERATOR_MOD
-            && type != NodeType.PARAM_BLOCK_FACE
-            && type != NodeType.SENSOR_POSITION_OF
-            && type != NodeType.SENSOR_DISTANCE_BETWEEN
-            && type != NodeType.SENSOR_SLOT_ITEM_COUNT) {
-            return false;
-        }
-        return true;
-    }
+			return !isParameterNode()
+					|| type == NodeType.OPERATOR_MOD
+					|| type == NodeType.PARAM_BLOCK_FACE
+					|| type == NodeType.SENSOR_POSITION_OF
+					|| type == NodeType.SENSOR_DISTANCE_BETWEEN
+					|| type == NodeType.SENSOR_SLOT_ITEM_COUNT;
+		}
 
     public boolean hasParameterSlot() {
         return canAcceptParameter();
@@ -1383,58 +1376,26 @@ public class Node {
     }
 
     public boolean hasAmountInputField() {
-        if (type == NodeType.COLLECT && (mode == null || mode == NodeMode.COLLECT_SINGLE)) {
-            return true;
-        }
-        if (type == NodeType.CRAFT && (mode == null || mode == NodeMode.CRAFT_PLAYER_GUI || mode == NodeMode.CRAFT_CRAFTING_TABLE)) {
-            return true;
-        }
-        if (type == NodeType.MOVE_ITEM) {
-            return true;
-        }
-        if (type == NodeType.CONTROL_REPEAT) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_ITEM_IN_INVENTORY) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_ITEM_IN_SLOT) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_HEALTH_BELOW) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_HUNGER_BELOW) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_CHAT_MESSAGE) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_VILLAGER_TRADE) {
-            return true;
-        }
-        if (type == NodeType.SENSOR_IN_STOCK) {
-            return true;
-        }
-        if (type == NodeType.CHANGE_VARIABLE) {
-            return true;
-        }
-        if (type == NodeType.WAIT) {
-            return true;
-        }
-        if (type == NodeType.PARAM_DURATION) {
-            return true;
-        }
-        if (type == NodeType.USE) {
-            return true;
-        }
-        if (type == NodeType.SWING) {
-            return true;
-        }
-        if (type == NodeType.DROP_ITEM) {
-            return true;
-        }
-        return false;
+        return
+            (type == NodeType.COLLECT
+                && (mode == null || mode == NodeMode.COLLECT_SINGLE))
+            || (type == NodeType.CRAFT
+                && (mode == null || mode == NodeMode.CRAFT_PLAYER_GUI || mode == NodeMode.CRAFT_CRAFTING_TABLE))
+            || type == NodeType.MOVE_ITEM
+            || type == NodeType.CONTROL_REPEAT
+            || type == NodeType.SENSOR_ITEM_IN_INVENTORY
+            || type == NodeType.SENSOR_ITEM_IN_SLOT
+            || type == NodeType.SENSOR_HEALTH_BELOW
+            || type == NodeType.SENSOR_HUNGER_BELOW
+            || type == NodeType.SENSOR_CHAT_MESSAGE
+            || type == NodeType.SENSOR_VILLAGER_TRADE
+            || type == NodeType.SENSOR_IN_STOCK
+            || type == NodeType.CHANGE_VARIABLE
+            || type == NodeType.WAIT
+            || type == NodeType.PARAM_DURATION
+            || type == NodeType.USE
+            || type == NodeType.SWING
+            || type == NodeType.DROP_ITEM;
     }
 
     public boolean hasRandomRoundingField() {
@@ -3071,18 +3032,13 @@ public class Node {
     }
 
     public boolean hasBooleanToggle() {
-        switch (type) {
-            case SENSOR_IS_SWIMMING:
-            case SENSOR_IS_IN_LAVA:
-            case SENSOR_IS_UNDERWATER:
-            case SENSOR_IS_FALLING:
-            case SENSOR_IS_DAYTIME:
-            case SENSOR_IS_RAINING:
-            case SENSOR_GUI_FILLED:
-                return true;
-            default:
-                return false;
-        }
+        return type == NodeType.SENSOR_IS_SWIMMING
+            || type == NodeType.SENSOR_IS_IN_LAVA
+            || type == NodeType.SENSOR_IS_UNDERWATER
+            || type == NodeType.SENSOR_IS_FALLING
+            || type == NodeType.SENSOR_IS_DAYTIME
+            || type == NodeType.SENSOR_IS_RAINING
+            || type == NodeType.SENSOR_GUI_FILLED;
     }
 
     public boolean getBooleanToggleValue() {
