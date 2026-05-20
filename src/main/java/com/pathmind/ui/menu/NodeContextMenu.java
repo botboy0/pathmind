@@ -160,7 +160,7 @@ public class NodeContextMenu {
             ContextMenuRenderer.renderMenuItem(context, menuX, itemY, MENU_WIDTH, ITEM_HEIGHT, hovered);
             int textX = menuX + TEXT_OFFSET_X;
             int textY = itemY + (ITEM_HEIGHT - textRenderer.fontHeight) / 2;
-            context.drawTextWithShadow(textRenderer, Text.literal(actions.get(i).getLabel()), textX, textY, UITheme.CONTEXT_MENU_TEXT);
+            context.drawTextWithShadow(textRenderer, Text.translatable(actions.get(i).getTranslationKey()), textX, textY, UITheme.CONTEXT_MENU_TEXT);
             itemY += ITEM_HEIGHT;
         }
 

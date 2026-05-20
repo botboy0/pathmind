@@ -6,6 +6,7 @@ import com.pathmind.util.DrawContextBridge;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.glfw.GLFW;
 
@@ -117,7 +118,7 @@ public class RawJsonEditor {
         );
 
         int headerBottom = y + HEADER_HEIGHT;
-        context.drawTextWithShadow(textRenderer, "Raw JSON", x + PANEL_PADDING, y + 9, UITheme.TEXT_PRIMARY);
+        context.drawTextWithShadow(textRenderer, Text.translatable("pathmind.rawJson.title"), x + PANEL_PADDING, y + 9, UITheme.TEXT_PRIMARY);
         if (!statusMessage.isEmpty()) {
             int statusY = headerBottom + 4;
             context.drawTextWithShadow(textRenderer, statusMessage, x + PANEL_PADDING, statusY, statusColor);

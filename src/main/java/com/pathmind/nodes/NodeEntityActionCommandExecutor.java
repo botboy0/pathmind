@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.util.BlockSelection;
 import com.pathmind.util.PlayerInventoryBridge;
 import net.minecraft.block.Block;
@@ -115,7 +117,7 @@ final class NodeEntityActionCommandExecutor {
             if (identifier == null || !Registries.BLOCK.containsId(identifier)) {
                 restoreSneakState.run();
                 String label = requestedBlockLabel != null && !requestedBlockLabel.isEmpty() ? requestedBlockLabel : configuredBlockId;
-                owner.sendNodeErrorMessage(client, "Cannot interact with \"" + label + "\": unknown block identifier.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.interactUnknownBlock", label));
                 future.complete(null);
                 return;
             }
@@ -143,7 +145,7 @@ final class NodeEntityActionCommandExecutor {
 
             if (entityIdentifier == null || !Registries.ENTITY_TYPE.containsId(entityIdentifier)) {
                 restoreSneakState.run();
-                owner.sendNodeErrorMessage(client, "Cannot interact with \"" + configuredEntityId + "\": unknown entity identifier.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.interactUnknownEntity", configuredEntityId));
                 future.complete(null);
                 return;
             }
@@ -154,7 +156,7 @@ final class NodeEntityActionCommandExecutor {
             if (!nearestEntity.isPresent()) {
                 restoreSneakState.run();
                 String entityName = configuredEntityId.replace("minecraft:", "").replace("_", " ");
-                owner.sendNodeErrorMessage(client, "No " + entityName + " nearby to interact with.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.noEntityNearbyToInteract", entityName));
                 future.complete(null);
                 return;
             }
@@ -171,7 +173,7 @@ final class NodeEntityActionCommandExecutor {
                     : String.valueOf(Registries.ENTITY_TYPE.getId(targetEntity.getType()))
                         .replace("minecraft:", "")
                         .replace("_", " ");
-                owner.sendNodeErrorMessage(client, entityName + " is too far away to interact with.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.entityTooFarToInteract", entityName));
                 future.complete(null);
                 return;
             }
@@ -291,7 +293,7 @@ final class NodeEntityActionCommandExecutor {
 
         Node parameterNode = owner.getAttachedParameter(0);
         if (parameterNode == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Break requires a block or coordinate parameter.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.breakRequiresBlockOrCoordinate"));
             return;
         }
 
@@ -309,7 +311,7 @@ final class NodeEntityActionCommandExecutor {
         if (targetPos == null && owner.providesTrait(parameterNode, NodeValueTrait.BLOCK)) {
             List<BlockSelection> selections = owner.resolveBlocksFromParameter(parameterNode);
             if (selections.isEmpty()) {
-                NodeExecutionCompletion.fail(owner, client, future, "No block selected for Break.");
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noBlockSelectedForBreak"));
                 return;
             }
             Optional<BlockHitResult> currentHit = owner.getCurrentBlockHitResult();
@@ -340,7 +342,7 @@ final class NodeEntityActionCommandExecutor {
         }
 
         if (targetPos == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "No matching block found in reach for Break.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noMatchingBlockInReachForBreak"));
             return;
         }
 
@@ -352,7 +354,7 @@ final class NodeEntityActionCommandExecutor {
         Vec3d eyePos = client.player.getEyePos();
         Vec3d center = Vec3d.ofCenter(targetPos);
         if (eyePos.squaredDistanceTo(center) > Node.DEFAULT_REACH_DISTANCE_SQUARED) {
-            NodeExecutionCompletion.fail(owner, client, future, "Target block is out of reach.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.targetBlockOutOfReach"));
             return;
         }
 
@@ -371,7 +373,7 @@ final class NodeEntityActionCommandExecutor {
         }
         float delta = state.calcBlockBreakingDelta(client.player, client.world, targetPos);
         if (delta <= 0.0F) {
-            NodeExecutionCompletion.fail(owner, client, future, "Block cannot be broken.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.blockCannotBeBroken"));
             return;
         }
         int ticksToBreak = Math.max(1, (int) Math.ceil(1.0F / delta));
@@ -433,7 +435,7 @@ final class NodeEntityActionCommandExecutor {
         // Check if a merchant screen is open
         net.minecraft.client.gui.screen.Screen currentScreen = client.currentScreen;
         if (!(currentScreen instanceof net.minecraft.client.gui.screen.ingame.MerchantScreen)) {
-            NodeExecutionCompletion.fail(owner, client, future, "No villager trading screen is open.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noVillagerTradingScreen"));
             return;
         }
 
@@ -443,14 +445,14 @@ final class NodeEntityActionCommandExecutor {
         // Get the screen handler from merchant screen
         net.minecraft.screen.MerchantScreenHandler screenHandler = merchantScreen.getScreenHandler();
         if (screenHandler == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot access merchant screen handler.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.merchantScreenHandlerUnavailable"));
             return;
         }
 
         // Get the trade offers
         net.minecraft.village.TradeOfferList tradeOffers = screenHandler.getRecipes();
         if (tradeOffers == null || tradeOffers.isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "No trades available from this villager.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noVillagerTrades"));
             return;
         }
         int selectedTradeNumber = owner.getConfiguredVillagerTradeNumber();
@@ -528,9 +530,9 @@ final class NodeEntityActionCommandExecutor {
 
                     if (!tradedThisPass) {
                         if (!anyMatchStillAvailable) {
-                            owner.sendNodeErrorMessage(client, "All matching trades are out of stock.");
+                            owner.sendNodeErrorMessage(client, tr("pathmind.error.tradesOutOfStock"));
                         } else {
-                            owner.sendNodeErrorMessage(client, "Not enough items to complete the requested trades.");
+                            owner.sendNodeErrorMessage(client, tr("pathmind.error.tradesNotEnoughItems"));
                         }
                         break;
                     }

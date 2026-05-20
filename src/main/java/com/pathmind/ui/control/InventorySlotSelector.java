@@ -111,7 +111,7 @@ public class InventorySlotSelector {
         // Mode label
         context.drawTextWithShadow(
             textRenderer,
-            Text.literal("Interface Mode:"),
+            Text.translatable("pathmind.inventorySlot.interfaceMode"),
             x,
             sectionY,
             applyAlpha(UITheme.TEXT_PRIMARY, alpha)
@@ -134,7 +134,7 @@ public class InventorySlotSelector {
         DrawContextBridge.drawBorder(context, buttonX, buttonY, buttonWidth, buttonHeight, applyAlpha(borderColor, alpha));
         context.drawTextWithShadow(
             textRenderer,
-            Text.literal(mode.displayName),
+            Text.literal(mode.getDisplayName()),
             buttonX + MODE_BUTTON_TEXT_PADDING,
             buttonY + 6,
             applyAlpha(textColor, alpha)
@@ -145,9 +145,11 @@ public class InventorySlotSelector {
         int gridHeight = renderGrid(context, textRenderer, sectionY, width, mouseX, mouseY, alpha);
         sectionY += gridHeight + INFO_TEXT_MARGIN;
 
-        String selectionText = "Selected Slot: " + selectedSlotId;
+        String selectionText = Text.translatable("pathmind.inventorySlot.selectedSlot", selectedSlotId).getString();
         if (selectedSlotIsPlayerSection != null) {
-            selectionText += selectedSlotIsPlayerSection ? " (Inventory)" : " (GUI)";
+            selectionText += " " + Text.translatable(selectedSlotIsPlayerSection
+                ? "pathmind.inventorySlot.section.inventory"
+                : "pathmind.inventorySlot.section.gui").getString();
         }
         context.drawTextWithShadow(
             textRenderer,
@@ -285,7 +287,7 @@ public class InventorySlotSelector {
             context.fill(dropdownX + 1, optionTop, dropdownX + dropdownWidth - 1, optionTop + DROPDOWN_OPTION_HEIGHT, applyAlpha(bg, alpha));
             context.drawTextWithShadow(
                 textRenderer,
-                Text.literal(option.displayName),
+                Text.literal(option.getDisplayName()),
                 dropdownX + MODE_BUTTON_TEXT_PADDING,
                 optionTop + 5,
                 applyAlpha(UITheme.TEXT_PRIMARY, alpha)
@@ -581,35 +583,39 @@ public class InventorySlotSelector {
     }
 
     private enum InventoryGuiMode {
-        PLAYER_INVENTORY("player_inventory", "Player Inventory", InventorySlotSelector::buildPlayerLayout),
-        CRAFTING_TABLE("crafting_table", "Crafting Table", InventorySlotSelector::buildCraftingTableLayout),
-        FURNACE("furnace", "Furnace", InventorySlotSelector::buildFurnaceLayout),
-        BLAST_FURNACE("blast_furnace", "Blast Furnace", InventorySlotSelector::buildFurnaceLayout),
-        SMOKER("smoker", "Smoker", InventorySlotSelector::buildFurnaceLayout),
-        ENCHANTING_TABLE("enchanting_table", "Enchanting Table", InventorySlotSelector::buildEnchantingLayout),
-        BREWING_STAND("brewing_stand", "Brewing Stand", InventorySlotSelector::buildBrewingLayout),
-        ANVIL("anvil", "Anvil", InventorySlotSelector::buildAnvilLayout),
-        GRINDSTONE("grindstone", "Grindstone", InventorySlotSelector::buildGrindstoneLayout),
-        STONECUTTER("stonecutter", "Stonecutter", InventorySlotSelector::buildStonecutterLayout),
-        SMITHING_TABLE("smithing_table", "Smithing Table", InventorySlotSelector::buildSmithingLayout),
-        LOOM("loom", "Loom", InventorySlotSelector::buildLoomLayout),
-        CARTOGRAPHY_TABLE("cartography_table", "Cartography Table", InventorySlotSelector::buildCartographyLayout),
-        BARREL("barrel", "Barrel / Single Chest", InventorySlotSelector::buildSingleChestLayout),
-        CHEST_DOUBLE("double_chest", "Double Chest", InventorySlotSelector::buildDoubleChestLayout),
-        SHULKER_BOX("shulker_box", "Shulker Box", InventorySlotSelector::buildSingleChestLayout),
-        HOPPER("hopper", "Hopper", InventorySlotSelector::buildHopperLayout),
-        DISPENSER("dispenser", "Dispenser / Dropper", InventorySlotSelector::buildDispenserLayout),
-        BEACON("beacon", "Beacon", InventorySlotSelector::buildBeaconLayout);
+        PLAYER_INVENTORY("player_inventory", "pathmind.gui.mode.playerInventory", InventorySlotSelector::buildPlayerLayout),
+        CRAFTING_TABLE("crafting_table", "pathmind.gui.mode.craftingTable", InventorySlotSelector::buildCraftingTableLayout),
+        FURNACE("furnace", "pathmind.gui.mode.furnace", InventorySlotSelector::buildFurnaceLayout),
+        BLAST_FURNACE("blast_furnace", "pathmind.gui.mode.blastFurnace", InventorySlotSelector::buildFurnaceLayout),
+        SMOKER("smoker", "pathmind.gui.mode.smoker", InventorySlotSelector::buildFurnaceLayout),
+        ENCHANTING_TABLE("enchanting_table", "pathmind.gui.mode.enchantingTable", InventorySlotSelector::buildEnchantingLayout),
+        BREWING_STAND("brewing_stand", "pathmind.gui.mode.brewingStand", InventorySlotSelector::buildBrewingLayout),
+        ANVIL("anvil", "pathmind.gui.mode.anvil", InventorySlotSelector::buildAnvilLayout),
+        GRINDSTONE("grindstone", "pathmind.gui.mode.grindstone", InventorySlotSelector::buildGrindstoneLayout),
+        STONECUTTER("stonecutter", "pathmind.gui.mode.stonecutter", InventorySlotSelector::buildStonecutterLayout),
+        SMITHING_TABLE("smithing_table", "pathmind.gui.mode.smithingTable", InventorySlotSelector::buildSmithingLayout),
+        LOOM("loom", "pathmind.gui.mode.loom", InventorySlotSelector::buildLoomLayout),
+        CARTOGRAPHY_TABLE("cartography_table", "pathmind.gui.mode.cartographyTable", InventorySlotSelector::buildCartographyLayout),
+        BARREL("barrel", "pathmind.gui.mode.barrel", InventorySlotSelector::buildSingleChestLayout),
+        CHEST_DOUBLE("double_chest", "pathmind.gui.mode.doubleChest", InventorySlotSelector::buildDoubleChestLayout),
+        SHULKER_BOX("shulker_box", "pathmind.gui.mode.shulkerBox", InventorySlotSelector::buildSingleChestLayout),
+        HOPPER("hopper", "pathmind.gui.mode.hopper", InventorySlotSelector::buildHopperLayout),
+        DISPENSER("dispenser", "pathmind.gui.mode.dispenser", InventorySlotSelector::buildDispenserLayout),
+        BEACON("beacon", "pathmind.gui.mode.beacon", InventorySlotSelector::buildBeaconLayout);
 
         final String id;
-        final String displayName;
+        final String translationKey;
         private final Supplier<InventoryLayout> layoutSupplier;
         private InventoryLayout cachedLayout;
 
-        InventoryGuiMode(String id, String displayName, Supplier<InventoryLayout> layoutSupplier) {
+        InventoryGuiMode(String id, String translationKey, Supplier<InventoryLayout> layoutSupplier) {
             this.id = id;
-            this.displayName = displayName;
+            this.translationKey = translationKey;
             this.layoutSupplier = layoutSupplier;
+        }
+
+        String getDisplayName() {
+            return Text.translatable(translationKey).getString();
         }
 
         InventoryLayout getLayout() {

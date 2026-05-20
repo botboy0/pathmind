@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.util.EntityCompatibilityBridge;
 import com.pathmind.util.InputCompatibilityBridge;
 import net.minecraft.client.option.KeyBinding;
@@ -205,7 +207,7 @@ final class NodeMovementCommandExecutor {
         if (useMouseButton) {
             Integer mouseButton = owner.resolveMouseButtonCode(buttonValue);
             if (mouseButton == null) {
-                owner.sendNodeErrorMessage(client, "Unknown mouse button: " + buttonValue);
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.unknownMouseButton", buttonValue));
                 future.complete(null);
                 return;
             }
@@ -233,7 +235,7 @@ final class NodeMovementCommandExecutor {
 
         Integer keyCode = owner.resolveKeyCode(buttonValue);
         if (keyCode == null) {
-            owner.sendNodeErrorMessage(client, "Unknown key: " + buttonValue);
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.unknownKey", buttonValue));
             future.complete(null);
             return;
         }

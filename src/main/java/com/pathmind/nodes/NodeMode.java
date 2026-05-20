@@ -1,5 +1,8 @@
 package com.pathmind.nodes;
 
+import java.util.Locale;
+import net.minecraft.text.Text;
+
 /**
  * Enum representing different modes for generalized nodes.
  * Each mode corresponds to a specific behavior within a generalized node type.
@@ -100,11 +103,19 @@ public enum NodeMode {
     }
 
     public String getDisplayName() {
-        return displayName;
+        return Text.translatable(getTranslationKey()).getString();
     }
 
     public String getDescription() {
-        return description;
+        return Text.translatable(getDescriptionKey()).getString();
+    }
+
+    public String getTranslationKey() {
+        return "pathmind.node.mode." + name().toLowerCase(Locale.ROOT);
+    }
+
+    public String getDescriptionKey() {
+        return getTranslationKey() + ".desc";
     }
     
     /**

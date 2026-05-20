@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.util.GuiSelectionMode;
 import com.pathmind.util.InventorySlotModeHelper;
 import com.pathmind.util.InputCompatibilityBridge;
@@ -71,7 +73,7 @@ final class NodeInventoryCommandExecutor {
                 }
             }
             if (foundSlot == -1) {
-                sendNodeErrorMessage(client, "No matching item found in your hotbar.");
+                sendNodeErrorMessage(client, tr("pathmind.error.noMatchingHotbarItem"));
                 future.complete(null);
                 return;
             }
@@ -163,7 +165,7 @@ final class NodeInventoryCommandExecutor {
         SlotSelectionType selectionType = resolveInventorySlotSelectionType(0);
         SlotResolution resolution = resolveInventorySlot(handler, inventory, slotValue, selectionType);
         if (resolution == null || resolution.slot == null) {
-            sendNodeErrorMessage(client, "Click Slot requires a valid slot selection.");
+            sendNodeErrorMessage(client, tr("pathmind.error.clickSlotRequiresValidSelection"));
             future.complete(null);
             return;
         }
@@ -188,7 +190,7 @@ final class NodeInventoryCommandExecutor {
             return;
         }
         if (client.currentScreen == null) {
-            sendNodeErrorMessage(client, "Click Screen requires an open GUI.");
+            sendNodeErrorMessage(client, tr("pathmind.error.clickScreenRequiresOpenGui"));
             future.complete(null);
             return;
         }
@@ -225,7 +227,7 @@ final class NodeInventoryCommandExecutor {
                 );
             }
             if (!moved || !pressed) {
-                sendNodeErrorMessage(client, "Failed to dispatch screen click.");
+                sendNodeErrorMessage(client, tr("pathmind.error.screenClickDispatchFailed"));
                 future.complete(null);
                 return;
             }
@@ -275,7 +277,7 @@ final class NodeInventoryCommandExecutor {
         }
 
         if (!handler.getCursorStack().isEmpty()) {
-            sendNodeErrorMessage(client, "Cannot move items while the cursor is holding another stack.");
+            sendNodeErrorMessage(client, tr("pathmind.error.cursorHoldingStack"));
             future.complete(null);
             return;
         }
@@ -316,25 +318,25 @@ final class NodeInventoryCommandExecutor {
             : resolveInventorySlot(handler, inventory, requestedTargetSlot, targetSelection);
 
         if (sourceResolution == null) {
-            sendNodeErrorMessage(client, "Move Item source slot could not be resolved.");
+            sendNodeErrorMessage(client, tr("pathmind.error.moveItemSourceUnresolved"));
             future.complete(null);
             return;
         }
         if (!shiftClickTarget && targetResolution == null) {
-            sendNodeErrorMessage(client, "Move Item target slot could not be resolved.");
+            sendNodeErrorMessage(client, tr("pathmind.error.moveItemTargetUnresolved"));
             future.complete(null);
             return;
         }
 
         if (!shiftClickTarget && sourceResolution.handlerSlotIndex == targetResolution.handlerSlotIndex) {
-            sendNodeErrorMessage(client, "Move Item source and target resolved to the same slot.");
+            sendNodeErrorMessage(client, tr("pathmind.error.moveItemSameSlot"));
             future.complete(null);
             return;
         }
 
         ItemStack sourceStack = sourceResolution.slot.getStack();
         if (sourceStack.isEmpty()) {
-            sendNodeErrorMessage(client, "Move Item source slot is empty.");
+            sendNodeErrorMessage(client, tr("pathmind.error.moveItemSourceEmpty"));
             future.complete(null);
             return;
         }
@@ -455,7 +457,7 @@ final class NodeInventoryCommandExecutor {
         }
 
         if (movedStacks == 0) {
-            sendNodeErrorMessage(client, "No matching stacks could be quick-moved for " + type.getDisplayName() + ".");
+            sendNodeErrorMessage(client, tr("pathmind.error.noMatchingStacksQuickMoved", type.getDisplayName()));
         }
     }
 
@@ -855,7 +857,7 @@ final class NodeInventoryCommandExecutor {
             && (isAnySelectionValue(getParameterString(parameterNode, "Item"))
                 || isAnySelectionValue(getParameterString(parameterNode, "Items")));
         if (itemIds.isEmpty() && !anySelection) {
-            sendParameterSearchFailure("No item selected on parameter for " + type.getDisplayName() + ".", future);
+            sendParameterSearchFailure(tr("pathmind.error.noItemSelectedOnParameter", type.getDisplayName()), future);
             return false;
         }
 
@@ -905,9 +907,11 @@ final class NodeInventoryCommandExecutor {
         }
 
         if (foundSlot < 0) {
-            String reference = anySelection ? "item" : String.join(", ", itemIds);
-            String locationDesc = selectionType == SlotSelectionType.GUI_CONTAINER ? "container" : "inventory";
-            sendParameterSearchFailure("No " + reference + " found in " + locationDesc + " for " + type.getDisplayName() + ".", future);
+            String reference = anySelection ? tr("pathmind.error.itemReference") : String.join(", ", itemIds);
+            String locationDesc = selectionType == SlotSelectionType.GUI_CONTAINER
+                ? tr("pathmind.error.locationContainer")
+                : tr("pathmind.error.locationInventory");
+            sendParameterSearchFailure(tr("pathmind.error.noItemFoundInLocation", reference, locationDesc, type.getDisplayName()), future);
             return false;
         }
 
@@ -941,7 +945,7 @@ final class NodeInventoryCommandExecutor {
             : getIntParameter("Slot", 0);
         SlotResolution resolution = resolveInventorySlot(handler, inventory, configuredSlot, selectionType);
         if (resolution == null || resolution.slot == null) {
-            sendNodeErrorMessage(client, type.getDisplayName() + " requires a valid slot selection.");
+            sendNodeErrorMessage(client, tr("pathmind.error.requiresValidSlotSelection", type.getDisplayName()));
             future.complete(null);
             return;
         }
@@ -1004,7 +1008,7 @@ final class NodeInventoryCommandExecutor {
             && (isAnySelectionValue(getParameterString(parameterNode, "Item"))
                 || isAnySelectionValue(getParameterString(parameterNode, "Items")));
         if (itemIds.isEmpty() && !anySelection) {
-            sendParameterSearchFailure("No item selected on parameter for " + type.getDisplayName() + ".", future);
+            sendParameterSearchFailure(tr("pathmind.error.noItemSelectedOnParameter", type.getDisplayName()), future);
             return false;
         }
 
@@ -1057,9 +1061,11 @@ final class NodeInventoryCommandExecutor {
         }
 
         if (foundSlot < 0) {
-            String reference = anySelection ? "item" : String.join(", ", itemIds);
-            String locationDesc = (selectionType == SlotSelectionType.GUI_CONTAINER) ? "container" : "inventory";
-            sendParameterSearchFailure("No " + reference + " found in " + locationDesc + " for " + type.getDisplayName() + ".", future);
+            String reference = anySelection ? tr("pathmind.error.itemReference") : String.join(", ", itemIds);
+            String locationDesc = (selectionType == SlotSelectionType.GUI_CONTAINER)
+                ? tr("pathmind.error.locationContainer")
+                : tr("pathmind.error.locationInventory");
+            sendParameterSearchFailure(tr("pathmind.error.noItemFoundInLocation", reference, locationDesc, type.getDisplayName()), future);
             return false;
         }
 
@@ -1100,7 +1106,7 @@ final class NodeInventoryCommandExecutor {
                 boolean anySelection = isAnySelectionValue(rawBlock);
                 List<BlockSelection> selections = resolveBlocksFromParameter(parameterNode);
                 if (selections.isEmpty() && !anySelection) {
-                    sendParameterSearchFailure("No block selected on parameter for " + type.getDisplayName() + ".", future);
+                    sendParameterSearchFailure(tr("pathmind.error.noBlockSelectedOnParameter", type.getDisplayName()), future);
                     return false;
                 }
 
@@ -1112,12 +1118,12 @@ final class NodeInventoryCommandExecutor {
                 }
 
                 if (result == null) {
-                    String reference = anySelection ? "block" : selections.stream()
+                    String reference = anySelection ? tr("pathmind.error.blockReference") : selections.stream()
                         .map(BlockSelection::getBlockIdString)
                         .filter(id -> id != null && !id.isEmpty())
                         .findFirst()
-                        .orElse("block");
-                    sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
+                        .orElse(tr("pathmind.error.blockReference"));
+                    sendParameterSearchFailure(tr("pathmind.error.noItemFoundInInventory", reference, type.getDisplayName()), future);
                     return false;
                 }
                 runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
@@ -1135,13 +1141,13 @@ final class NodeInventoryCommandExecutor {
                 itemIds = resolveItemIdsFromParameter(parameterNode);
             }
             if (itemIds.isEmpty()) {
-                sendParameterSearchFailure("No item selected on parameter for " + type.getDisplayName() + ".", future);
+                sendParameterSearchFailure(tr("pathmind.error.noItemSelectedOnParameter", type.getDisplayName()), future);
                 return false;
             }
                 ItemSearchResult result = findUseItemSlot(inventory, itemIds);
                 if (result == null) {
                     String reference = String.join(", ", itemIds);
-                    sendParameterSearchFailure("No " + reference + " found in inventory for " + type.getDisplayName() + ".", future);
+                    sendParameterSearchFailure(tr("pathmind.error.noItemFoundInInventory", reference, type.getDisplayName()), future);
                     return false;
                 }
                 runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
@@ -1153,7 +1159,7 @@ final class NodeInventoryCommandExecutor {
         if (traits.contains(NodeValueTrait.INVENTORY_SLOT)) {
                 SlotSelectionType selectionType = resolveInventorySlotSelectionType(parameterNode);
                 if (selectionType == SlotSelectionType.GUI_CONTAINER) {
-                    sendNodeErrorMessage(client, "Use node can only use player inventory slots.");
+                    sendNodeErrorMessage(client, tr("pathmind.error.useOnlyPlayerInventorySlots"));
                     if (future != null && !future.isDone()) {
                         future.complete(null);
                     }

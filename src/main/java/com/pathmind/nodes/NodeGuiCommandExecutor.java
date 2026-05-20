@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
@@ -31,7 +33,7 @@ final class NodeGuiCommandExecutor {
         }
 
         if (!com.pathmind.util.UiUtilsProxy.isAvailable()) {
-            sendNodeErrorMessage(client, "UI Utils is not installed.");
+            sendNodeErrorMessage(client, tr("pathmind.error.uiUtilsNotInstalled"));
             future.complete(null);
             return;
         }

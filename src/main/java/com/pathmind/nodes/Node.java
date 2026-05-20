@@ -39,6 +39,7 @@ import com.pathmind.util.BlockSelection;
 import com.pathmind.util.EntityStateOptions;
 import com.pathmind.util.InventorySlotModeHelper;
 import com.pathmind.util.PlayerInventoryBridge;
+import com.pathmind.util.PathmindI18n;
 import com.pathmind.util.RecipeCompatibilityBridge;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.EquipmentSlot;
@@ -188,6 +189,10 @@ public class Node {
     static final int PLAYER_ARMOR_SLOT_COUNT = 4;
     private static final int PLAYER_OFFHAND_INVENTORY_INDEX = PlayerInventory.MAIN_SIZE + PLAYER_ARMOR_SLOT_COUNT;
     static final int PARAMETER_SLOT_BOTTOM_PADDING = 6;
+
+    private static String tr(String key, Object... args) {
+        return PathmindI18n.tr(key, args);
+    }
     static final int SLOT_AREA_PADDING_TOP = 0;
     static final int SLOT_AREA_PADDING_BOTTOM = 6;
     static final int SLOT_VERTICAL_SPACING = 6;
@@ -1474,7 +1479,7 @@ public class Node {
                     case WAIT_HOURS -> "Hours";
                     default -> "Seconds";
                 };
-            case NodeType.CONTROL_REPEAT -> "TImes";
+            case NodeType.CONTROL_REPEAT -> "Times";
             default -> "Amount";
         };
     }
@@ -3910,7 +3915,7 @@ public class Node {
         }
         String variableName = getParameterString(variableNode, "Variable");
         if (variableName == null || variableName.trim().isEmpty()) {
-            sendVariableError("Variable name cannot be empty.", future);
+            sendVariableError(tr("pathmind.error.variableNameEmpty"), future);
             return null;
         }
 
@@ -3921,19 +3926,19 @@ public class Node {
             runtimeVariable = manager.getRuntimeVariableFromAnyActiveChain(variableName.trim());
         }
         if (runtimeVariable == null) {
-            sendVariableError("Variable \"" + variableName.trim() + "\" is not set.", future);
+            sendVariableError(tr("pathmind.error.variableNotSet", variableName.trim()), future);
             return null;
         }
 
         NodeType valueType = runtimeVariable.getType();
         if (valueType == null) {
-            sendVariableError("Variable \"" + variableName.trim() + "\" has no value.", future);
+            sendVariableError(tr("pathmind.error.variableNoValue", variableName.trim()), future);
             return null;
         }
 
         Node snapshot = createRuntimeVariableSnapshot(runtimeVariable);
         if (snapshot == null) {
-            sendVariableError("Variable \"" + variableName.trim() + "\" has no value.", future);
+            sendVariableError(tr("pathmind.error.variableNoValue", variableName.trim()), future);
             return null;
         }
 
@@ -3944,7 +3949,7 @@ public class Node {
         }
 
         if (!variableSupported) {
-            sendVariableError("Variable \"" + variableName.trim() + "\" cannot be used with " + type.getDisplayName() + ".", future);
+            sendVariableError(tr("pathmind.error.variableUnsupportedForNode", variableName.trim(), type.getDisplayName()), future);
             return null;
         }
 
@@ -4484,7 +4489,7 @@ public class Node {
                 return;
             }
         }
-        sendNodeErrorMessage(client, "Parameter \"" + parameterNode.getType().getDisplayName() + "\" cannot be used with \"" + this.type.getDisplayName() + "\".");
+        sendNodeErrorMessage(client, tr("pathmind.error.incompatibleParameter", parameterNode.getType().getDisplayName(), this.type.getDisplayName()));
     }
 
     void sendParameterSearchFailure(String message, CompletableFuture<Void> future) {
@@ -4505,10 +4510,12 @@ public class Node {
             return true;
         }
         String joined = String.join(", ", emptyNames);
-        String subject = target.getType() != null ? target.getType().getDisplayName() + " node" : "node";
+        String subject = target.getType() != null
+            ? tr("pathmind.error.subjectNodeType", target.getType().getDisplayName())
+            : tr("pathmind.error.subjectNode");
         String message = emptyNames.size() == 1
-            ? joined + " cannot be empty on " + subject + "."
-            : "Parameters " + joined + " cannot be empty on " + subject + ".";
+            ? tr("pathmind.error.parameterEmptyOnNode", joined, subject)
+            : tr("pathmind.error.parametersEmptyOnNode", joined, subject);
         NodeExecutionCompletion.failWithCurrentClient(this, future, message);
         return false;
     }
@@ -4590,7 +4597,7 @@ public class Node {
               }
               MinecraftClient client = MinecraftClient.getInstance();
               if (client != null && variableName != null && !variableName.trim().isEmpty()) {
-                node.sendNodeErrorMessage(client, "Variable \"" + variableName.trim() + "\" is not a numeric value.");
+                node.sendNodeErrorMessage(client, tr("pathmind.error.variableNotNumeric", variableName.trim()));
               }
               return defaultValue;
             }
@@ -4608,7 +4615,7 @@ public class Node {
         } catch (NumberFormatException e) {
             net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
             if (client != null) {
-                node.sendNodeErrorMessage(client, "Please enter a number, arithmetic expression, or variable (~variable_name).");
+                node.sendNodeErrorMessage(client, tr("pathmind.error.enterNumberExpressionOrVariable"));
             }
             return defaultValue;
         }
@@ -4646,7 +4653,7 @@ public class Node {
                 }
                 net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
                 if (client != null && variableName != null && !variableName.trim().isEmpty()) {
-                    node.sendNodeErrorMessage(client, "Variable \"" + variableName.trim() + "\" is not a numeric value.");
+                    node.sendNodeErrorMessage(client, tr("pathmind.error.variableNotNumeric", variableName.trim()));
                 }
                 return defaultValue;
             }
@@ -4664,7 +4671,7 @@ public class Node {
         } catch (NumberFormatException e) {
             net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
             if (client != null) {
-                node.sendNodeErrorMessage(client, "Please enter a number, arithmetic expression, or variable (~variable_name).");
+                node.sendNodeErrorMessage(client, tr("pathmind.error.enterNumberExpressionOrVariable"));
             }
             return defaultValue;
         }
@@ -6170,16 +6177,16 @@ public class Node {
 
     private void notifyInvalidBlockStateSelection(String blockId, String state) {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        String blockLabel = (blockId == null || blockId.isEmpty()) ? "the selected block" : blockId;
-        String stateLabel = state == null || state.isEmpty() ? "(unspecified state)" : state;
-        sendNodeErrorMessage(client, "State \"" + stateLabel + "\" is not valid for " + blockLabel + " on " + type.getDisplayName() + ".");
+        String blockLabel = (blockId == null || blockId.isEmpty()) ? tr("pathmind.error.selectedBlock") : blockId;
+        String stateLabel = state == null || state.isEmpty() ? tr("pathmind.error.unspecifiedState") : state;
+        sendNodeErrorMessage(client, tr("pathmind.error.invalidBlockState", stateLabel, blockLabel, type.getDisplayName()));
     }
 
     private void notifyInvalidEntityStateSelection(String entityId, String state) {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        String entityLabel = (entityId == null || entityId.isEmpty()) ? "the selected entity" : entityId;
-        String stateLabel = state == null || state.isEmpty() ? "(unspecified state)" : state;
-        sendNodeErrorMessage(client, "State \"" + stateLabel + "\" is not valid for " + entityLabel + " on " + type.getDisplayName() + ".");
+        String entityLabel = (entityId == null || entityId.isEmpty()) ? tr("pathmind.error.selectedEntity") : entityId;
+        String stateLabel = state == null || state.isEmpty() ? tr("pathmind.error.unspecifiedState") : state;
+        sendNodeErrorMessage(client, tr("pathmind.error.invalidEntityState", stateLabel, entityLabel, type.getDisplayName()));
     }
 
     Optional<BlockPos> findNearestDroppedItem(net.minecraft.client.MinecraftClient client, Item item, double range) {
@@ -6242,7 +6249,7 @@ public class Node {
 
         String listName = getParameterString(listNode, "List");
         if (listName == null || listName.trim().isEmpty()) {
-            sendNodeErrorMessage(client, "List name cannot be empty.");
+            sendNodeErrorMessage(client, tr("pathmind.error.listNameEmpty"));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -6251,7 +6258,7 @@ public class Node {
 
         ExecutionManager.RuntimeList list = resolveRuntimeList(listNode);
         if (list == null || list.getEntries().isEmpty()) {
-            sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" is empty or missing.");
+            sendNodeErrorMessage(client, tr("pathmind.error.listEmptyOrMissing", listName.trim()));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -6260,7 +6267,7 @@ public class Node {
 
         int index = parseNodeInt(listNode, "Index", 1);
         if (index <= 0) {
-            sendNodeErrorMessage(client, "List item index must be 1 or greater.");
+            sendNodeErrorMessage(client, tr("pathmind.error.listIndexPositive"));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -6269,7 +6276,7 @@ public class Node {
 
         int listIndex = index - 1;
         if (listIndex >= list.getEntries().size()) {
-            sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" has no item " + index + ".");
+            sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", listName.trim(), index));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -6278,7 +6285,7 @@ public class Node {
 
         String entry = list.getEntries().get(listIndex);
         if (entry == null || entry.isEmpty()) {
-            sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" has no item " + index + ".");
+            sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", listName.trim(), index));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -6306,7 +6313,7 @@ public class Node {
 
         if (list.getElementType() == NodeType.PARAM_GUI) {
             if (getParameter("Slot") == null && getParameter("SourceSlot") == null && getParameter("TargetSlot") == null) {
-                sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" contains GUI slots and cannot be used by " + type.getDisplayName() + ".");
+                sendNodeErrorMessage(client, tr("pathmind.error.listGuiSlotsUnsupported", listName.trim(), type.getDisplayName()));
                 if (future != null && !future.isDone()) {
                     future.complete(null);
                 }
@@ -6314,7 +6321,7 @@ public class Node {
             }
             ListSlotEntry slotEntry = parseListSlotEntry(entry);
             if (slotEntry == null) {
-                sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" item " + index + " is not a valid GUI slot.");
+                sendNodeErrorMessage(client, tr("pathmind.error.listItemInvalidGuiSlot", listName.trim(), index));
                 if (future != null && !future.isDone()) {
                     future.complete(null);
                 }
@@ -6332,7 +6339,7 @@ public class Node {
             java.util.UUID uuid = java.util.UUID.fromString(entry);
             Entity entity = resolveEntityByUuid(client, uuid);
             if (entity == null || entity.isRemoved()) {
-                sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" item " + index + " is not available.");
+                sendNodeErrorMessage(client, tr("pathmind.error.listItemUnavailable", listName.trim(), index));
                 if (future != null && !future.isDone()) {
                     future.complete(null);
                 }
@@ -6388,7 +6395,7 @@ public class Node {
                 }
             }
 
-            sendNodeErrorMessage(client, "List \"" + listName.trim() + "\" item " + index + " is not available.");
+            sendNodeErrorMessage(client, tr("pathmind.error.listItemUnavailable", listName.trim(), index));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -6439,7 +6446,7 @@ public class Node {
         int index = parseNodeInt(listNode, "Index", 1);
         if (index <= 0 || index > list.getEntries().size()) {
             if (reportErrors && client != null) {
-                sendNodeErrorMessage(client, "List \"" + safeListName + "\" has no item " + index + ".");
+                sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", safeListName, index));
             }
             if (reportErrors && future != null && !future.isDone()) {
                 future.complete(null);
@@ -6450,7 +6457,7 @@ public class Node {
         ListSlotEntry parsed = parseListSlotEntry(entry);
         if (parsed == null) {
             if (reportErrors && client != null) {
-                sendNodeErrorMessage(client, "List \"" + safeListName + "\" item " + index + " is not a valid GUI slot.");
+                sendNodeErrorMessage(client, tr("pathmind.error.listItemInvalidGuiSlot", safeListName, index));
             }
             if (reportErrors && future != null && !future.isDone()) {
                 future.complete(null);

@@ -113,11 +113,11 @@ public class BookTextEditorOverlay {
             nextPageButton = null;
         }
 
-        saveButton = ButtonWidget.builder(Text.literal("Save"), button -> save())
+        saveButton = ButtonWidget.builder(Text.translatable("pathmind.button.save"), button -> save())
             .dimensions(buttonStartX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT)
             .build();
 
-        cancelButton = ButtonWidget.builder(Text.literal("Cancel"), button -> closeWithoutSave())
+        cancelButton = ButtonWidget.builder(Text.translatable("pathmind.button.cancel"), button -> closeWithoutSave())
             .dimensions(buttonStartX + BUTTON_WIDTH + BUTTON_SPACING, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT)
             .build();
     }

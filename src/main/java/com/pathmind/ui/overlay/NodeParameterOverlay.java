@@ -386,7 +386,7 @@ public class NodeParameterOverlay {
         // Render title
         context.drawTextWithShadow(
             textRenderer,
-            Text.literal("Edit Parameters: " + node.getType().getDisplayName()),
+            Text.translatable("pathmind.overlay.editParameters", node.getType().getDisplayName()),
             popupX + 20,
             popupY + 15,
             applyPopupAlpha(UITheme.TEXT_PRIMARY, popupAlpha)
@@ -719,11 +719,13 @@ public class NodeParameterOverlay {
             applyPopupAlpha(exactMode ? inactiveBorder : accentColor, popupAlpha));
 
         int textY = fieldY + (DIRECTION_MODE_TAB_HEIGHT - textRenderer.fontHeight) / 2 + 1;
-        int exactTextX = fieldX + Math.max(0, (exactWidth - textRenderer.getWidth("Exact")) / 2);
-        int cardinalTextX = splitX + Math.max(0, (cardinalWidth - textRenderer.getWidth("Cardinal")) / 2);
-        context.drawTextWithShadow(textRenderer, Text.literal("Exact"), exactTextX, textY,
+        String exactLabel = Text.translatable("pathmind.option.directionMode.exact").getString();
+        String cardinalLabel = Text.translatable("pathmind.option.directionMode.cardinal").getString();
+        int exactTextX = fieldX + Math.max(0, (exactWidth - textRenderer.getWidth(exactLabel)) / 2);
+        int cardinalTextX = splitX + Math.max(0, (cardinalWidth - textRenderer.getWidth(cardinalLabel)) / 2);
+        context.drawTextWithShadow(textRenderer, Text.literal(exactLabel), exactTextX, textY,
             applyPopupAlpha(exactMode ? UITheme.TEXT_EDITING : UITheme.TEXT_PRIMARY, popupAlpha));
-        context.drawTextWithShadow(textRenderer, Text.literal("Cardinal"), cardinalTextX, textY,
+        context.drawTextWithShadow(textRenderer, Text.literal(cardinalLabel), cardinalTextX, textY,
             applyPopupAlpha(exactMode ? UITheme.TEXT_PRIMARY : UITheme.TEXT_EDITING, popupAlpha));
     }
 
@@ -1243,12 +1245,12 @@ public class NodeParameterOverlay {
     
     private void recreateButtons() {
         this.saveButton = ButtonWidget.builder(
-            Text.literal("Save"),
+            Text.translatable("pathmind.button.save"),
             b -> saveParameters()
         ).dimensions(popupX + 20, computeVisibleButtonY(), BUTTON_WIDTH, BUTTON_HEIGHT).build();
 
         this.cancelButton = ButtonWidget.builder(
-            Text.literal("Cancel"),
+            Text.translatable("pathmind.button.cancel"),
             b -> close()
         ).dimensions(popupX + popupWidth - (BUTTON_WIDTH + 20), computeVisibleButtonY(), BUTTON_WIDTH, BUTTON_HEIGHT).build();
 

@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.execution.PreciseCompletionTracker;
 import com.pathmind.util.BaritoneApiProxy;
 import com.pathmind.util.BlockSelection;
@@ -173,7 +175,7 @@ final class NodeWorldActionCommandExecutor {
             return true;
         }
         if (parameterData.slotSelectionType == SlotSelectionType.GUI_CONTAINER) {
-            owner.sendNodeErrorMessage(client, "Use node cannot use items from GUI/container slots.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.useCannotUseGuiSlots"));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -184,7 +186,7 @@ final class NodeWorldActionCommandExecutor {
         boolean armorSlot = clampedSlot >= PlayerInventory.MAIN_SIZE
             && clampedSlot < PlayerInventory.MAIN_SIZE + Node.PLAYER_ARMOR_SLOT_COUNT;
         if (armorSlot) {
-            owner.sendNodeErrorMessage(client, "Use node cannot activate armor slots.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.useCannotActivateArmorSlots"));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -193,7 +195,7 @@ final class NodeWorldActionCommandExecutor {
 
         ItemStack stack = inventory.getStack(clampedSlot);
         if (stack.isEmpty()) {
-            owner.sendNodeErrorMessage(client, "Selected slot for " + owner.getType().getDisplayName() + " is empty.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.selectedSlotEmpty", owner.getType().getDisplayName()));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -208,7 +210,7 @@ final class NodeWorldActionCommandExecutor {
         }
 
         if (!prepared) {
-            owner.sendNodeErrorMessage(client, "Failed to prepare selected item for " + owner.getType().getDisplayName() + ".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.failedPrepareSelectedItem", owner.getType().getDisplayName()));
             if (future != null && !future.isDone()) {
                 future.complete(null);
             }
@@ -426,14 +428,14 @@ final class NodeWorldActionCommandExecutor {
             blockIdToUse = getBlockIdFromHand(client, hand);
         }
         if (blockIdToUse == null || blockIdToUse.isEmpty() || Node.isAnySelectionValue(blockIdToUse)) {
-            owner.sendNodeErrorMessage(client, "Cannot place block: no block selected.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeNoBlockSelected"));
             future.complete(null);
             return;
         }
 
         Block desiredBlock = owner.resolveBlockForPlacement(blockIdToUse);
         if (desiredBlock == null) {
-            owner.sendNodeErrorMessage(client, "Cannot place block: unknown block \"" + blockIdToUse + "\".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeUnknownBlock", blockIdToUse));
             future.complete(null);
             return;
         }
@@ -464,7 +466,7 @@ final class NodeWorldActionCommandExecutor {
                         }
                         ActionResult result = client.interactionManager.interactBlock(client.player, resolvedHand, placementHitResult);
                         if (!result.isAccepted()) {
-                            throw new Node.PlacementFailure("Cannot place block at " + formatBlockPos(placementPos) + ": placement rejected (" + result + ").");
+                            throw new Node.PlacementFailure(tr("pathmind.error.placeRejected", formatBlockPos(placementPos), result));
                         }
                         if (shouldSwing) {
                             client.player.swingHand(resolvedHand);
@@ -480,7 +482,7 @@ final class NodeWorldActionCommandExecutor {
                 }
                 boolean placed = owner.waitForBlockPlacement(client, placementPos, resolvedBlock);
                 if (!placed) {
-                    owner.sendNodeErrorMessage(client, "Attempted to place block \"" + resolvedBlockId + "\" at " + formatBlockPos(placementPos) + " but it did not appear. Make sure the space is clear and within reach.");
+                    owner.sendNodeErrorMessage(client, tr("pathmind.error.placeDidNotAppear", resolvedBlockId, formatBlockPos(placementPos)));
                 }
                 future.complete(null);
             } catch (InterruptedException e) {
@@ -490,7 +492,7 @@ final class NodeWorldActionCommandExecutor {
                 owner.sendNodeErrorMessage(client, e.getMessage());
                 future.complete(null);
             } catch (RuntimeException e) {
-                owner.sendNodeErrorMessage(client, "Failed to place block \"" + resolvedBlockId + "\": " + e.getMessage());
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.placeFailed", resolvedBlockId, e.getMessage()));
                 future.complete(null);
             }
         }, "Pathmind-PlaceHand").start();
@@ -999,7 +1001,7 @@ final class NodeWorldActionCommandExecutor {
         }
 
         if (block == null || block.isEmpty() || Node.isAnySelectionValue(block)) {
-            owner.sendNodeErrorMessage(client, "Cannot place block: no block selected.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeNoBlockSelected"));
             future.complete(null);
             return;
         }
@@ -1067,7 +1069,7 @@ final class NodeWorldActionCommandExecutor {
 
         Block desiredBlock = resolveBlockForPlacement(block);
         if (desiredBlock == null) {
-            owner.sendNodeErrorMessage(client, "Cannot place block: unknown block \"" + block + "\".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeUnknownBlock", block));
             future.complete(null);
             return;
         }
@@ -1090,7 +1092,7 @@ final class NodeWorldActionCommandExecutor {
 
                     ActionResult result = client.interactionManager.interactBlock(client.player, resolvedHand, placementHitResult);
                     if (!result.isAccepted()) {
-                        throw new Node.PlacementFailure("Cannot place block at " + formatBlockPos(placementPos) + ": placement rejected (" + result + ").");
+                        throw new Node.PlacementFailure(tr("pathmind.error.placeRejected", formatBlockPos(placementPos), result));
                     }
                     if (client.player != null) {
                         client.player.swingHand(resolvedHand);
@@ -1101,7 +1103,7 @@ final class NodeWorldActionCommandExecutor {
                 });
                 boolean placed = waitForBlockPlacement(client, placementPos, resolvedBlock);
                 if (!placed) {
-                    owner.sendNodeErrorMessage(client, "Attempted to place block \"" + resolvedBlockId + "\" at " + formatBlockPos(placementPos) + " but it did not appear. Make sure the space is clear and within reach.");
+                    owner.sendNodeErrorMessage(client, tr("pathmind.error.placeDidNotAppear", resolvedBlockId, formatBlockPos(placementPos)));
                 }
                 future.complete(null);
             } catch (InterruptedException e) {
@@ -1111,7 +1113,7 @@ final class NodeWorldActionCommandExecutor {
                 owner.sendNodeErrorMessage(client, e.getMessage());
                 future.complete(null);
             } catch (RuntimeException e) {
-                owner.sendNodeErrorMessage(client, "Failed to place block \"" + resolvedBlockId + "\": " + e.getMessage());
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.placeFailed", resolvedBlockId, e.getMessage()));
                 future.complete(null);
             }
         }, "Pathmind-Place").start();
@@ -1177,18 +1179,18 @@ final class NodeWorldActionCommandExecutor {
         }
         SlotSelectionType selectionType = owner.resolveInventorySlotSelectionType(parameterNode);
         if (selectionType == SlotSelectionType.GUI_CONTAINER) {
-            owner.sendNodeErrorMessage(client, owner.getType().getDisplayName() + " can only use player inventory slots.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.onlyPlayerInventorySlots", owner.getType().getDisplayName()));
             return null;
         }
         PlayerInventory inventory = client.player.getInventory();
         int slotValue = owner.clampInventorySlot(inventory, Node.parseNodeInt(parameterNode, "Slot", 0));
         ItemStack stack = inventory.getStack(slotValue);
         if (stack.isEmpty()) {
-            owner.sendNodeErrorMessage(client, "Selected slot for " + owner.getType().getDisplayName() + " is empty.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.selectedSlotEmpty", owner.getType().getDisplayName()));
             return null;
         }
         if (!(stack.getItem() instanceof BlockItem)) {
-            owner.sendNodeErrorMessage(client, "Selected slot for " + owner.getType().getDisplayName() + " does not contain a block.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.selectedSlotNoBlock", owner.getType().getDisplayName()));
             return null;
         }
         if (owner.runtimeState().runtimeParameterData == null) {
@@ -1197,7 +1199,7 @@ final class NodeWorldActionCommandExecutor {
         owner.runtimeState().runtimeParameterData.slotIndex = slotValue;
         owner.runtimeState().runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
         if (!ensureStackSelectedInMainHand(client, inventory, slotValue, stack)) {
-            owner.sendNodeErrorMessage(client, "Failed to prepare selected block for " + owner.getType().getDisplayName() + ".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.failedPrepareSelectedBlock", owner.getType().getDisplayName()));
             return null;
         }
         Identifier id = Registries.ITEM.getId(stack.getItem());

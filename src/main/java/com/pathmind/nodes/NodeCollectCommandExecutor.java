@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.execution.PreciseCompletionTracker;
 import com.pathmind.util.BaritoneApiProxy;
 import com.pathmind.util.BlockSelection;
@@ -149,7 +151,7 @@ final class NodeCollectCommandExecutor {
         addBlockIds(blockIds, owner.getStringParameter("Blocks", null));
 
         if (blockIds.isEmpty()) {
-            owner.sendParameterSearchFailure("No block types specified for " + owner.getType().getDisplayName() + ".", future);
+            owner.sendParameterSearchFailure(tr("pathmind.error.noBlockTypesSpecified", owner.getType().getDisplayName()), future);
             return Collections.emptyList();
         }
 
@@ -157,7 +159,7 @@ final class NodeCollectCommandExecutor {
         for (String idString : blockIds) {
             Identifier identifier = Identifier.tryParse(idString);
             if (identifier == null || !Registries.BLOCK.containsId(identifier)) {
-                owner.sendParameterSearchFailure("Unknown block \"" + idString + "\" for " + owner.getType().getDisplayName() + ".", future);
+                owner.sendParameterSearchFailure(tr("pathmind.error.unknownBlockForNode", idString, owner.getType().getDisplayName()), future);
                 return Collections.emptyList();
             }
             targets.add(identifier.toString());
@@ -266,7 +268,7 @@ final class NodeCollectCommandExecutor {
         Vec3d eyePos = client.player.getEyePos();
         Vec3d center = Vec3d.ofCenter(targetPos);
         if (eyePos.squaredDistanceTo(center) > Node.DEFAULT_REACH_DISTANCE_SQUARED) {
-            NodeExecutionCompletion.fail(owner, client, future, "Target block is out of reach.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.targetBlockOutOfReach"));
             return;
         }
 
@@ -283,7 +285,7 @@ final class NodeCollectCommandExecutor {
 
         float delta = state.calcBlockBreakingDelta(client.player, client.world, targetPos);
         if (delta <= 0.0F) {
-            NodeExecutionCompletion.fail(owner, client, future, "Block cannot be broken.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.blockCannotBeBroken"));
             return;
         }
         int ticksToBreak = Math.max(1, (int) Math.ceil(1.0F / delta));

@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -92,40 +94,40 @@ final class NodeBehaviorDefinitionSupport {
 
     static String playerSearchFailureMessage(Node owner, String playerName) {
         if (Node.isAnyPlayerValue(playerName)) {
-            return "No players nearby for " + owner.getType().getDisplayName() + ".";
+            return tr("pathmind.error.noPlayersNearby", owner.getType().getDisplayName());
         }
         if (Node.isSelfPlayerValue(playerName)) {
-            return "Local player unavailable for " + owner.getType().getDisplayName() + ".";
+            return tr("pathmind.error.localPlayerUnavailable", owner.getType().getDisplayName());
         }
-        return "Player \"" + playerName + "\" is not nearby for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.playerNotNearby", playerName, owner.getType().getDisplayName());
     }
 
     static String noNearbyEntityMessage(Node owner) {
-        return "No nearby entity found for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.noNearbyEntity", owner.getType().getDisplayName());
     }
 
     static String unknownItemMessage(Node owner, String reference) {
-        return "Unknown item \"" + reference + "\" for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.unknownItemForNode", reference, owner.getType().getDisplayName());
     }
 
     static String noDroppedItemMessage(Node owner, java.util.List<String> itemIds) {
-        return "No dropped " + String.join(", ", itemIds) + " found for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.noDroppedItemForNode", String.join(", ", itemIds), owner.getType().getDisplayName());
     }
 
     static String noBlocksDefinedMessage(Node owner) {
-        return "No blocks defined on parameter for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.noBlocksDefinedOnParameter", owner.getType().getDisplayName());
     }
 
     static String noNearbyBlockMessage(Node owner) {
-        return "No nearby block found for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.noNearbyBlock", owner.getType().getDisplayName());
     }
 
     static String noMatchingBlockMessage(Node owner) {
-        return "No matching block from parameter found for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.noMatchingBlockFromParameter", owner.getType().getDisplayName());
     }
 
     static String noOpenBlockMessage(Node owner) {
-        return "No open block found within range for " + owner.getType().getDisplayName() + ".";
+        return tr("pathmind.error.noOpenBlockInRange", owner.getType().getDisplayName());
     }
 
     static Orientation applyDirection(String direction, float currentYaw, float currentPitch) {

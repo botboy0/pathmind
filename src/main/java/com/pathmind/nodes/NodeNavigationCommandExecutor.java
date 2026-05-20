@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.execution.PathmindNavigator;
 import com.pathmind.execution.PreciseCompletionTracker;
 import com.pathmind.execution.ExecutionManager;
@@ -724,14 +726,14 @@ final class NodeNavigationCommandExecutor {
             : null;
 
         if (normalized == null || normalized.isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to block: no block selected.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateBlockNoSelection"));
             return null;
         }
 
         Identifier identifier = Identifier.tryParse(normalized);
         if (identifier == null || !Registries.BLOCK.containsId(identifier)) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "Cannot navigate to block \"" + blockId + "\": unknown identifier.");
+                tr("pathmind.error.navigateBlockUnknownIdentifier", blockId));
             return null;
         }
 
@@ -741,7 +743,7 @@ final class NodeNavigationCommandExecutor {
         Optional<BlockPos> nearest = findNearestBlock(client, selections, Node.PARAMETER_SEARCH_RADIUS);
         if (nearest.isEmpty()) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "No " + normalized + " found nearby for " + type.getDisplayName() + ".");
+                tr("pathmind.error.noTargetFoundNearby", normalized, type.getDisplayName()));
             return null;
         }
 
@@ -779,7 +781,7 @@ final class NodeNavigationCommandExecutor {
             return true;
         }
         if (customGoalProcess == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to entity: goal process unavailable.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateEntityGoalUnavailable"));
             return true;
         }
 
@@ -824,13 +826,12 @@ final class NodeNavigationCommandExecutor {
         if (matchedPosition.isEmpty()) {
             String reference = String.join(", ", itemIds);
             NodeExecutionCompletion.fail(owner, client, future,
-                "No dropped " + reference + " found nearby for " + type.getDisplayName()
-                    + ". It may not have appeared yet.");
+                tr("pathmind.error.noDroppedItemNearbyYet", reference, type.getDisplayName()));
             return true;
         }
 
         if (customGoalProcess == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to dropped item: goal process unavailable.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateDroppedItemGoalUnavailable"));
             return true;
         }
 
@@ -879,12 +880,12 @@ final class NodeNavigationCommandExecutor {
         }
         if (nearest == null) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "No matching entity found nearby for " + type.getDisplayName() + ".");
+                tr("pathmind.error.noMatchingEntityNearby", type.getDisplayName()));
             return true;
         }
 
         if (customGoalProcess == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to entity: goal process unavailable.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateEntityGoalUnavailable"));
             return true;
         }
 
@@ -921,18 +922,18 @@ final class NodeNavigationCommandExecutor {
         if (match.isEmpty()) {
             String message;
             if (isAnyPlayerValue(playerName)) {
-                message = "No players nearby for " + type.getDisplayName() + ".";
+                message = tr("pathmind.error.noPlayersNearby", type.getDisplayName());
             } else if (isSelfPlayerValue(playerName)) {
-                message = "Local player unavailable for " + type.getDisplayName() + ".";
+                message = tr("pathmind.error.localPlayerUnavailable", type.getDisplayName());
             } else {
-                message = "Player \"" + playerName + "\" is not nearby for " + type.getDisplayName() + ".";
+                message = tr("pathmind.error.playerNotNearby", playerName, type.getDisplayName());
             }
             NodeExecutionCompletion.fail(owner, client, future, message);
             return true;
         }
 
         if (customGoalProcess == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to player: goal process unavailable.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigatePlayerGoalUnavailable"));
             return true;
         }
 
@@ -964,14 +965,14 @@ final class NodeNavigationCommandExecutor {
 
         if (client != null && client.world != null) {
             if (normalized == null || normalized.isEmpty()) {
-                NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to block: no block selected.");
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateBlockNoSelection"));
                 return true;
             }
 
             Identifier identifier = Identifier.tryParse(normalized);
             if (identifier == null || !Registries.BLOCK.containsId(identifier)) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "Cannot navigate to block \"" + blockId + "\": unknown identifier.");
+                    tr("pathmind.error.navigateBlockUnknownIdentifier", blockId));
                 return true;
             }
 
@@ -982,7 +983,7 @@ final class NodeNavigationCommandExecutor {
                 Optional<BlockPos> nearest = findNearestBlock(client, selections, Node.PARAMETER_SEARCH_RADIUS);
                 if (nearest.isEmpty()) {
                     NodeExecutionCompletion.fail(owner, client, future,
-                        "No " + normalized + " found nearby for " + type.getDisplayName() + ".");
+                        tr("pathmind.error.noTargetFoundNearby", normalized, type.getDisplayName()));
                     return true;
                 }
                 targetPos = nearest.get();
@@ -1008,7 +1009,7 @@ final class NodeNavigationCommandExecutor {
         if (targetPos != null) {
             Object customGoalProcess = baritone != null ? BaritoneApiProxy.getCustomGoalProcess(baritone) : null;
             if (customGoalProcess == null) {
-                NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to block: goal process unavailable.");
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateBlockGoalUnavailable"));
                 return true;
             }
 
@@ -1020,7 +1021,7 @@ final class NodeNavigationCommandExecutor {
 
         Object getToBlockProcess = baritone != null ? BaritoneApiProxy.getGetToBlockProcess(baritone) : null;
         if (getToBlockProcess == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Cannot navigate to block: block search process unavailable.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.navigateBlockSearchUnavailable"));
             return true;
         }
 

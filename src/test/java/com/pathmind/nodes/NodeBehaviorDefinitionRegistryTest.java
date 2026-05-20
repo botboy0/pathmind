@@ -312,11 +312,11 @@ class NodeBehaviorDefinitionRegistryTest {
     void playerSearchFailureMessageUsesPlayerSelectionKind() {
         Node owner = new Node(NodeType.LOOK, 0, 0);
 
-        assertEquals("No players nearby for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noPlayersNearby",
             NodeBehaviorDefinitionRegistry.playerSearchFailureMessage(owner, "Any"));
-        assertEquals("Local player unavailable for pathmind.node.type.look.",
+        assertEquals("pathmind.error.localPlayerUnavailable",
             NodeBehaviorDefinitionRegistry.playerSearchFailureMessage(owner, "Self"));
-        assertEquals("Player \"Alex\" is not nearby for pathmind.node.type.look.",
+        assertEquals("pathmind.error.playerNotNearby",
             NodeBehaviorDefinitionRegistry.playerSearchFailureMessage(owner, "Alex"));
     }
 
@@ -324,7 +324,7 @@ class NodeBehaviorDefinitionRegistryTest {
     void noNearbyEntityMessageUsesOwnerDisplayName() {
         Node owner = new Node(NodeType.LOOK, 0, 0);
 
-        assertEquals("No nearby entity found for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noNearbyEntity",
             NodeBehaviorDefinitionRegistry.noNearbyEntityMessage(owner));
     }
 
@@ -332,9 +332,9 @@ class NodeBehaviorDefinitionRegistryTest {
     void itemSearchFailureMessagesUseOwnerDisplayName() {
         Node owner = new Node(NodeType.LOOK, 0, 0);
 
-        assertEquals("Unknown item \"missing_item\" for pathmind.node.type.look.",
+        assertEquals("pathmind.error.unknownItemForNode",
             NodeBehaviorDefinitionRegistry.unknownItemMessage(owner, "missing_item"));
-        assertEquals("No dropped diamond, emerald found for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noDroppedItemForNode",
             NodeBehaviorDefinitionRegistry.noDroppedItemMessage(owner, java.util.List.of("diamond", "emerald")));
     }
 
@@ -342,13 +342,13 @@ class NodeBehaviorDefinitionRegistryTest {
     void blockSearchFailureMessagesUseOwnerDisplayName() {
         Node owner = new Node(NodeType.LOOK, 0, 0);
 
-        assertEquals("No blocks defined on parameter for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noBlocksDefinedOnParameter",
             NodeBehaviorDefinitionRegistry.noBlocksDefinedMessage(owner));
-        assertEquals("No nearby block found for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noNearbyBlock",
             NodeBehaviorDefinitionRegistry.noNearbyBlockMessage(owner));
-        assertEquals("No matching block from parameter found for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noMatchingBlockFromParameter",
             NodeBehaviorDefinitionRegistry.noMatchingBlockMessage(owner));
-        assertEquals("No open block found within range for pathmind.node.type.look.",
+        assertEquals("pathmind.error.noOpenBlockInRange",
             NodeBehaviorDefinitionRegistry.noOpenBlockMessage(owner));
     }
 }

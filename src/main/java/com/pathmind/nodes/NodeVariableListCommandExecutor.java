@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.execution.ExecutionManager;
 import com.pathmind.util.BlockSelection;
 import com.pathmind.util.EntityStateOptions;
@@ -44,13 +46,13 @@ final class NodeVariableListCommandExecutor {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (variableNode == null || variableNode.getType() != NodeType.VARIABLE
             || valueNode == null || valueNode.getType() == NodeType.VARIABLE) {
-            NodeExecutionCompletion.fail(owner, client, future, "Set Variable requires a variable input and a value parameter.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.setVariableRequiresInputs"));
             return;
         }
 
         String variableName = Node.getParameterString(variableNode, "Variable");
         if (variableName == null || variableName.trim().isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "Variable name cannot be empty.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.variableNameEmpty"));
             return;
         }
 
@@ -72,13 +74,13 @@ final class NodeVariableListCommandExecutor {
             Node parameterNode = valueNode.getAttachedParameter(0);
             if (parameterNode == null) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "Position Of requires an entity, user, block, or item parameter.");
+                    tr("pathmind.error.positionOfRequiresParameter"));
                 return;
             }
             Optional<Vec3d> resolved = valueNode.resolvePositionTarget(parameterNode, null, null);
             if (resolved.isEmpty()) {
                 owner.setNextOutputSocket(Node.NO_OUTPUT);
-                NodeExecutionCompletion.fail(owner, client, future, "Position Of could not resolve its target.");
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.positionOfTargetUnresolved"));
                 return;
             }
             values = valueNode.exportParameterValues();
@@ -89,7 +91,7 @@ final class NodeVariableListCommandExecutor {
             if (parameterNodeA == null || parameterNodeB == null) {
                 owner.setNextOutputSocket(Node.NO_OUTPUT);
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "Distance Between requires two parameters (coordinate, entity, user, block, or item).");
+                    tr("pathmind.error.distanceBetweenRequiresTwoParameters"));
                 return;
             }
             if ((!valueNode.providesTrait(parameterNodeA, NodeValueTrait.ENTITY)
@@ -104,7 +106,7 @@ final class NodeVariableListCommandExecutor {
                 && !valueNode.providesTrait(parameterNodeB, NodeValueTrait.PLAYER))) {
                 owner.setNextOutputSocket(Node.NO_OUTPUT);
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "Distance Between only accepts coordinate, entity, user, block, or item parameters.");
+                    tr("pathmind.error.distanceBetweenInvalidParameters"));
                 return;
             }
             Optional<Vec3d> resolvedA = valueNode.resolveDistanceBetweenTarget(parameterNodeA);
@@ -112,7 +114,7 @@ final class NodeVariableListCommandExecutor {
             if (resolvedA.isEmpty() || resolvedB.isEmpty()) {
                 owner.setNextOutputSocket(Node.NO_OUTPUT);
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "Distance Between could not resolve one or both targets.");
+                    tr("pathmind.error.distanceBetweenTargetsUnresolved"));
                 return;
             }
             double distance = Math.sqrt(resolvedA.get().squaredDistanceTo(resolvedB.get()));
@@ -139,34 +141,34 @@ final class NodeVariableListCommandExecutor {
 
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (variableNode == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Change Variable requires a variable.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.changeVariableRequiresVariable"));
             return;
         }
 
         String variableName = Node.getParameterString(variableNode, "Variable");
         if (variableName == null || variableName.trim().isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "Variable name cannot be empty.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.variableNameEmpty"));
             return;
         }
 
         ExecutionManager manager = ExecutionManager.getInstance();
         Node startNode = owner.getOwningStartNode();
         if (startNode == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "No active node tree available for variable change.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noActiveTreeVariableChange"));
             return;
         }
 
         ExecutionManager.RuntimeVariable current = manager.getRuntimeVariable(startNode, variableName.trim());
         if (current == null) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "Variable \"" + variableName.trim() + "\" is not set.");
+                tr("pathmind.error.variableNotSet", variableName.trim()));
             return;
         }
 
         NodeType valueType = current.getType();
         if (valueType == null) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "Variable \"" + variableName.trim() + "\" has no value.");
+                tr("pathmind.error.variableNoValue", variableName.trim()));
             return;
         }
 
@@ -180,14 +182,14 @@ final class NodeVariableListCommandExecutor {
         double amount = owner.getDoubleParameter("Amount", 1.0);
         String operation = owner.getAmountOperation();
         if ((operation.equals("/") || operation.equals("%")) && Math.abs(amount) < 1.0E-9) {
-            NodeExecutionCompletion.fail(owner, client, future, "Change Variable cannot divide by 0.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.changeVariableDivideByZero"));
             return;
         }
 
         String[] error = new String[1];
         if (!applyNumericOperation(snapshot, amount, operation, error)) {
             NodeExecutionCompletion.fail(owner, client, future, error[0] != null ? error[0]
-                : "Change Variable supports variables with a single numeric value.");
+                : tr("pathmind.error.changeVariableRequiresSingleNumericValue"));
             return;
         }
 
@@ -208,13 +210,13 @@ final class NodeVariableListCommandExecutor {
         Node parameterNode = owner.getAttachedParameter(0);
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (parameterNode == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "Add To List requires an entity, player, or item parameter.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.addToListRequiresParameter"));
             return;
         }
 
         String listName = owner.getStringParameter("List", "");
         if (listName == null || listName.trim().isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "List name cannot be empty.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.listNameEmpty"));
             return;
         }
 
@@ -224,13 +226,13 @@ final class NodeVariableListCommandExecutor {
         }
         if (listValue == null || listValue.entry == null || listValue.entry.trim().isEmpty()) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "No matching target found nearby for " + owner.getType().getDisplayName() + ".");
+                tr("pathmind.error.noMatchingTargetNearby", owner.getType().getDisplayName()));
             return;
         }
 
         Node startNode = owner.resolveExecutionStartNode();
         if (startNode == null) {
-            NodeExecutionCompletion.fail(owner, client, future, "No active node tree available for list update.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noActiveTreeListUpdate"));
             return;
         }
 
@@ -258,14 +260,14 @@ final class NodeVariableListCommandExecutor {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         String listName = owner.getStringParameter("List", "");
         if (listName == null || listName.trim().isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "List name cannot be empty.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.listNameEmpty"));
             return;
         }
 
         ExecutionManager.RuntimeList runtimeList = owner.resolveRuntimeList(owner);
         if (runtimeList == null || runtimeList.isEmpty()) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "List \"" + listName.trim() + "\" is empty or missing.");
+                tr("pathmind.error.listEmptyOrMissing", listName.trim()));
             return;
         }
 
@@ -277,19 +279,19 @@ final class NodeVariableListCommandExecutor {
         } else if (mode == RemoveListMode.INDEX) {
             int index = owner.getIntParameter("Index", 1);
             if (index <= 0) {
-                NodeExecutionCompletion.fail(owner, client, future, "List item index must be 1 or greater.");
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.listIndexPositive"));
                 return;
             }
             removed = runtimeList.removeEntry(index - 1);
             if (removed == null) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "List \"" + listName.trim() + "\" has no item " + index + ".");
+                    tr("pathmind.error.listNoItem", listName.trim(), index));
                 return;
             }
         } else {
             Node valueNode = owner.getAttachedParameter(0);
             if (valueNode == null) {
-                NodeExecutionCompletion.fail(owner, client, future, "Remove From List requires a value parameter.");
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.removeFromListRequiresValue"));
                 return;
             }
             int removedCount = 0;
@@ -309,14 +311,14 @@ final class NodeVariableListCommandExecutor {
             }
             if (removedCount <= 0) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No matching entry was found in list \"" + listName.trim() + "\".");
+                    tr("pathmind.error.noMatchingEntryInList", listName.trim()));
                 return;
             }
         }
 
         if (removed == null) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "List \"" + listName.trim() + "\" is empty or missing.");
+                tr("pathmind.error.listEmptyOrMissing", listName.trim()));
             return;
         }
         NodeExecutionCompletion.complete(future);
@@ -327,14 +329,14 @@ final class NodeVariableListCommandExecutor {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (parameterNode == null) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "Create List requires an entity, player, item, or GUI parameter.");
+                tr("pathmind.error.createListRequiresParameter"));
             return;
         }
 
         NodeType parameterType = parameterNode.getType();
         String listName = owner.getStringParameter("List", "");
         if (listName == null || listName.trim().isEmpty()) {
-            NodeExecutionCompletion.fail(owner, client, future, "List name cannot be empty.");
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.listNameEmpty"));
             return;
         }
 
@@ -354,7 +356,7 @@ final class NodeVariableListCommandExecutor {
             }
             if (singleValue == null || singleValue.entry == null || singleValue.entry.trim().isEmpty()) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "Create List could not resolve a value from the attached parameter.");
+                    tr("pathmind.error.createListValueUnresolved"));
                 return;
             }
 
@@ -362,7 +364,7 @@ final class NodeVariableListCommandExecutor {
             Node startNode = owner.resolveExecutionStartNode();
             if (startNode == null) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No active node tree available for list creation.");
+                    tr("pathmind.error.noActiveTreeListCreation"));
                 return;
             }
             manager.setRuntimeList(startNode, listName.trim(),
@@ -376,14 +378,14 @@ final class NodeVariableListCommandExecutor {
             List<BlockSelection> blocks = owner.resolveBlocksFromParameter(parameterNode);
             if (blocks.isEmpty()) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No block selected for " + owner.getType().getDisplayName() + ".");
+                    tr("pathmind.error.noBlockSelectedForNode", owner.getType().getDisplayName()));
                 return;
             }
 
             List<BlockPos> positions = owner.findBlocksWithinRange(client, blocks, searchRadius);
             if (positions.isEmpty()) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No matching blocks found nearby for " + owner.getType().getDisplayName() + ".");
+                    tr("pathmind.error.noMatchingBlocksNearby", owner.getType().getDisplayName()));
                 return;
             }
             if (isCreateListBlockCapEnabled() && positions.size() > getCreateListMaxBlocks()) {
@@ -409,7 +411,7 @@ final class NodeVariableListCommandExecutor {
             Node startNode = owner.resolveExecutionStartNode();
             if (startNode == null) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No active node tree available for list creation.");
+                    tr("pathmind.error.noActiveTreeListCreation"));
                 return;
             }
 
@@ -500,7 +502,7 @@ final class NodeVariableListCommandExecutor {
             ScreenHandler handler = client.player.currentScreenHandler;
             if (handler == null) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No GUI is open for " + owner.getType().getDisplayName() + ".");
+                    tr("pathmind.error.noGuiOpenForNode", owner.getType().getDisplayName()));
                 return;
             }
 
@@ -508,7 +510,7 @@ final class NodeVariableListCommandExecutor {
             List<String> entries = collectGuiListEntries(handler, guiMode);
             if (entries.isEmpty()) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No matching GUI slots found for " + owner.getType().getDisplayName() + ".");
+                    tr("pathmind.error.noMatchingGuiSlots", owner.getType().getDisplayName()));
                 return;
             }
 
@@ -516,7 +518,7 @@ final class NodeVariableListCommandExecutor {
             Node startNode = owner.resolveExecutionStartNode();
             if (startNode == null) {
                 NodeExecutionCompletion.fail(owner, client, future,
-                    "No active node tree available for list creation.");
+                    tr("pathmind.error.noActiveTreeListCreation"));
                 return;
             }
 
@@ -544,7 +546,7 @@ final class NodeVariableListCommandExecutor {
             }
 
             NodeExecutionCompletion.fail(owner, client, future,
-                "No matching targets found nearby for " + owner.getType().getDisplayName() + ".");
+                tr("pathmind.error.noMatchingTargetsNearby", owner.getType().getDisplayName()));
             return;
         }
 
@@ -560,7 +562,7 @@ final class NodeVariableListCommandExecutor {
         Node startNode = owner.resolveExecutionStartNode();
         if (startNode == null) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "No active node tree available for list creation.");
+                tr("pathmind.error.noActiveTreeListCreation"));
             return;
         }
 
@@ -772,7 +774,7 @@ final class NodeVariableListCommandExecutor {
         Map<String, String> exported = exportResolvedParameterValues(parameterNode);
         if (resolvedType == null || exported == null || exported.isEmpty()) {
             if (client != null) {
-                owner.sendNodeErrorMessage(client, "No value available to add to the list.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.noValueForList"));
             }
             if (future != null && !future.isDone()) {
                 future.complete(null);
@@ -1009,7 +1011,7 @@ final class NodeVariableListCommandExecutor {
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (list == null || list.isEmpty()) {
             if (reportErrors && client != null) {
-                owner.sendNodeErrorMessage(client, "List \"" + safeListName + "\" is empty or missing.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.listEmptyOrMissing", safeListName));
             }
             if (reportErrors && future != null && !future.isDone()) {
                 future.complete(null);
@@ -1020,7 +1022,7 @@ final class NodeVariableListCommandExecutor {
         int index = Node.parseNodeInt(listNode, "Index", 1);
         if (index <= 0 || index > list.size()) {
             if (reportErrors && client != null) {
-                owner.sendNodeErrorMessage(client, "List \"" + safeListName + "\" has no item " + index + ".");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", safeListName, index));
             }
             if (reportErrors && future != null && !future.isDone()) {
                 future.complete(null);
@@ -1054,7 +1056,7 @@ final class NodeVariableListCommandExecutor {
         if (numericParam.getType() == ParameterType.INTEGER) {
             if (!isWholeNumber(amount)) {
                 if (error != null && error.length > 0) {
-                    error[0] = "Change Variable requires a whole number for integer values.";
+                    error[0] = tr("pathmind.error.changeVariableRequiresWholeNumber");
                 }
                 return false;
             }
@@ -1073,7 +1075,7 @@ final class NodeVariableListCommandExecutor {
                 case "/":
                     if (step == 0) {
                         if (error != null && error.length > 0) {
-                            error[0] = "Change Variable cannot divide by 0.";
+                            error[0] = tr("pathmind.error.changeVariableDivideByZero");
                         }
                         return false;
                     }
@@ -1082,7 +1084,7 @@ final class NodeVariableListCommandExecutor {
                 case "%":
                     if (step == 0) {
                         if (error != null && error.length > 0) {
-                            error[0] = "Change Variable cannot divide by 0.";
+                            error[0] = tr("pathmind.error.changeVariableDivideByZero");
                         }
                         return false;
                     }
@@ -1107,7 +1109,7 @@ final class NodeVariableListCommandExecutor {
                 case "/":
                     if (Math.abs(amount) < 1.0E-9) {
                         if (error != null && error.length > 0) {
-                            error[0] = "Change Variable cannot divide by 0.";
+                            error[0] = tr("pathmind.error.changeVariableDivideByZero");
                         }
                         return false;
                     }
@@ -1116,7 +1118,7 @@ final class NodeVariableListCommandExecutor {
                 case "%":
                     if (Math.abs(amount) < 1.0E-9) {
                         if (error != null && error.length > 0) {
-                            error[0] = "Change Variable cannot divide by 0.";
+                            error[0] = tr("pathmind.error.changeVariableDivideByZero");
                         }
                         return false;
                     }

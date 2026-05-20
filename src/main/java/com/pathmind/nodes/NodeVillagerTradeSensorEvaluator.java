@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
@@ -58,7 +60,7 @@ final class NodeVillagerTradeSensorEvaluator {
         }
         Screen currentScreen = client.currentScreen;
         if (!(currentScreen instanceof MerchantScreen merchantScreen)) {
-            owner.sendNodeErrorMessage(client, "No villager trading screen is open.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.noVillagerTradingScreen"));
             return null;
         }
         MerchantScreenHandler screenHandler = merchantScreen.getScreenHandler();

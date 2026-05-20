@@ -145,20 +145,20 @@ public class Sidebar {
     private List<NodeGroup> createFlowGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Entry Points",
+            "pathmind.sidebar.group.entryPoints",
             NodeType.START,
             NodeType.START_CHAIN,
             NodeType.EVENT_FUNCTION,
             NodeType.EVENT_CALL
         ));
         groups.add(createGroup(
-            "Timing & Stops",
+            "pathmind.sidebar.group.timingStops",
             NodeType.WAIT,
             NodeType.STOP_CHAIN,
             NodeType.STOP_ALL
         ));
         groups.add(createGroup(
-            "Presets",
+            "pathmind.sidebar.group.presets",
             NodeType.RUN_PRESET,
             NodeType.TEMPLATE
         ));
@@ -168,7 +168,7 @@ public class Sidebar {
     private List<NodeGroup> createControlGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Branching & Loops",
+            "pathmind.sidebar.group.branchingLoops",
             NodeType.CONTROL_IF,
             NodeType.CONTROL_IF_ELSE,
             NodeType.CONTROL_REPEAT,
@@ -176,13 +176,13 @@ public class Sidebar {
             NodeType.CONTROL_FOREVER
         ));
         groups.add(createGroup(
-            "Parallel",
+            "pathmind.sidebar.group.parallel",
             NodeType.CONTROL_FORK,
             NodeType.CONTROL_JOIN_ANY,
             NodeType.CONTROL_JOIN_ALL
         ));
         groups.add(createGroup(
-            "Conditions & Waiting",
+            "pathmind.sidebar.group.conditionsWaiting",
             NodeType.CONTROL_WAIT_UNTIL
         ));
         return groups;
@@ -191,7 +191,7 @@ public class Sidebar {
     private List<NodeGroup> createWorldGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Navigation",
+            "pathmind.sidebar.group.navigation",
             NodeType.GOTO,
             NodeType.TRAVEL,
             NodeType.GOAL,
@@ -202,18 +202,18 @@ public class Sidebar {
             NodeType.STOP
         ));
         groups.add(createGroup(
-            "Exploration",
+            "pathmind.sidebar.group.exploration",
             NodeType.EXPLORE,
             NodeType.FOLLOW
         ));
         groups.add(createGroup(
-            "Gathering",
+            "pathmind.sidebar.group.gathering",
             NodeType.COLLECT,
             NodeType.FARM,
             NodeType.TUNNEL
         ));
         groups.add(createGroup(
-            "Building & Crafting",
+            "pathmind.sidebar.group.buildingCrafting",
             NodeType.BUILD,
             NodeType.PLACE,
             NodeType.CRAFT
@@ -224,7 +224,7 @@ public class Sidebar {
     private List<NodeGroup> createPlayerGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Movement",
+            "pathmind.sidebar.group.movement",
             NodeType.WALK,
             NodeType.JUMP,
             NodeType.CRAWL,
@@ -233,19 +233,19 @@ public class Sidebar {
             NodeType.FLY
         ));
         groups.add(createGroup(
-            "View & Input",
+            "pathmind.sidebar.group.viewInput",
             NodeType.LOOK,
             NodeType.PRESS_KEY
         ));
         groups.add(createGroup(
-            "Interaction",
+            "pathmind.sidebar.group.interaction",
             NodeType.USE,
             NodeType.INTERACT,
             NodeType.BREAK,
             NodeType.PLACE_HAND
         ));
         groups.add(createGroup(
-            "Combat & Trading",
+            "pathmind.sidebar.group.combatTrading",
             NodeType.SWING,
             NodeType.TRADE
         ));
@@ -255,7 +255,7 @@ public class Sidebar {
     private List<NodeGroup> createInterfaceGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Inventory",
+            "pathmind.sidebar.group.inventory",
             NodeType.HOTBAR,
             NodeType.MOVE_ITEM,
             NodeType.DROP_ITEM,
@@ -265,13 +265,13 @@ public class Sidebar {
             NodeType.EQUIP_ARMOR
         ));
         groups.add(createGroup(
-            "Screens & UI",
+            "pathmind.sidebar.group.screensUi",
             NodeType.CLICK_SCREEN,
             NodeType.CLOSE_GUI,
             NodeType.UI_UTILS
         ));
         groups.add(createGroup(
-            "Writing & Output",
+            "pathmind.sidebar.group.writingOutput",
             NodeType.MESSAGE,
             NodeType.WRITE_BOOK,
             NodeType.WRITE_SIGN
@@ -282,13 +282,13 @@ public class Sidebar {
     private List<NodeGroup> createDataGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Variables",
+            "pathmind.sidebar.group.variables",
             NodeType.VARIABLE,
             NodeType.SET_VARIABLE,
             NodeType.CHANGE_VARIABLE
         ));
         groups.add(createGroup(
-            "Lists",
+            "pathmind.sidebar.group.lists",
             NodeType.CREATE_LIST,
             NodeType.ADD_TO_LIST,
             NodeType.REMOVE_FIRST_FROM_LIST,
@@ -299,7 +299,7 @@ public class Sidebar {
             NodeType.LIST_LENGTH
         ));
         groups.add(createGroup(
-            "Comparison & Boolean",
+            "pathmind.sidebar.group.comparisonBoolean",
             NodeType.OPERATOR_EQUALS,
             NodeType.OPERATOR_NOT,
             NodeType.OPERATOR_BOOLEAN_NOT,
@@ -310,7 +310,7 @@ public class Sidebar {
             NodeType.OPERATOR_LESS
         ));
         groups.add(createGroup(
-            "Math & Random",
+            "pathmind.sidebar.group.mathRandom",
             NodeType.OPERATOR_MOD,
             NodeType.OPERATOR_RANDOM
         ));
@@ -320,7 +320,7 @@ public class Sidebar {
     private List<NodeGroup> createParameterGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Spatial Data",
+            "pathmind.sidebar.group.spatialData",
             NodeType.PARAM_COORDINATE,
             NodeType.PARAM_ROTATION,
             NodeType.PARAM_DIRECTION,
@@ -330,7 +330,7 @@ public class Sidebar {
             NodeType.PARAM_CLOSEST
         ));
         groups.add(createGroup(
-            "Targets & Objects",
+            "pathmind.sidebar.group.targetsObjects",
             NodeType.PARAM_BLOCK,
             NodeType.PARAM_ITEM,
             NodeType.PARAM_ENTITY,
@@ -339,19 +339,19 @@ public class Sidebar {
             NodeType.PARAM_SCHEMATIC
         ));
         groups.add(createGroup(
-            "Inventory & GUI",
+            "pathmind.sidebar.group.inventoryGui",
             NodeType.PARAM_INVENTORY_SLOT,
             NodeType.PARAM_HAND,
             NodeType.PARAM_GUI
         ));
         groups.add(createGroup(
-            "Input & Text",
+            "pathmind.sidebar.group.inputText",
             NodeType.PARAM_KEY,
             NodeType.PARAM_MOUSE_BUTTON,
             NodeType.PARAM_MESSAGE
         ));
         groups.add(createGroup(
-            "Utility Values",
+            "pathmind.sidebar.group.utilityValues",
             NodeType.PARAM_DURATION,
             NodeType.PARAM_AMOUNT,
             NodeType.PARAM_BOOLEAN
@@ -362,7 +362,7 @@ public class Sidebar {
     private List<NodeGroup> createSensorGroups() {
         List<NodeGroup> groups = new ArrayList<>();
         groups.add(createGroup(
-            "Player State",
+            "pathmind.sidebar.group.playerState",
             NodeType.SENSOR_IS_SWIMMING,
             NodeType.SENSOR_IS_IN_LAVA,
             NodeType.SENSOR_IS_UNDERWATER,
@@ -373,14 +373,14 @@ public class Sidebar {
             NodeType.SENSOR_CURRENT_HAND
         ));
         groups.add(createGroup(
-            "Events & Input",
+            "pathmind.sidebar.group.eventsInput",
             NodeType.SENSOR_KEY_PRESSED,
             NodeType.SENSOR_CHAT_MESSAGE,
             NodeType.SENSOR_JOINED_SERVER,
             NodeType.SENSOR_FABRIC_EVENT
         ));
         groups.add(createGroup(
-            "Spatial & Targeting",
+            "pathmind.sidebar.group.spatialTargeting",
             NodeType.SENSOR_POSITION_OF,
             NodeType.SENSOR_DISTANCE_BETWEEN,
             NodeType.SENSOR_LOOK_DIRECTION,
@@ -389,7 +389,7 @@ public class Sidebar {
             NodeType.SENSOR_TOUCHING_BLOCK
         ));
         groups.add(createGroup(
-            "Blocks, Faces & Visibility",
+            "pathmind.sidebar.group.blocksFacesVisibility",
             NodeType.SENSOR_AT_COORDINATES,
             NodeType.SENSOR_TARGETED_BLOCK_FACE,
             NodeType.SENSOR_TOUCHING_ENTITY,
@@ -398,26 +398,26 @@ public class Sidebar {
             NodeType.SENSOR_IS_VISIBLE
         ));
         groups.add(createGroup(
-            "Inventory & Items",
+            "pathmind.sidebar.group.inventoryItems",
             NodeType.SENSOR_ITEM_IN_INVENTORY,
             NodeType.SENSOR_ITEM_IN_SLOT,
             NodeType.SENSOR_SLOT_ITEM_COUNT,
             NodeType.SENSOR_GUI_FILLED
         ));
         groups.add(createGroup(
-            "Trading",
+            "pathmind.sidebar.group.trading",
             NodeType.SENSOR_VILLAGER_TRADE,
             NodeType.SENSOR_IN_STOCK
         ));
         groups.add(createGroup(
-            "World & Weather",
+            "pathmind.sidebar.group.worldWeather",
             NodeType.SENSOR_IS_DAYTIME,
             NodeType.SENSOR_IS_RAINING
         ));
         return groups;
     }
 
-    private NodeGroup createGroup(String title, NodeType... nodeTypes) {
+    private NodeGroup createGroup(String titleKey, NodeType... nodeTypes) {
         List<NodeType> nodes = new ArrayList<>();
         if (nodeTypes != null) {
             for (NodeType type : nodeTypes) {
@@ -429,7 +429,7 @@ public class Sidebar {
                 }
             }
         }
-        return new NodeGroup(title, nodes);
+        return new NodeGroup(titleKey, nodes);
     }
 
     private boolean shouldIncludeNode(NodeType nodeType) {
@@ -1264,11 +1264,11 @@ public class Sidebar {
     private record NodeRowInfo(NodeType nodeType, CustomNodeEntry customNode, List<String> lines, int height) {}
 
     public static class NodeGroup {
-        private final String title;
+        private final String titleKey;
         private final List<NodeType> nodes;
 
-        NodeGroup(String title, List<NodeType> nodeTypes) {
-            this.title = title;
+        NodeGroup(String titleKey, List<NodeType> nodeTypes) {
+            this.titleKey = titleKey;
             this.nodes = new ArrayList<>();
             if (nodeTypes != null) {
                 this.nodes.addAll(nodeTypes);
@@ -1276,7 +1276,7 @@ public class Sidebar {
         }
 
         public String getTitle() {
-            return title;
+            return Text.translatable(titleKey).getString();
         }
 
         public List<NodeType> getNodes() {

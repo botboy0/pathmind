@@ -78,6 +78,10 @@ public class NodeGraph {
     private static final int MINIMAL_NODE_TAB_WIDTH = 6;
     private static final int GRID_SNAP_SIZE = 20;
     private static final int TEMPLATE_PREVIEW_MARGIN = 6;
+
+    private static String tr(String key) {
+        return Text.translatable(key).getString();
+    }
     private static final int TEMPLATE_PREVIEW_TOP = 42;
     private static final int TEMPLATE_PREVIEW_BOTTOM_MARGIN = 6;
     private static final int VIEWPORT_CULL_MARGIN = 64;
@@ -3383,7 +3387,7 @@ public class NodeGraph {
             drawNodeText(
                 context,
                 textRenderer,
-                Text.literal("Function"),
+                Text.translatable("pathmind.node.type.eventFunction"),
                 x + 6,
                 y + 4,
                 titleColor
@@ -3494,7 +3498,7 @@ public class NodeGraph {
             drawNodeText(
                 context,
                 textRenderer,
-                Text.literal("Variable"),
+                Text.translatable("pathmind.node.type.variable"),
                 x + 6,
                 y + 4,
                 titleColor
@@ -3622,7 +3626,7 @@ public class NodeGraph {
             drawNodeText(
                 context,
                 textRenderer,
-                Text.literal("Call Function"),
+                Text.translatable("pathmind.node.type.eventCall"),
                 x + 6,
                 y + 4,
                 titleColor
@@ -4409,11 +4413,13 @@ public class NodeGraph {
         context.fill(cardinalLeft, fieldTop, cardinalLeft + cardinalWidth, fieldTop + fieldHeight, cardinalBackground);
         DrawContextBridge.drawBorderInLayer(context, cardinalLeft, fieldTop, cardinalWidth, fieldHeight, cardinalBorder);
 
-        int exactLabelX = exactLeft + Math.max(0, (exactWidth - textRenderer.getWidth("Exact")) / 2);
-        int cardinalLabelX = cardinalLeft + Math.max(0, (cardinalWidth - textRenderer.getWidth("Cardinal")) / 2);
+        String exactLabel = tr("pathmind.option.directionMode.exact");
+        String cardinalLabel = tr("pathmind.option.directionMode.cardinal");
+        int exactLabelX = exactLeft + Math.max(0, (exactWidth - textRenderer.getWidth(exactLabel)) / 2);
+        int cardinalLabelX = cardinalLeft + Math.max(0, (cardinalWidth - textRenderer.getWidth(cardinalLabel)) / 2);
         int labelY = fieldTop + (fieldHeight - textRenderer.fontHeight) / 2 + 1;
-        drawNodeText(context, textRenderer, Text.literal("Exact"), exactLabelX, labelY, exactMode ? activeText : inactiveText);
-        drawNodeText(context, textRenderer, Text.literal("Cardinal"), cardinalLabelX, labelY, exactMode ? inactiveText : activeText);
+        drawNodeText(context, textRenderer, Text.literal(exactLabel), exactLabelX, labelY, exactMode ? activeText : inactiveText);
+        drawNodeText(context, textRenderer, Text.literal(cardinalLabel), cardinalLabelX, labelY, exactMode ? inactiveText : activeText);
     }
 
     private void renderBooleanModeTabs(DrawContext context, TextRenderer textRenderer, Node node, boolean isOverSidebar,
@@ -4470,11 +4476,13 @@ public class NodeGraph {
         context.fill(variableLeft, fieldTop, variableLeft + variableWidth, fieldTop + fieldHeight, variableBackground);
         DrawContextBridge.drawBorderInLayer(context, variableLeft, fieldTop, variableWidth, fieldHeight, variableBorder);
 
-        int literalLabelX = literalLeft + Math.max(0, (literalWidth - textRenderer.getWidth("Literal")) / 2);
-        int variableLabelX = variableLeft + Math.max(0, (variableWidth - textRenderer.getWidth("Variable")) / 2);
+        String literalLabel = tr("pathmind.option.booleanMode.literal");
+        String variableLabel = tr("pathmind.option.booleanMode.variable");
+        int literalLabelX = literalLeft + Math.max(0, (literalWidth - textRenderer.getWidth(literalLabel)) / 2);
+        int variableLabelX = variableLeft + Math.max(0, (variableWidth - textRenderer.getWidth(variableLabel)) / 2);
         int labelY = fieldTop + (fieldHeight - textRenderer.fontHeight) / 2 + 1;
-        drawNodeText(context, textRenderer, Text.literal("Literal"), literalLabelX, labelY, literalMode ? activeText : inactiveText);
-        drawNodeText(context, textRenderer, Text.literal("Variable"), variableLabelX, labelY, literalMode ? inactiveText : activeText);
+        drawNodeText(context, textRenderer, Text.literal(literalLabel), literalLabelX, labelY, literalMode ? activeText : inactiveText);
+        drawNodeText(context, textRenderer, Text.literal(variableLabel), variableLabelX, labelY, literalMode ? inactiveText : activeText);
     }
 
     private String getParameterLabelText(Node node, NodeParameter parameter, TextRenderer textRenderer, int maxWidth) {
@@ -4723,7 +4731,7 @@ public class NodeGraph {
             if (useLogicSlotTitle) {
                 return;
             }
-            String placeholder = "Drag a node here";
+            String placeholder = tr("pathmind.node.slot.dragNodeHere");
             String display = trimTextToWidth(placeholder, textRenderer, slotWidth - 8);
             int textWidth = textRenderer.getWidth(display);
             int textX = slotX + Math.max(4, (slotWidth - textWidth) / 2);
@@ -5530,7 +5538,7 @@ public class NodeGraph {
         int fieldRight = fieldLeft + fieldWidth;
 
         int labelY = labelTop + Math.max(0, (labelHeight - textRenderer.fontHeight) / 2);
-        drawNodeText(context, textRenderer, Text.literal("Rounding"), fieldLeft + 2, labelY, baseLabelColor);
+        drawNodeText(context, textRenderer, Text.translatable("pathmind.field.rounding"), fieldLeft + 2, labelY, baseLabelColor);
 
         int fieldBottom = fieldTop + fieldHeight;
         int disabledBg = isOverSidebar ? UITheme.BACKGROUND_TERTIARY : UITheme.BUTTON_DEFAULT_BG;
@@ -5625,7 +5633,7 @@ public class NodeGraph {
         int visibleCount = layout.visibleCount;
         for (int row = 0; row < visibleCount; row++) {
             int optionIndex = randomRoundingDropdownScrollOffset + row;
-            String optionLabel = options.isEmpty() ? "No options" : options.get(optionIndex).label();
+            String optionLabel = options.isEmpty() ? tr("pathmind.dropdown.noOptions") : options.get(optionIndex).label();
             int rowTop = listTop + row * rowHeight;
             int rowBottom = rowTop + rowHeight;
             boolean hovered = options.isEmpty() ? row == 0 && randomRoundingDropdownHoverIndex >= 0 : optionIndex == randomRoundingDropdownHoverIndex;
@@ -5768,7 +5776,7 @@ public class NodeGraph {
     private void renderEventNamePreview(DrawContext context, TextRenderer textRenderer, String value, int x, int y,
                                         int baseColor, int maxWidth) {
         if (value == null || value.isEmpty()) {
-            drawNodeText(context, textRenderer, Text.literal("enter name"), x, y, baseColor);
+            drawNodeText(context, textRenderer, Text.translatable("pathmind.field.enterName"), x, y, baseColor);
             return;
         }
         if (textRenderer.getWidth(value) <= maxWidth) {
@@ -6391,7 +6399,7 @@ public class NodeGraph {
         int labelLeft = node.getMessageScopeToggleLeft() - cameraX;
         int labelTop = node.getMessageScopeLabelTop() - cameraY;
         int labelY = labelTop + Math.max(0, (node.getMessageScopeLabelHeight() - textRenderer.fontHeight) / 2);
-        drawNodeText(context, textRenderer, Text.literal("Visibility"), labelLeft + 2, labelY, labelColor);
+        drawNodeText(context, textRenderer, Text.translatable("pathmind.field.visibility"), labelLeft + 2, labelY, labelColor);
 
         int left = node.getMessageScopeToggleLeft() - cameraX;
         int top = node.getMessageScopeToggleTop() - cameraY;
@@ -6440,8 +6448,8 @@ public class NodeGraph {
         context.fill(clientLeft, top, clientLeft + segmentWidth, top + height, clientFill);
         DrawContextBridge.drawBorderInLayer(context, clientLeft, top, segmentWidth, height, clientBorder);
 
-        String globalLabel = "Global";
-        String clientLabel = "Client Side";
+        String globalLabel = tr("pathmind.option.messageScope.global");
+        String clientLabel = tr("pathmind.option.messageScope.clientSide");
         int globalX = globalLeft + Math.max(0, (segmentWidth - textRenderer.getWidth(globalLabel)) / 2);
         int clientX = clientLeft + Math.max(0, (segmentWidth - textRenderer.getWidth(clientLabel)) / 2);
         int textY = top + (height - textRenderer.fontHeight) / 2 + 1;
@@ -6475,7 +6483,7 @@ public class NodeGraph {
         context.fill(buttonLeft, buttonTop, buttonLeft + buttonWidth, buttonTop + buttonHeight, buttonFill);
         DrawContextBridge.drawBorderInLayer(context, buttonLeft, buttonTop, buttonWidth, buttonHeight, buttonBorder);
 
-        String buttonLabel = "Edit Text";
+        String buttonLabel = tr("pathmind.button.editText");
         int textColor = isOverSidebar ? UITheme.TEXT_TERTIARY : UITheme.TEXT_PRIMARY;
         int textX = buttonLeft + (buttonWidth - textRenderer.getWidth(buttonLabel)) / 2;
         int textY = buttonTop + (buttonHeight - textRenderer.fontHeight) / 2;
@@ -6484,7 +6492,7 @@ public class NodeGraph {
         if (node.hasBookTextPageInput()) {
             int labelColor = isOverSidebar ? UITheme.NODE_LABEL_DIMMED : UITheme.TEXT_SECONDARY;
             int labelTop = node.getBookTextPageLabelTop() - cameraY;
-            drawNodeText(context, textRenderer, Text.literal("Page #:"), buttonLeft, labelTop, labelColor);
+            drawNodeText(context, textRenderer, Text.translatable("pathmind.field.pageNumber"), buttonLeft, labelTop, labelColor);
 
             int fieldTop = node.getBookTextPageFieldTop() - cameraY;
             int fieldHeight = node.getBookTextPageFieldHeight();
@@ -6650,7 +6658,7 @@ public class NodeGraph {
 
         int labelY = fieldTop - textRenderer.fontHeight - 2;
         if (labelY >= node.getY() - cameraY + 14) {
-            drawNodeText(context, textRenderer, Text.literal("Custom Node"), fieldLeft, labelY,
+            drawNodeText(context, textRenderer, Text.translatable("pathmind.node.type.customNode"), fieldLeft, labelY,
                 isOverSidebar ? UITheme.NODE_LABEL_DIMMED : UITheme.NODE_LABEL_COLOR);
         }
 
@@ -6973,7 +6981,7 @@ public class NodeGraph {
         if (isRunPresetNode) {
             int labelY = fieldTop - textRenderer.fontHeight - 2;
             if (labelY >= node.getY() - cameraY + 14) {
-                drawNodeText(context, textRenderer, Text.literal("Preset"), fieldLeft, labelY, baseLabelColor);
+                drawNodeText(context, textRenderer, Text.translatable("pathmind.field.preset"), fieldLeft, labelY, baseLabelColor);
             }
         }
 
@@ -7296,7 +7304,7 @@ public class NodeGraph {
         int accentColor = isOverSidebar ? toGrayscale(UITheme.SCHEMATIC_ACTIVE_BORDER, 0.8f) : UITheme.SCHEMATIC_ACTIVE_BORDER;
         UIStyleHelper.FieldPalette palette = UIStyleHelper.getDropdownFieldPalette(accentColor, hoverProgress, open, false);
 
-        drawNodeText(context, textRenderer, Text.literal("Schematic"), fieldLeft, labelTop + (labelHeight - textRenderer.fontHeight) / 2, labelColor);
+        drawNodeText(context, textRenderer, Text.translatable("pathmind.field.schematic"), fieldLeft, labelTop + (labelHeight - textRenderer.fontHeight) / 2, labelColor);
 
         int fieldBottom = fieldTop + fieldHeight;
         UIStyleHelper.drawFieldFrame(
@@ -7402,7 +7410,7 @@ public class NodeGraph {
 
         for (int row = 0; row < visibleCount; row++) {
             int optionIndex = schematicDropdownScrollOffset + row;
-            String optionLabel = options.isEmpty() ? "No schematics found" : options.get(optionIndex);
+            String optionLabel = options.isEmpty() ? tr("pathmind.dropdown.noSchematicsFound") : options.get(optionIndex);
             int rowTop = listTop + row * SCHEMATIC_DROPDOWN_ROW_HEIGHT;
             int rowBottom = rowTop + SCHEMATIC_DROPDOWN_ROW_HEIGHT;
             boolean hovered = options.isEmpty() ? row == 0 && schematicDropdownHoverIndex >= 0 : optionIndex == schematicDropdownHoverIndex;
@@ -7505,7 +7513,7 @@ public class NodeGraph {
 
         for (int row = 0; row < visibleCount; row++) {
             int optionIndex = runPresetDropdownScrollOffset + row;
-            String optionLabel = options.isEmpty() ? "No presets found" : options.get(optionIndex);
+            String optionLabel = options.isEmpty() ? tr("pathmind.dropdown.noPresetsFound") : options.get(optionIndex);
             int rowTop = listTop + row * SCHEMATIC_DROPDOWN_ROW_HEIGHT;
             int rowBottom = rowTop + SCHEMATIC_DROPDOWN_ROW_HEIGHT;
             boolean hovered = options.isEmpty() ? row == 0 && runPresetDropdownHoverIndex >= 0 : optionIndex == runPresetDropdownHoverIndex;
@@ -7850,7 +7858,7 @@ public class NodeGraph {
         }
         String value = coordinateEditBuffer == null ? "" : coordinateEditBuffer.trim();
         if (!value.isEmpty() && !"-".equals(value) && !isNumericOrVariableReference(value, coordinateEditingNode, false, true)) {
-            coordinateEditingNode.sendNodeErrorMessageToPlayer("Please enter a number, arithmetic expression, or variable (~variable_name).");
+            coordinateEditingNode.sendNodeErrorMessageToPlayer(tr("pathmind.error.enterNumberExpressionOrVariable"));
             return false;
         }
         if (value.isEmpty() || "-".equals(value)) {
@@ -8098,7 +8106,7 @@ public class NodeGraph {
             && amountEditingNode.getType() != NodeType.SWING
             && !value.isEmpty()
             && !isNumericOrVariableReference(value, amountEditingNode, true, false)) {
-            amountEditingNode.sendNodeErrorMessageToPlayer("Please enter a number, arithmetic expression, or variable (~variable_name).");
+            amountEditingNode.sendNodeErrorMessageToPlayer(tr("pathmind.error.enterNumberExpressionOrVariable"));
             return false;
         }
         if (value.isEmpty()) {
@@ -8530,7 +8538,7 @@ public class NodeGraph {
         if (!isPresetSelectorNode(stopTargetEditingNode)
             && !value.isEmpty()
             && !isNumericOrVariableReference(value, stopTargetEditingNode, false, false)) {
-            stopTargetEditingNode.sendNodeErrorMessageToPlayer("Please enter a number, arithmetic expression, or variable (~variable_name).");
+            stopTargetEditingNode.sendNodeErrorMessageToPlayer(tr("pathmind.error.enterNumberExpressionOrVariable"));
             return false;
         }
         String keyName = getStopTargetParameterKey(stopTargetEditingNode);
@@ -11179,9 +11187,9 @@ public class NodeGraph {
 
     private List<ParameterDropdownOption> getRandomRoundingDropdownOptions() {
         List<ParameterDropdownOption> options = new ArrayList<>(3);
-        options.add(new ParameterDropdownOption("Round", "round"));
-        options.add(new ParameterDropdownOption("Floor", "floor"));
-        options.add(new ParameterDropdownOption("Ceil", "ceil"));
+        options.add(new ParameterDropdownOption(tr("pathmind.option.round"), "round"));
+        options.add(new ParameterDropdownOption(tr("pathmind.option.floor"), "floor"));
+        options.add(new ParameterDropdownOption(tr("pathmind.option.ceil"), "ceil"));
         return options;
     }
 
@@ -11220,7 +11228,7 @@ public class NodeGraph {
             return attribute != null ? attribute.label() : value;
         }
         if ("Value".equalsIgnoreCase(parameter.getName()) && isAttributeDetectionBooleanValueParameter(node, node.getParameters().indexOf(parameter))) {
-            return "true".equalsIgnoreCase(value) ? "True" : "False";
+            return "true".equalsIgnoreCase(value) ? tr("pathmind.option.true") : tr("pathmind.option.false");
         }
         return value;
     }
@@ -11236,8 +11244,8 @@ public class NodeGraph {
         }
         if (isAttributeDetectionBooleanValueParameter(node, index)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("True", "true"));
-            result.add(new ParameterDropdownOption("False", "false"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.true"), "true"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.false"), "false"));
             return filterDropdownOptions(result, lowered);
         }
         if (isBlockStateParameter(node, index)) {
@@ -11248,7 +11256,7 @@ public class NodeGraph {
         }
         if (isFabricEventSensorParameter(node, index)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("Any", "Any"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.any"), "Any"));
             for (String eventName : FabricEventTracker.getSupportedEvents()) {
                 result.add(new ParameterDropdownOption(eventName, eventName));
             }
@@ -11258,7 +11266,7 @@ public class NodeGraph {
         List<String> source;
         if (node != null && node.getType() == NodeType.PARAM_GUI) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("Any", ""));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.any"), ""));
             for (GuiSelectionMode mode : GuiSelectionMode.valuesList()) {
                 result.add(new ParameterDropdownOption(mode.getDisplayName(), mode.getId()));
             }
@@ -11266,46 +11274,46 @@ public class NodeGraph {
         }
         if (isMouseButtonParameter(node, null)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("Left", "Left"));
-            result.add(new ParameterDropdownOption("Right", "Right"));
-            result.add(new ParameterDropdownOption("Middle", "Middle"));
-            result.add(new ParameterDropdownOption("Button 4", "Button 4"));
-            result.add(new ParameterDropdownOption("Button 5", "Button 5"));
-            result.add(new ParameterDropdownOption("Button 6", "Button 6"));
-            result.add(new ParameterDropdownOption("Button 7", "Button 7"));
-            result.add(new ParameterDropdownOption("Button 8", "Button 8"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.left"), "Left"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.right"), "Right"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.middle"), "Middle"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.button4"), "Button 4"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.button5"), "Button 5"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.button6"), "Button 6"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.button7"), "Button 7"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.mouse.button8"), "Button 8"));
             return filterDropdownOptions(result, lowered);
         }
         if (isHandParameter(node, null)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("Main Hand", "main"));
-            result.add(new ParameterDropdownOption("Offhand", "offhand"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.hand.main"), "main"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.hand.offhand"), "offhand"));
             return filterDropdownOptions(result, lowered);
         }
         if (isDirectionParameter(node, index)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("North", "north"));
-            result.add(new ParameterDropdownOption("South", "south"));
-            result.add(new ParameterDropdownOption("East", "east"));
-            result.add(new ParameterDropdownOption("West", "west"));
-            result.add(new ParameterDropdownOption("Up", "up"));
-            result.add(new ParameterDropdownOption("Down", "down"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.north"), "north"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.south"), "south"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.east"), "east"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.west"), "west"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.up"), "up"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.down"), "down"));
             return filterDropdownOptions(result, lowered);
         }
         if (isBooleanLiteralParameter(node, index)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("True", "true"));
-            result.add(new ParameterDropdownOption("False", "false"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.true"), "true"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.false"), "false"));
             return filterDropdownOptions(result, lowered);
         }
         if (isBlockFaceParameter(node, index)) {
             List<ParameterDropdownOption> result = new ArrayList<>();
-            result.add(new ParameterDropdownOption("North", "north"));
-            result.add(new ParameterDropdownOption("South", "south"));
-            result.add(new ParameterDropdownOption("East", "east"));
-            result.add(new ParameterDropdownOption("West", "west"));
-            result.add(new ParameterDropdownOption("Up", "up"));
-            result.add(new ParameterDropdownOption("Down", "down"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.north"), "north"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.south"), "south"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.east"), "east"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.west"), "west"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.up"), "up"));
+            result.add(new ParameterDropdownOption(tr("pathmind.option.direction.down"), "down"));
             return filterDropdownOptions(result, lowered);
         }
         if (isBlockParameter(node, index)) {
@@ -11321,7 +11329,7 @@ public class NodeGraph {
         List<ParameterDropdownOption> starts = new ArrayList<>();
         List<ParameterDropdownOption> contains = new ArrayList<>();
         List<ParameterDropdownOption> result = new ArrayList<>(65);
-        result.add(new ParameterDropdownOption("Any", ""));
+        result.add(new ParameterDropdownOption(tr("pathmind.option.any"), ""));
         if (lowered.isEmpty()) {
             int limit = 64;
             int added = 0;
@@ -11413,7 +11421,7 @@ public class NodeGraph {
         List<ParameterDropdownOption> results = new ArrayList<>();
         boolean includeAnyState = loweredQuery == null || loweredQuery.isEmpty();
         if (includeAnyState) {
-            results.add(new ParameterDropdownOption("Any State", ""));
+            results.add(new ParameterDropdownOption(tr("pathmind.option.anyState"), ""));
         }
         String lowered = loweredQuery == null ? "" : loweredQuery;
         for (BlockSelection.StateOption option : options) {
@@ -11455,7 +11463,7 @@ public class NodeGraph {
         List<ParameterDropdownOption> results = new ArrayList<>();
         boolean includeAnyState = loweredQuery == null || loweredQuery.isEmpty();
         if (includeAnyState) {
-            results.add(new ParameterDropdownOption("Any State", ""));
+            results.add(new ParameterDropdownOption(tr("pathmind.option.anyState"), ""));
         }
         String lowered = loweredQuery == null ? "" : loweredQuery;
         for (EntityStateOptions.StateOption option : options) {
@@ -11646,7 +11654,7 @@ public class NodeGraph {
         if (textRenderer == null) {
             return parameterDropdownFieldWidth;
         }
-        int longestLabelWidth = textRenderer.getWidth("No matches");
+        int longestLabelWidth = textRenderer.getWidth(tr("pathmind.dropdown.noMatches"));
         for (ParameterDropdownOption option : parameterDropdownOptions) {
             if (option != null && option.label() != null) {
                 longestLabelWidth = Math.max(longestLabelWidth, textRenderer.getWidth(option.label()));
@@ -11816,7 +11824,7 @@ public class NodeGraph {
 
         for (int row = 0; row < visibleCount; row++) {
             int optionIndex = parameterDropdownScrollOffset + row;
-            String optionLabel = options.isEmpty() ? "No matches" : options.get(optionIndex).label();
+            String optionLabel = options.isEmpty() ? tr("pathmind.dropdown.noMatches") : options.get(optionIndex).label();
             int rowTop = listTop + row * rowHeight;
             int rowBottom = rowTop + rowHeight;
             boolean hovered = options.isEmpty() ? row == 0 && parameterDropdownHoverIndex >= 0 : optionIndex == parameterDropdownHoverIndex;
@@ -12038,7 +12046,7 @@ public class NodeGraph {
         int visibleCount = layout.visibleCount;
         for (int row = 0; row < visibleCount; row++) {
             int optionIndex = modeDropdownScrollOffset + row;
-            String optionLabel = options.isEmpty() ? "No modes" : options.get(optionIndex).label();
+            String optionLabel = options.isEmpty() ? tr("pathmind.dropdown.noModes") : options.get(optionIndex).label();
             int rowTop = listTop + row * rowHeight;
             int rowBottom = rowTop + rowHeight;
             boolean hovered = options.isEmpty() ? row == 0 && modeDropdownHoverIndex >= 0 : optionIndex == modeDropdownHoverIndex;
@@ -12086,7 +12094,7 @@ public class NodeGraph {
         if (textRenderer == null) {
             return modeDropdownFieldWidth;
         }
-        int longestLabelWidth = textRenderer.getWidth("No modes");
+        int longestLabelWidth = textRenderer.getWidth(tr("pathmind.dropdown.noModes"));
         for (ModeDropdownOption option : modeDropdownOptions) {
             if (option != null && option.label() != null) {
                 longestLabelWidth = Math.max(longestLabelWidth, textRenderer.getWidth(option.label()));
@@ -12100,7 +12108,7 @@ public class NodeGraph {
         if (textRenderer == null || node == null) {
             return node != null ? node.getRandomRoundingFieldWidth() : 0;
         }
-        int longestLabelWidth = textRenderer.getWidth("No options");
+        int longestLabelWidth = textRenderer.getWidth(tr("pathmind.dropdown.noOptions"));
         for (ParameterDropdownOption option : getRandomRoundingDropdownOptions()) {
             if (option != null && option.label() != null) {
                 longestLabelWidth = Math.max(longestLabelWidth, textRenderer.getWidth(option.label()));
@@ -12114,7 +12122,7 @@ public class NodeGraph {
         if (textRenderer == null || node == null) {
             return node != null ? node.getSchematicFieldWidth() : 0;
         }
-        int longestLabelWidth = textRenderer.getWidth("No schematics found");
+        int longestLabelWidth = textRenderer.getWidth(tr("pathmind.dropdown.noSchematicsFound"));
         for (String option : schematicDropdownOptions) {
             if (option != null) {
                 longestLabelWidth = Math.max(longestLabelWidth, textRenderer.getWidth(option));
@@ -12128,7 +12136,7 @@ public class NodeGraph {
         if (textRenderer == null || node == null) {
             return node != null ? node.getStopTargetFieldWidth() : 0;
         }
-        int longestLabelWidth = textRenderer.getWidth("No presets found");
+        int longestLabelWidth = textRenderer.getWidth(tr("pathmind.dropdown.noPresetsFound"));
         for (String option : runPresetDropdownOptions) {
             if (option != null) {
                 longestLabelWidth = Math.max(longestLabelWidth, textRenderer.getWidth(option));

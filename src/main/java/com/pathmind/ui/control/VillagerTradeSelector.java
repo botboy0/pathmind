@@ -170,7 +170,7 @@ public class VillagerTradeSelector {
         int sectionY = y;
         context.drawTextWithShadow(
             textRenderer,
-            Text.literal("Profession:"),
+            Text.translatable("pathmind.villagerTrade.profession"),
             x,
             sectionY,
             applyAlpha(UITheme.TEXT_PRIMARY, alpha)
@@ -188,7 +188,9 @@ public class VillagerTradeSelector {
         int borderColor = dropdownOpen ? UITheme.ACCENT_DEFAULT : (hoverButton ? UITheme.TEXT_SECONDARY : UITheme.BORDER_SUBTLE);
         context.fill(dropdownX, dropdownY, dropdownX + dropdownWidth, dropdownY + dropdownHeight, applyAlpha(buttonBg, alpha));
         DrawContextBridge.drawBorder(context, dropdownX, dropdownY, dropdownWidth, dropdownHeight, applyAlpha(borderColor, alpha));
-        String professionLabel = selectedProfession != null ? selectedProfession.displayName : "None";
+        String professionLabel = selectedProfession != null
+            ? selectedProfession.displayName
+            : Text.translatable("pathmind.option.none").getString();
         context.drawTextWithShadow(
             textRenderer,
             Text.literal(professionLabel),
@@ -221,7 +223,7 @@ public class VillagerTradeSelector {
         if (showPlaceholder) {
             context.drawTextWithShadow(
                 textRenderer,
-                Text.literal("Search trades..."),
+                Text.translatable("pathmind.villagerTrade.searchTrades"),
                 searchX + TEXT_PADDING,
                 textY,
                 applyAlpha(UITheme.TEXT_TERTIARY, alpha)
@@ -310,9 +312,9 @@ public class VillagerTradeSelector {
         }
 
         if (filteredTrades.isEmpty()) {
-            String emptyMessage = "No trades found. Open a villager trade screen to load trades.";
+            String emptyMessage = Text.translatable("pathmind.villagerTrade.noTradesFound").getString();
             if (selectedProfession != null && "open_gui".equals(selectedProfession.id)) {
-                emptyMessage = "Open a villager trade screen to load trades.";
+                emptyMessage = Text.translatable("pathmind.villagerTrade.openTradeScreen").getString();
             }
             int maxTextWidth = Math.max(0, listWidth - TEXT_PADDING * 2);
             int emptyTextX = listX + TEXT_PADDING;

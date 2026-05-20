@@ -8,6 +8,7 @@ import com.pathmind.ui.theme.UITheme;
 import com.pathmind.util.MatrixStackBridge;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,8 +18,8 @@ import java.util.List;
  * Hovering over a category shows a submenu with nodes in that category.
  */
 public class ContextMenu {
-    private static final String SEARCH_LABEL = "Search Nodes...";
-    private static final String STICKY_NOTE_LABEL = "New Sticky Note";
+    private static final String SEARCH_LABEL_KEY = "pathmind.context.searchNodes";
+    private static final String STICKY_NOTE_LABEL_KEY = "pathmind.context.newStickyNote";
     private static final int MENU_WIDTH = UITheme.CONTEXT_MENU_WIDTH;
     private static final int ITEM_HEIGHT = UITheme.CONTEXT_MENU_ITEM_HEIGHT;
     private static final int PADDING = UITheme.CONTEXT_MENU_PADDING;
@@ -280,7 +281,7 @@ public class ContextMenu {
         ContextMenuRenderer.renderSeparator(context, menuX + 4, separatorY, MENU_WIDTH - 8);
         int searchTextX = menuX + 8;
         int searchTextY = itemY + (ITEM_HEIGHT - textRenderer.fontHeight) / 2;
-        context.drawTextWithShadow(textRenderer, net.minecraft.text.Text.literal(SEARCH_LABEL), searchTextX, searchTextY, UITheme.CONTEXT_MENU_TEXT);
+        context.drawTextWithShadow(textRenderer, Text.translatable(SEARCH_LABEL_KEY), searchTextX, searchTextY, UITheme.CONTEXT_MENU_TEXT);
         int iconColor = searchHovered ? UITheme.TEXT_PRIMARY : UITheme.TEXT_SECONDARY;
         int iconX = menuX + MENU_WIDTH - SEARCH_ICON_X_OFFSET;
         int iconY = itemY + (ITEM_HEIGHT - 8) / 2;
@@ -290,7 +291,7 @@ public class ContextMenu {
         ContextMenuRenderer.renderMenuItem(context, menuX, itemY, MENU_WIDTH, ITEM_HEIGHT, stickyNoteHovered);
         int noteTextX = menuX + 8;
         int noteTextY = itemY + (ITEM_HEIGHT - textRenderer.fontHeight) / 2;
-        context.drawTextWithShadow(textRenderer, net.minecraft.text.Text.literal(STICKY_NOTE_LABEL), noteTextX, noteTextY, UITheme.CONTEXT_MENU_TEXT);
+        context.drawTextWithShadow(textRenderer, Text.translatable(STICKY_NOTE_LABEL_KEY), noteTextX, noteTextY, UITheme.CONTEXT_MENU_TEXT);
         ContextMenuRenderer.renderSeparator(context, menuX + 4, itemY - 1, MENU_WIDTH - 8);
         ContextMenuRenderer.renderSeparator(context, menuX + 4, itemY + ITEM_HEIGHT - 1, MENU_WIDTH - 8);
         itemY += ITEM_HEIGHT;

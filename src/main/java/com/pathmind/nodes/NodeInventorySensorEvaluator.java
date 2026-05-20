@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
@@ -57,7 +59,7 @@ final class NodeInventorySensorEvaluator {
         if (itemNode == null || slotNode == null) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null) {
-                owner.sendNodeErrorMessage(client, owner.getType().getDisplayName() + " requires an item and slot parameter.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.requiresItemAndSlotParameter", owner.getType().getDisplayName()));
             }
             return false;
         }
@@ -73,7 +75,7 @@ final class NodeInventorySensorEvaluator {
         if (itemIds.isEmpty()) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null) {
-                owner.sendNodeErrorMessage(client, "No item specified for " + owner.getType().getDisplayName() + ".");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.noItemSpecifiedForNode", owner.getType().getDisplayName()));
             }
             return false;
         }
@@ -87,7 +89,7 @@ final class NodeInventorySensorEvaluator {
         SlotSelectionType selectionType = owner.resolveInventorySlotSelectionType(slotNode);
         SlotResolution resolved = owner.resolveInventorySlot(handler, inventory, slotValue, selectionType);
         if (resolved == null || resolved.slot == null) {
-            owner.sendNodeErrorMessage(client, owner.getType().getDisplayName() + " requires a valid slot selection.");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.requiresValidSlotSelection", owner.getType().getDisplayName()));
             return false;
         }
         ItemStack stack = resolved.slot.getStack();
@@ -105,7 +107,7 @@ final class NodeInventorySensorEvaluator {
         if (slotNode == null || !owner.providesTrait(slotNode, NodeValueTrait.INVENTORY_SLOT)) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null) {
-                owner.sendNodeErrorMessage(client, owner.getType().getDisplayName() + " requires an inventory slot parameter.");
+                owner.sendNodeErrorMessage(client, tr("pathmind.error.requiresInventorySlotParameter", owner.getType().getDisplayName()));
             }
             return false;
         }

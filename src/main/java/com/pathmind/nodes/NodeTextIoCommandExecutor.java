@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.util.PlayerInventoryBridge;
 import com.pathmind.execution.ExecutionManager;
 import net.minecraft.client.MinecraftClient;
@@ -50,15 +52,15 @@ final class NodeTextIoCommandExecutor {
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.player == null) {
-            sendNodeErrorMessage(client, "Client or player not available");
-            future.completeExceptionally(new RuntimeException("Client or player not available"));
+            sendNodeErrorMessage(client, tr("pathmind.error.clientOrPlayerUnavailable"));
+            future.completeExceptionally(new RuntimeException(tr("pathmind.error.clientOrPlayerUnavailable")));
             return;
         }
 
         // Check if a book edit screen is open
         if (!(client.currentScreen instanceof BookEditScreen)) {
-            sendNodeErrorMessage(client, "No book and quill screen is open");
-            future.completeExceptionally(new RuntimeException("No book and quill screen is open"));
+            sendNodeErrorMessage(client, tr("pathmind.error.noBookScreenOpen"));
+            future.completeExceptionally(new RuntimeException(tr("pathmind.error.noBookScreenOpen")));
             return;
         }
 
@@ -122,8 +124,8 @@ final class NodeTextIoCommandExecutor {
                 if (pages == null) {
                     for (Field field : bookScreen.getClass().getDeclaredFields()) {
                     }
-                    sendNodeErrorMessage(client, "Could not access book pages");
-                    future.completeExceptionally(new RuntimeException("Could not access book pages"));
+                    sendNodeErrorMessage(client, tr("pathmind.error.bookPagesUnavailable"));
+                    future.completeExceptionally(new RuntimeException(tr("pathmind.error.bookPagesUnavailable")));
                     return;
                 }
 
@@ -528,7 +530,7 @@ final class NodeTextIoCommandExecutor {
                 if (message == null || message.isBlank()) {
                     message = e.getClass().getSimpleName();
                 }
-                sendNodeErrorMessage(client, "Error writing to book: " + message);
+                sendNodeErrorMessage(client, tr("pathmind.error.writeBookFailed", message));
                 future.completeExceptionally(e);
             }
         });
@@ -563,14 +565,14 @@ final class NodeTextIoCommandExecutor {
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.player == null) {
-            sendNodeErrorMessage(client, "Client or player not available");
-            future.completeExceptionally(new RuntimeException("Client or player not available"));
+            sendNodeErrorMessage(client, tr("pathmind.error.clientOrPlayerUnavailable"));
+            future.completeExceptionally(new RuntimeException(tr("pathmind.error.clientOrPlayerUnavailable")));
             return;
         }
 
         if (!(client.currentScreen instanceof AbstractSignEditScreen)) {
-            sendNodeErrorMessage(client, "No sign edit screen is open");
-            future.completeExceptionally(new RuntimeException("No sign edit screen is open"));
+            sendNodeErrorMessage(client, tr("pathmind.error.noSignScreenOpen"));
+            future.completeExceptionally(new RuntimeException(tr("pathmind.error.noSignScreenOpen")));
             return;
         }
 
@@ -647,7 +649,7 @@ final class NodeTextIoCommandExecutor {
                 if (message == null || message.isBlank()) {
                     message = e.getClass().getSimpleName();
                 }
-                sendNodeErrorMessage(client, "Error writing to sign: " + message);
+                sendNodeErrorMessage(client, tr("pathmind.error.writeSignFailed", message));
                 future.completeExceptionally(e);
             }
         });

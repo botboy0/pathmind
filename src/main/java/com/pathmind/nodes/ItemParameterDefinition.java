@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -40,7 +42,7 @@ final class ItemParameterDefinition {
         }
         List<String> itemIds = owner.resolveItemIdsFromParameter(parameterNode);
         if (itemIds.isEmpty()) {
-            owner.sendParameterSearchFailure("No item selected on parameter for " + owner.getType().getDisplayName() + ".", future);
+            owner.sendParameterSearchFailure(tr("pathmind.error.noItemSelectedOnParameter", owner.getType().getDisplayName()), future);
             return Optional.empty();
         }
         double defaultRange = owner.getType() == NodeType.SENSOR_DISTANCE_BETWEEN ? 256.0 : Node.PARAMETER_SEARCH_RADIUS;
@@ -103,7 +105,7 @@ final class ItemParameterDefinition {
         }
         List<String> itemIds = owner.resolveItemIdsFromParameter(parameterNode);
         if (itemIds.isEmpty()) {
-            owner.sendNodeErrorMessage(client, "No item selected for " + owner.getType().getDisplayName() + ".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.noItemSelectedForNode", owner.getType().getDisplayName()));
             future.complete(null);
             return null;
         }
@@ -129,7 +131,7 @@ final class ItemParameterDefinition {
 
         if (matchedPosition.isEmpty()) {
             String reference = String.join(", ", itemIds);
-            owner.sendNodeErrorMessage(client, "No dropped " + reference + " found nearby for " + owner.getType().getDisplayName() + ".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.noDroppedItemNearby", reference, owner.getType().getDisplayName()));
             future.complete(null);
             return null;
         }

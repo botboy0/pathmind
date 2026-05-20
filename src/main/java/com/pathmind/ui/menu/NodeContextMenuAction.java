@@ -1,18 +1,18 @@
 package com.pathmind.ui.menu;
 
 public enum NodeContextMenuAction {
-    COPY("Copy"),
-    DUPLICATE("Duplicate"),
-    PASTE("Paste"),
-    DELETE("Delete");
+    COPY("pathmind.context.copy"),
+    DUPLICATE("pathmind.context.duplicate"),
+    PASTE("pathmind.context.paste"),
+    DELETE("pathmind.context.delete");
 
-    private final String label;
+    private final String translationKey;
 
-    NodeContextMenuAction(String label) {
-        this.label = label;
+    NodeContextMenuAction(String translationKey) {
+        this.translationKey = translationKey;
     }
 
-    public String getLabel() {
-        return label;
+    public String getTranslationKey() {
+        return translationKey;
     }
 }

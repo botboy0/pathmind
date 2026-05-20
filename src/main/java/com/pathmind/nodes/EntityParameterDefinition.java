@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import static com.pathmind.util.PathmindI18n.tr;
+
 import com.pathmind.util.EntityCompatibilityBridge;
 import com.pathmind.util.EntityStateOptions;
 
@@ -52,7 +54,7 @@ final class EntityParameterDefinition {
 
         List<String> entityIds = owner.resolveEntityIdsFromParameter(parameterNode);
         if (entityIds.isEmpty()) {
-            owner.sendParameterSearchFailure("No entity selected on parameter for " + owner.getType().getDisplayName() + ".", future);
+            owner.sendParameterSearchFailure(tr("pathmind.error.noEntitySelectedOnParameter", owner.getType().getDisplayName()), future);
             return Optional.empty();
         }
         Entity nearest = null;
@@ -129,7 +131,7 @@ final class EntityParameterDefinition {
         }
         List<String> entityIds = owner.resolveEntityIdsFromParameter(parameterNode);
         if (entityIds.isEmpty()) {
-            owner.sendNodeErrorMessage(client, "No entity selected for " + owner.getType().getDisplayName() + ".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.noEntitySelectedForNode", owner.getType().getDisplayName()));
             future.complete(null);
             return null;
         }
@@ -154,7 +156,7 @@ final class EntityParameterDefinition {
             }
         }
         if (nearest == null) {
-            owner.sendNodeErrorMessage(client, "No matching entity found nearby for " + owner.getType().getDisplayName() + ".");
+            owner.sendNodeErrorMessage(client, tr("pathmind.error.noMatchingEntityNearby", owner.getType().getDisplayName()));
             future.complete(null);
             return null;
         }
