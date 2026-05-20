@@ -44,6 +44,7 @@ import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
@@ -411,8 +412,9 @@ public class PathmindClientMod implements ClientModInitializer {
 
         ExecutionManager manager = ExecutionManager.getInstance();
         boolean editorOpen = PathmindScreens.isVisualEditorScreen(client.currentScreen);
-        // Allow execution to continue while GUIs are open so key-pressed sensors can fire.
-        manager.setSingleplayerPaused(client.isInSingleplayer() && editorOpen);
+        // Allow execution to continue for normal in-game GUIs so GUI nodes can work,
+        // but freeze Pathmind when the vanilla pause menu is open in multiplayer too.
+        manager.setSingleplayerPaused((client.isInSingleplayer() && editorOpen) || isPauseMenuOpen(client));
 
         if (client.world == null) {
             if (!PathmindScreens.isVisualEditorScreen(client.currentScreen)) {
@@ -439,6 +441,10 @@ public class PathmindClientMod implements ClientModInitializer {
             ExecutionManager.getInstance().playAllGraphs();
         }
         playGraphsKeyDown = playDown;
+    }
+
+    private boolean isPauseMenuOpen(MinecraftClient client) {
+        return client != null && client.currentScreen instanceof GameMenuScreen;
     }
 
     private boolean shouldIgnoreKeybinds(MinecraftClient client) {

@@ -37,6 +37,8 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 final class NodeWorldActionCommandExecutor {
+    private static final long ITEM_USE_SYNC_TIMEOUT_MS = 300L;
+
     private final Node owner;
 
     NodeWorldActionCommandExecutor(Node owner) {
@@ -108,7 +110,8 @@ final class NodeWorldActionCommandExecutor {
                             ActionResult entityResult = client.interactionManager.interactEntity(client.player, entityHit.getEntity(), hand);
                             performed = entityResult.isAccepted();
                         }
-                        if (!performed && allowBlock && target instanceof BlockHitResult blockHit) {
+                        BlockHitResult blockHit = resolveFreshBlockHit(client, target);
+                        if (!performed && allowBlock && blockHit != null) {
                             ActionResult blockResult = client.interactionManager.interactBlock(client.player, hand, blockHit);
                             performed = blockResult.isAccepted();
                         }
@@ -136,6 +139,8 @@ final class NodeWorldActionCommandExecutor {
                             }
                         });
                     }
+
+                    waitForItemUseSync(client, hand, stack);
 
                     if (sneakWhileUsing && restoreSneak) {
                         boolean sneakState = previousSneak;
@@ -165,6 +170,76 @@ final class NodeWorldActionCommandExecutor {
                 future.completeExceptionally(e);
             }
         }, "Pathmind-Use").start();
+    }
+
+    private BlockHitResult resolveFreshBlockHit(net.minecraft.client.MinecraftClient client, HitResult cachedTarget) {
+        if (client != null && client.player != null) {
+            BlockHitResult freshHit = owner.raycastBlockFromOrientation(
+                client,
+                client.player.getYaw(),
+                client.player.getPitch(),
+                0.0
+            );
+            if (freshHit != null) {
+                return freshHit;
+            }
+        }
+        return cachedTarget instanceof BlockHitResult blockHit ? blockHit : null;
+    }
+
+    private void waitForItemUseSync(net.minecraft.client.MinecraftClient client, Hand hand, ItemStack beforeUse) throws InterruptedException {
+        if (client == null || beforeUse == null || beforeUse.isEmpty() || !mayChangeAfterUse(beforeUse)) {
+            return;
+        }
+
+        long deadline = System.currentTimeMillis() + ITEM_USE_SYNC_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            ItemStack current = owner.supplyFromClient(client, () -> {
+                if (client.player == null) {
+                    return ItemStack.EMPTY;
+                }
+                return client.player.getStackInHand(hand).copy();
+            });
+            if (current == null || !ItemStack.areEqual(current, beforeUse)) {
+                return;
+            }
+            Thread.sleep(Node.CONTROL_POLL_INTERVAL_MS);
+        }
+    }
+
+    private boolean mayChangeAfterUse(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return stack.isDamageable()
+            || stack.getMaxCount() > 1
+            || hasRecipeRemainder(stack.getItem())
+            || isKnownStatefulUseItem(stack.getItem());
+    }
+
+    private boolean hasRecipeRemainder(Item item) {
+        if (item == null) {
+            return false;
+        }
+        try {
+            java.lang.reflect.Method method = Item.class.getMethod("getRecipeRemainder");
+            Object remainder = method.invoke(item);
+            return remainder instanceof Item remainderItem && remainderItem != Items.AIR;
+        } catch (ReflectiveOperationException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isKnownStatefulUseItem(Item item) {
+        return item == Items.BUCKET
+            || item == Items.WATER_BUCKET
+            || item == Items.LAVA_BUCKET
+            || item == Items.POWDER_SNOW_BUCKET
+            || item == Items.GLASS_BOTTLE
+            || item == Items.POTION
+            || item == Items.SPLASH_POTION
+            || item == Items.LINGERING_POTION
+            || item == Items.MILK_BUCKET;
     }
 
     private boolean prepareSelectedItemForUse(net.minecraft.client.MinecraftClient client,

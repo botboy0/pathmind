@@ -186,6 +186,10 @@ final class NodeFlowCommandExecutor {
                         future.complete(null);
                         return;
                     }
+                    if (manager.isExecutionPaused()) {
+                        Thread.sleep(Node.CONTROL_POLL_INTERVAL_MS);
+                        continue;
+                    }
                     if (manager.getExecutionNodeDuration(executionId) >= waitMs) {
                         future.complete(null);
                         return;
@@ -260,6 +264,10 @@ final class NodeFlowCommandExecutor {
                     if (!manager.isExecutionActiveOnNode(executionId, nodeId)) {
                         future.complete(null);
                         return;
+                    }
+                    if (manager.isExecutionPaused()) {
+                        Thread.sleep(Node.CONTROL_POLL_INTERVAL_MS);
+                        continue;
                     }
                     if (owner.evaluateConditionFromParameters()) {
                         owner.setNextOutputSocket(0);

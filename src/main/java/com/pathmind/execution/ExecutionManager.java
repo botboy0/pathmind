@@ -1439,7 +1439,7 @@ public class ExecutionManager {
     }
 
     /**
-     * Update whether the singleplayer game is currently paused so node timers can be frozen.
+     * Update whether Pathmind execution should be paused so node timers and polling can be frozen.
      */
     public void setSingleplayerPaused(boolean paused) {
         if (this.singleplayerPaused == paused) {
@@ -1474,6 +1474,10 @@ public class ExecutionManager {
                 }
             }
         }
+    }
+
+    public boolean isExecutionPaused() {
+        return singleplayerPaused;
     }
 
     private void resetActiveNodeTiming() {
