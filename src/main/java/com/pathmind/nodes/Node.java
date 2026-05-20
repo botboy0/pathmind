@@ -61,7 +61,6 @@ import net.minecraft.registry.Registries;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.network.packet.c2s.play.BookUpdateC2SPacket;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -133,8 +132,6 @@ import com.pathmind.util.InputCompatibilityBridge;
  */
 public class Node {
     private static final Logger LOGGER = LoggerFactory.getLogger(Node.class);
-    private static final Method DO_ATTACK_METHOD = resolveDoAttackMethod();
-    private static final Method SYNC_SELECTED_SLOT_METHOD = resolveSyncSelectedSlotMethod();
     static final Gson LIST_ENTRY_GSON = new Gson();
     static final String LIST_ENTRY_SERIALIZED_PREFIX = "pm_list:";
     public static final int NO_OUTPUT = -1;
@@ -5422,14 +5419,6 @@ public class Node {
 
     static boolean isCreateListCollectionTarget(NodeType parameterType) {
         return NodeVariableListCommandExecutor.isCreateListCollectionTarget(parameterType);
-    }
-
-    private static Method resolveDoAttackMethod() {
-        return NodeEntityActionCommandExecutor.resolveDoAttackMethod();
-    }
-
-    private static Method resolveSyncSelectedSlotMethod() {
-        return NodeEntityActionCommandExecutor.resolveSyncSelectedSlotMethod();
     }
 
     static void syncSelectedHotbarSlot(MinecraftClient client) {

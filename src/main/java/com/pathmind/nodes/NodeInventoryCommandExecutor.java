@@ -2,6 +2,7 @@ package com.pathmind.nodes;
 
 import static com.pathmind.util.PathmindI18n.tr;
 
+import com.pathmind.util.HotbarSlotSynchronizer;
 import com.pathmind.util.GuiSelectionMode;
 import com.pathmind.util.InventorySlotModeHelper;
 import com.pathmind.util.InputCompatibilityBridge;
@@ -86,8 +87,7 @@ final class NodeInventoryCommandExecutor {
             slot = MathHelper.clamp(resolvedSlot, 0, PlayerInventory.getHotbarSize() - 1);
         }
 
-        PlayerInventoryBridge.setSelectedSlot(client.player.getInventory(), slot);
-        syncSelectedHotbarSlot(client);
+        HotbarSlotSynchronizer.selectHotbarSlot(client, slot);
         future.complete(null);
     }
     
@@ -1341,10 +1341,6 @@ final class NodeInventoryCommandExecutor {
 
     private void sendNodeErrorMessage(MinecraftClient client, String message) {
         owner.sendNodeErrorMessage(client, message);
-    }
-
-    private void syncSelectedHotbarSlot(MinecraftClient client) {
-        Node.syncSelectedHotbarSlot(client);
     }
 
     private void runOnClientThread(MinecraftClient client, Runnable task) throws InterruptedException {

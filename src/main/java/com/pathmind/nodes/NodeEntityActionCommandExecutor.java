@@ -3,7 +3,7 @@ package com.pathmind.nodes;
 import static com.pathmind.util.PathmindI18n.tr;
 
 import com.pathmind.util.BlockSelection;
-import com.pathmind.util.PlayerInventoryBridge;
+import com.pathmind.util.HotbarSlotSynchronizer;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -16,7 +16,6 @@ import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -41,7 +40,6 @@ import org.lwjgl.glfw.GLFW;
 
 final class NodeEntityActionCommandExecutor {
     private static final Method DO_ATTACK_METHOD = resolveDoAttackMethod();
-    private static final Method SYNC_SELECTED_SLOT_METHOD = resolveSyncSelectedSlotMethod();
 
     private final Node owner;
 
@@ -814,36 +812,8 @@ final class NodeEntityActionCommandExecutor {
         }
     }
 
-    static Method resolveSyncSelectedSlotMethod() {
-        try {
-            return net.minecraft.client.network.ClientPlayerInteractionManager.class.getMethod("syncSelectedSlot");
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
     static void syncSelectedHotbarSlot(MinecraftClient client) {
-        if (client == null) {
-            return;
-        }
-        if (client.player != null && client.player.networkHandler != null) {
-            try {
-                int selectedSlot = PlayerInventoryBridge.getSelectedSlot(client.player.getInventory());
-                if (selectedSlot >= 0) {
-                    client.player.networkHandler.sendPacket(new UpdateSelectedSlotC2SPacket(selectedSlot));
-                }
-            } catch (IllegalStateException ignored) {
-                // Fall back to interaction-manager sync below.
-            }
-        }
-        if (client.interactionManager == null || SYNC_SELECTED_SLOT_METHOD == null) {
-            return;
-        }
-        try {
-            SYNC_SELECTED_SLOT_METHOD.invoke(client.interactionManager);
-        } catch (ReflectiveOperationException ignored) {
-            // Older mappings may not expose slot sync by name.
-        }
+        HotbarSlotSynchronizer.syncSelectedHotbarSlot(client);
     }
 
     static void performMainHandAttack(MinecraftClient client) {

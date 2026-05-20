@@ -5,6 +5,7 @@ import static com.pathmind.util.PathmindI18n.tr;
 import com.pathmind.execution.PreciseCompletionTracker;
 import com.pathmind.util.BaritoneApiProxy;
 import com.pathmind.util.BlockSelection;
+import com.pathmind.util.HotbarSlotSynchronizer;
 import com.pathmind.util.GameProfileCompatibilityBridge;
 import com.pathmind.util.PlayerInventoryBridge;
 import net.minecraft.block.Block;
@@ -17,7 +18,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.registry.Registries;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.SlotActionType;
@@ -308,13 +308,7 @@ final class NodeWorldActionCommandExecutor {
                 return false;
             }
         }
-        try {
-            PlayerInventoryBridge.setSelectedSlot(inventory, targetSlot);
-        } catch (IllegalStateException ignored) {
-            // Fall back to the packet-only update when inventory accessors are unavailable.
-        }
-        Node.syncSelectedHotbarSlot(client);
-        return true;
+        return HotbarSlotSynchronizer.selectHotbarSlot(client, targetSlot);
     }
 
     private boolean ensureStackEquippedInOffhand(net.minecraft.client.MinecraftClient client,
@@ -608,14 +602,7 @@ final class NodeWorldActionCommandExecutor {
         }
 
         if (hand == Hand.MAIN_HAND) {
-            try {
-                PlayerInventoryBridge.setSelectedSlot(inventory, slot);
-            } catch (IllegalStateException ignored) {
-                // Fall back to the packet-only update when inventory accessors are unavailable.
-            }
-            if (client.player.networkHandler != null) {
-                client.player.networkHandler.sendPacket(new UpdateSelectedSlotC2SPacket(slot));
-            }
+            HotbarSlotSynchronizer.selectHotbarSlot(client, slot);
             return;
         }
 
@@ -624,10 +611,7 @@ final class NodeWorldActionCommandExecutor {
             return;
         }
 
-        PlayerInventoryBridge.setSelectedSlot(inventory, slot);
-        if (client.player.networkHandler != null) {
-            client.player.networkHandler.sendPacket(new UpdateSelectedSlotC2SPacket(slot));
-        }
+        HotbarSlotSynchronizer.selectHotbarSlot(client, slot);
     }
 
     boolean waitForBlockPlacement(net.minecraft.client.MinecraftClient client, BlockPos targetPos, Block desiredBlock) throws InterruptedException {

@@ -2,6 +2,7 @@ package com.pathmind.execution;
 
 import com.pathmind.ui.overlay.NodeErrorNotificationOverlay;
 import com.pathmind.ui.theme.UITheme;
+import com.pathmind.util.HotbarSlotSynchronizer;
 import com.pathmind.util.PlayerInventoryBridge;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -13,7 +14,6 @@ import net.minecraft.fluid.Fluids;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.Slot;
@@ -50,7 +50,6 @@ import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.lang.reflect.Method;
 import java.util.stream.Collectors;
 
 /**
@@ -59,7 +58,6 @@ import java.util.stream.Collectors;
  */
 public final class PathmindNavigator {
     private static final PathmindNavigator INSTANCE = new PathmindNavigator();
-    private static final Method SYNC_SELECTED_SLOT_METHOD = resolveSyncSelectedSlotMethod();
     private static final double WAYPOINT_REACHED_DISTANCE_SQ = 0.64D;
     private static final double WAYPOINT_NEAR_DISTANCE_SQ = 0.90D;
     private static final float MAX_YAW_STEP = 14.0F;
@@ -7536,8 +7534,7 @@ public final class PathmindNavigator {
         }
 
         int previousSlot = PlayerInventoryBridge.getSelectedSlot(player.getInventory());
-        PlayerInventoryBridge.setSelectedSlot(player.getInventory(), hotbarSlot);
-        syncSelectedHotbarSlot(client);
+        HotbarSlotSynchronizer.selectHotbarSlot(client, hotbarSlot);
 
         if (client.options != null) {
             if (client.options.jumpKey != null) {
@@ -7565,8 +7562,7 @@ public final class PathmindNavigator {
             player.swingHand(Hand.MAIN_HAND);
         }
 
-        PlayerInventoryBridge.setSelectedSlot(player.getInventory(), previousSlot);
-        syncSelectedHotbarSlot(client);
+        HotbarSlotSynchronizer.selectHotbarSlot(client, previousSlot);
         applySneakState(client, true);
 
         boolean placedNow = hasCollision(world, placePos);
@@ -8785,7 +8781,7 @@ public final class PathmindNavigator {
             return;
         }
         if (PlayerInventoryBridge.getSelectedSlot(player.getInventory()) != bestSlot) {
-            PlayerInventoryBridge.setSelectedSlot(player.getInventory(), bestSlot);
+            HotbarSlotSynchronizer.selectHotbarSlot(MinecraftClient.getInstance(), bestSlot);
         }
     }
 
@@ -8952,8 +8948,7 @@ public final class PathmindNavigator {
             return false;
         }
         int previousSlot = PlayerInventoryBridge.getSelectedSlot(player.getInventory());
-        PlayerInventoryBridge.setSelectedSlot(player.getInventory(), hotbarSlot);
-        syncSelectedHotbarSlot(client);
+        HotbarSlotSynchronizer.selectHotbarSlot(client, hotbarSlot);
         if (!preserveMovementState) {
             releaseMovementKeys(client);
         }
@@ -8971,8 +8966,7 @@ public final class PathmindNavigator {
         if (accepted) {
             player.swingHand(Hand.MAIN_HAND);
         }
-        PlayerInventoryBridge.setSelectedSlot(player.getInventory(), previousSlot);
-        syncSelectedHotbarSlot(client);
+        HotbarSlotSynchronizer.selectHotbarSlot(client, previousSlot);
         boolean placedNow = hasCollision(world, placePos);
         synchronized (this) {
             lastPlaceTarget = placePos.toImmutable();
@@ -9257,38 +9251,6 @@ public final class PathmindNavigator {
             }
         }
         return null;
-    }
-
-    private static Method resolveSyncSelectedSlotMethod() {
-        try {
-            return net.minecraft.client.network.ClientPlayerInteractionManager.class.getMethod("syncSelectedSlot");
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
-    private static void syncSelectedHotbarSlot(MinecraftClient client) {
-        if (client == null) {
-            return;
-        }
-        if (client.player != null && client.player.networkHandler != null) {
-            try {
-                int selectedSlot = PlayerInventoryBridge.getSelectedSlot(client.player.getInventory());
-                if (selectedSlot >= 0) {
-                    client.player.networkHandler.sendPacket(new UpdateSelectedSlotC2SPacket(selectedSlot));
-                }
-            } catch (IllegalStateException ignored) {
-                // Fall back to interaction-manager sync below.
-            }
-        }
-        if (client.interactionManager == null || SYNC_SELECTED_SLOT_METHOD == null) {
-            return;
-        }
-        try {
-            SYNC_SELECTED_SLOT_METHOD.invoke(client.interactionManager);
-        } catch (ReflectiveOperationException ignored) {
-            // Older mappings may not expose slot sync by name.
-        }
     }
 
     private static float stepAngle(float current, float target, float maxStep) {
