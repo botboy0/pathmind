@@ -2262,8 +2262,8 @@ public class PathmindVisualEditorScreen extends Screen {
             return true;
         }
         
-        // Delete selected node with Delete key
-        if (keyCode == GLFW.GLFW_KEY_DELETE) {
+        // Delete selected node with Delete/Backspace key
+        if (keyCode == GLFW.GLFW_KEY_DELETE || keyCode == GLFW.GLFW_KEY_BACKSPACE) {
             if (nodeGraph.deleteSelectedNode()) {
                 return true;
             }
@@ -4130,7 +4130,7 @@ public class PathmindVisualEditorScreen extends Screen {
                 nodeGraph.copySelectedNodeToClipboard();
                 return true;
             case GLFW.GLFW_KEY_X:
-                return nodeGraph.deleteSelectedNode();
+                return nodeGraph.cutSelectedNodeToClipboard();
             case GLFW.GLFW_KEY_V:
                 nodeGraph.pasteClipboardNode();
                 return true;

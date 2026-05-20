@@ -64,4 +64,25 @@ class NodeGraphTest {
         assertEquals(1, graph.getSelectedNodes().size());
         assertSame(pasted, graph.getSelectedNode());
     }
+
+    @Test
+    void cutSelectedNodeCopiesThenDeletesAndCanPaste() {
+        NodeGraph graph = new NodeGraph();
+
+        Node cut = new Node(NodeType.PARAM_AMOUNT, 100, 100);
+        graph.addNode(cut);
+        graph.selectNode(cut);
+
+        assertTrue(graph.cutSelectedNodeToClipboard());
+        assertFalse(graph.getNodes().contains(cut));
+        assertTrue(graph.getSelectedNodes().isEmpty());
+
+        Node pasted = graph.pasteClipboardNode();
+
+        assertNotNull(pasted);
+        assertNotSame(cut, pasted);
+        assertEquals(NodeType.PARAM_AMOUNT, pasted.getType());
+        assertEquals(1, graph.getNodes().size());
+        assertSame(pasted, graph.getSelectedNode());
+    }
 }

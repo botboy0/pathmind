@@ -114,6 +114,25 @@ class NodeCompatibilityTest {
     }
 
     @Test
+    void createListClassifiesVariableResolvedBlockTargetAsCollectionSource() {
+        String variableName = "block_target_" + System.nanoTime();
+        Node createList = new Node(NodeType.CREATE_LIST, 0, 0);
+        Node variable = new Node(NodeType.VARIABLE, 0, 0);
+        variable.setParameterValueAndPropagate("Variable", variableName);
+        ExecutionManager.getInstance().setRuntimeVariableForAnyActiveChain(variableName,
+            new ExecutionManager.RuntimeVariable(NodeType.PARAM_BLOCK, Map.of(
+                "Block", "minecraft:azalea_leaves",
+                "block", "minecraft:azalea_leaves"
+            )));
+
+        Node resolved = new NodeVariableListCommandExecutor(createList)
+            .resolveCreateListTargetParameter(variable, null);
+
+        assertEquals(NodeType.PARAM_BLOCK, resolved.getType());
+        assertTrue(Node.isCreateListCollectionTarget(resolved.getType()));
+    }
+
+    @Test
     void recipeCacheUsableRequiresAtLeastOneValidRecipeEntry() {
         assertFalse(Node.isRecipeCacheUsableForTests(Map.of()));
         assertFalse(Node.isRecipeCacheUsableForTests(Map.of(

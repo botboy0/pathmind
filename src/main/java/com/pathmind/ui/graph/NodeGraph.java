@@ -1257,6 +1257,19 @@ public class NodeGraph {
         return true;
     }
 
+    public boolean cutSelectedNodeToClipboard() {
+        pruneSelectionToCurrentNodes();
+        if (selectedNodes.isEmpty()) {
+            return false;
+        }
+        ClipboardSnapshot snapshot = createClipboardSnapshot(selectedNodes);
+        if (snapshot == null) {
+            return false;
+        }
+        clipboardNodeSnapshot = snapshot;
+        return deleteSelectedNode();
+    }
+
     public Node duplicateSelectedNode() {
         pruneSelectionToCurrentNodes();
         if (selectedNodes.isEmpty()) {

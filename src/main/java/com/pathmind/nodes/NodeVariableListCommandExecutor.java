@@ -333,6 +333,16 @@ final class NodeVariableListCommandExecutor {
             return;
         }
 
+        parameterNode = resolveCreateListTargetParameter(parameterNode, future);
+        if (future.isDone()) {
+            return;
+        }
+        if (parameterNode == null) {
+            NodeExecutionCompletion.fail(owner, client, future,
+                tr("pathmind.error.createListValueUnresolved"));
+            return;
+        }
+
         NodeType parameterType = parameterNode.getType();
         String listName = owner.getStringParameter("List", "");
         if (listName == null || listName.trim().isEmpty()) {
@@ -569,6 +579,13 @@ final class NodeVariableListCommandExecutor {
         manager.setRuntimeList(startNode, listName.trim(),
             new ExecutionManager.RuntimeList(parameterType, entries));
         NodeExecutionCompletion.complete(future);
+    }
+
+    Node resolveCreateListTargetParameter(Node parameterNode, CompletableFuture<Void> future) {
+        if (parameterNode != null && parameterNode.getType() == NodeType.VARIABLE) {
+            return owner.resolveVariableValueNode(parameterNode, 0, future);
+        }
+        return parameterNode;
     }
 
     static boolean isCreateListCollectionTarget(NodeType parameterType) {
