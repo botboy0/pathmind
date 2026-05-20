@@ -521,6 +521,41 @@ class ExecutionManagerValidationTest {
     }
 
     @Test
+    void messageFormattingDereferencesRuntimeListItemVariables() throws Exception {
+        Node start = new Node(NodeType.START, 0, 0);
+        Node message = new Node(NodeType.MESSAGE, 100, 0);
+        message.setOwningStartNode(start);
+
+        Class<?> controllerClass = Arrays.stream(ExecutionManager.class.getDeclaredClasses())
+            .filter(candidate -> "ChainController".equals(candidate.getSimpleName()))
+            .findFirst()
+            .orElseThrow();
+        Constructor<?> constructor = controllerClass.getDeclaredConstructor(Node.class, int.class);
+        constructor.setAccessible(true);
+        Object controller = constructor.newInstance(start, 1);
+
+        Field activeChainsField = ExecutionManager.class.getDeclaredField("activeChains");
+        activeChainsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Node, Object> activeChains = (Map<Node, Object>) activeChainsField.get(manager);
+        activeChains.put(start, controller);
+
+        manager.setRuntimeList(start, "positions", new ExecutionManager.RuntimeList(
+            NodeType.PARAM_COORDINATE,
+            List.of("pm_list:{\"X\":\"10\",\"Y\":\"64\",\"Z\":\"-3\",\"x\":\"10\",\"y\":\"64\",\"z\":\"-3\"}")
+        ));
+        manager.setRuntimeVariable(start, "position", new ExecutionManager.RuntimeVariable(
+            NodeType.LIST_ITEM,
+            Map.of("List", "positions", "list", "positions", "Index", "1", "index", "1")
+        ));
+
+        Method resolveRuntimeVariablesInText = Node.class.getDeclaredMethod("resolveRuntimeVariablesInText", String.class);
+        resolveRuntimeVariablesInText.setAccessible(true);
+
+        assertEquals("position=10 64 -3", resolveRuntimeVariablesInText.invoke(message, "position=~position"));
+    }
+
+    @Test
     void joinAllBarrierWaitsForBothInputsAndResets() throws Exception {
         Node start = new Node(NodeType.START, 0, 0);
         Node joinAll = new Node(NodeType.CONTROL_JOIN_ALL, 100, 0);

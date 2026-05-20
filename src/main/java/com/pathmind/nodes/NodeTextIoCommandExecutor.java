@@ -864,6 +864,9 @@ final class NodeTextIoCommandExecutor {
         if (valueType == null) {
             return "";
         }
+        if (valueType == NodeType.LIST_ITEM) {
+            return formatListItemRuntimeVariable(values);
+        }
         switch (valueType) {
             case PARAM_BLOCK:
             case PARAM_PLACE_TARGET:
@@ -1021,6 +1024,25 @@ final class NodeTextIoCommandExecutor {
                 break;
         }
         return owner.formatCanonicalValueMap(values);
+    }
+
+    private String formatListItemRuntimeVariable(Map<String, String> values) {
+        Node listItem = new Node(NodeType.LIST_ITEM, 0, 0);
+        listItem.setSocketsHidden(true);
+        Node startNode = owner.resolveExecutionStartNode();
+        if (startNode != null) {
+            listItem.setOwningStartNode(startNode);
+        }
+        listItem.applyParameterValuesFromMap(values);
+
+        Node resolved = owner.resolveListItemValueNode(listItem, null, false, null);
+        if (resolved == null) {
+            return "";
+        }
+        return formatRuntimeVariableValue(new ExecutionManager.RuntimeVariable(
+            resolved.getType(),
+            resolved.exportParameterValues()
+        ));
     }
 
     String formatCoordinateValues(Map<String, String> values) {
