@@ -58,6 +58,7 @@ public class ExecutionManager {
     private volatile boolean cancelRequested;
     private final Map<Node, ChainController> activeChains;
     private final Map<String, RuntimeVariable> globalRuntimeVariables;
+    private final Map<String, RuntimeList> globalRuntimeLists;
     private final Map<ConnectionKey, Node> eventConnectionOwners;
     private final Set<Node> activeEventFunctionNodes;
     private final Map<Integer, Node> activeExecutionNodes;
@@ -279,6 +280,7 @@ public class ExecutionManager {
         this.cancelRequested = false;
         this.activeChains = new ConcurrentHashMap<>();
         this.globalRuntimeVariables = new ConcurrentHashMap<>();
+        this.globalRuntimeLists = new ConcurrentHashMap<>();
         this.globalExecutionActive = false;
         this.lastSnapshotWasGlobal = false;
         this.activeConnectionLookup = ConcurrentHashMap.newKeySet();
@@ -371,9 +373,11 @@ public class ExecutionManager {
         }
         ChainController controller = activeChains.get(startNode);
         if (controller == null) {
-            return false;
+            globalRuntimeLists.put(name.trim(), list);
+            return true;
         }
         controller.runtimeLists.put(name.trim(), list);
+        globalRuntimeLists.put(name.trim(), list);
         return true;
     }
 
@@ -383,9 +387,10 @@ public class ExecutionManager {
         }
         ChainController controller = activeChains.get(startNode);
         if (controller == null) {
-            return null;
+            return globalRuntimeLists.get(name.trim());
         }
-        return controller.runtimeLists.get(name.trim());
+        RuntimeList list = controller.runtimeLists.get(name.trim());
+        return list != null ? list : globalRuntimeLists.get(name.trim());
     }
 
     public List<RuntimeVariableEntry> getRuntimeVariableEntries() {
@@ -936,6 +941,7 @@ public class ExecutionManager {
      */
     private void startExecution(List<Node> startNodes, boolean markGlobal) {
         globalRuntimeVariables.clear();
+        globalRuntimeLists.clear();
         this.activeExecutionNodes.clear();
         this.executionNodeStartTimes.clear();
         this.executionNodePausedDurations.clear();
@@ -1046,6 +1052,7 @@ public class ExecutionManager {
         this.primaryExecutionId = null;
         this.activeChains.clear();
         this.globalRuntimeVariables.clear();
+        this.globalRuntimeLists.clear();
     }
 
     private void cancelAllBaritoneCommands() {
@@ -1935,6 +1942,7 @@ public class ExecutionManager {
             executionNodePauseStartTimes.clear();
             primaryExecutionId = null;
             globalRuntimeVariables.clear();
+            globalRuntimeLists.clear();
         }
     }
 

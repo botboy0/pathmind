@@ -556,6 +556,38 @@ class ExecutionManagerValidationTest {
     }
 
     @Test
+    void runtimeListsResolveAcrossActiveStartsLikeRuntimeVariables() throws Exception {
+        Node firstStart = new Node(NodeType.START, 0, 0);
+        Node secondStart = new Node(NodeType.START, 100, 0);
+
+        Class<?> controllerClass = Arrays.stream(ExecutionManager.class.getDeclaredClasses())
+            .filter(candidate -> "ChainController".equals(candidate.getSimpleName()))
+            .findFirst()
+            .orElseThrow();
+        Constructor<?> constructor = controllerClass.getDeclaredConstructor(Node.class, int.class);
+        constructor.setAccessible(true);
+
+        Field activeChainsField = ExecutionManager.class.getDeclaredField("activeChains");
+        activeChainsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Node, Object> activeChains = (Map<Node, Object>) activeChainsField.get(manager);
+        activeChains.put(firstStart, constructor.newInstance(firstStart, 1));
+        activeChains.put(secondStart, constructor.newInstance(secondStart, 2));
+
+        manager.setRuntimeList(firstStart, "positions", new ExecutionManager.RuntimeList(
+            NodeType.PARAM_COORDINATE,
+            List.of("pm_list:{\"X\":\"1\",\"Y\":\"64\",\"Z\":\"1\"}")
+        ));
+
+        ExecutionManager.RuntimeList shared = manager.getRuntimeList(secondStart, "positions");
+        assertNotNull(shared);
+        shared.addEntry("pm_list:{\"X\":\"2\",\"Y\":\"64\",\"Z\":\"2\"}");
+
+        assertEquals(2, manager.getRuntimeList(firstStart, "positions").size());
+        assertEquals(2, manager.getRuntimeList(secondStart, "positions").size());
+    }
+
+    @Test
     void joinAllBarrierWaitsForBothInputsAndResets() throws Exception {
         Node start = new Node(NodeType.START, 0, 0);
         Node joinAll = new Node(NodeType.CONTROL_JOIN_ALL, 100, 0);
