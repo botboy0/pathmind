@@ -3462,7 +3462,7 @@ public class NodeGraph {
             Set<String> eventNameVariableNames = collectRuntimeVariableNames(node);
             InlineVariableRender eventNameRenderData = null;
             boolean highlightPlainEventName = false;
-            if (!eventNameVariableNames.isEmpty() && value.indexOf('~') >= 0) {
+            if (shouldBuildInlineExpressionRender(value, eventNameVariableNames)) {
                 InlineVariableRender candidate = buildInlineVariableRender(value, eventNameVariableNames, isOverSidebar ? toGrayscale(UITheme.NODE_EVENT_TEXT, 0.85f) : UITheme.NODE_EVENT_TEXT, eventNameVariableHighlightColor);
                 if (editingEventName) {
                     eventNameRenderData = candidate;
@@ -4022,7 +4022,7 @@ public class NodeGraph {
                         int paramVariableHighlightColor = isOverSidebar ? toGrayscale(getSelectedNodeAccentColor(), 0.85f) : getSelectedNodeAccentColor();
                         Set<String> paramVariableNames = collectRuntimeVariableNames(node);
                         InlineVariableRender paramRenderData = null;
-                        if (!paramVariableNames.isEmpty() && value != null && value.indexOf('~') >= 0) {
+                        if (shouldBuildInlineExpressionRender(value, paramVariableNames)) {
                             InlineVariableRender candidate = buildInlineVariableRender(value, paramVariableNames, valueColor, paramVariableHighlightColor);
                             if (editingThis) {
                                 paramRenderData = candidate;
@@ -5376,7 +5376,7 @@ public class NodeGraph {
             int variableHighlightColor = isOverSidebar ? toGrayscale(getSelectedNodeAccentColor(), 0.85f) : getSelectedNodeAccentColor();
             Set<String> coordVariableNames = collectRuntimeVariableNames(node);
             InlineVariableRender coordRenderData = null;
-            if (!coordVariableNames.isEmpty() && value.indexOf('~') >= 0) {
+            if (shouldBuildInlineExpressionRender(value, coordVariableNames)) {
                 InlineVariableRender candidate = buildInlineVariableRender(value, coordVariableNames, valueColor, variableHighlightColor);
                 if (editingAxis) {
                     coordRenderData = candidate;
@@ -5530,7 +5530,7 @@ public class NodeGraph {
             int variableHighlightColor = isOverSidebar ? toGrayscale(getSelectedNodeAccentColor(), 0.85f) : getSelectedNodeAccentColor();
         Set<String> amountVariableNames = collectRuntimeVariableNames(node);
         InlineVariableRender amountRenderData = null;
-        if (amountEnabled && !showPlaceholder && !amountVariableNames.isEmpty() && value != null && value.indexOf('~') >= 0) {
+        if (amountEnabled && !showPlaceholder && shouldBuildInlineExpressionRender(value, amountVariableNames)) {
             InlineVariableRender candidate = buildInlineVariableRender(value, amountVariableNames, valueColor, variableHighlightColor);
             if (editing && amountEnabled) {
                 amountRenderData = candidate;
@@ -5820,7 +5820,7 @@ public class NodeGraph {
                 ? rawValue
                 : trimTextToWidth(rawValue, textRenderer, fieldWidth - 6);
             InlineVariableRender renderData = null;
-            if (!runtimeVariableNames.isEmpty() && rawValue.indexOf('~') >= 0) {
+            if (shouldBuildInlineExpressionRender(rawValue, runtimeVariableNames)) {
                 InlineVariableRender candidate = buildInlineVariableRender(rawValue, runtimeVariableNames, valueColor, variableHighlightColor);
                 if (editingThis) {
                     renderData = candidate;
@@ -5904,7 +5904,7 @@ public class NodeGraph {
     }
 
     private InlineVariableRender buildInlineVariableRender(String rawText, Set<String> variableNames, int baseColor, int highlightColor) {
-        if (rawText == null || rawText.isEmpty() || variableNames == null || variableNames.isEmpty()) {
+        if (rawText == null || rawText.isEmpty()) {
             return new InlineVariableRender(rawText == null ? "" : rawText, Collections.emptyList(), new int[0]);
         }
         List<InlineTextSegment> segments = new ArrayList<>();
@@ -5940,8 +5940,30 @@ public class NodeGraph {
         return new InlineVariableRender(displayBuilder.toString(), segments, removed);
     }
 
+    private boolean shouldBuildInlineExpressionRender(String rawText, Set<String> variableNames) {
+        if (rawText == null || rawText.isEmpty()) {
+            return false;
+        }
+        if (containsInlineArithmeticOperator(rawText)) {
+            return true;
+        }
+        return variableNames != null && !variableNames.isEmpty() && rawText.indexOf('~') >= 0;
+    }
+
     private boolean isInlineVariableChar(char character) {
         return Character.isLetterOrDigit(character) || character == '_' || character == '-';
+    }
+
+    private boolean containsInlineArithmeticOperator(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            if (isInlineArithmeticOperator(text.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isInlineArithmeticOperator(char character) {
@@ -7124,7 +7146,7 @@ public class NodeGraph {
         int variableHighlightColor = isOverSidebar ? toGrayscale(getSelectedNodeAccentColor(), 0.85f) : getSelectedNodeAccentColor();
         Set<String> stopTargetVariableNames = collectRuntimeVariableNames(node);
         InlineVariableRender stopTargetRenderData = null;
-        if (!stopTargetVariableNames.isEmpty() && value.indexOf('~') >= 0) {
+        if (shouldBuildInlineExpressionRender(value, stopTargetVariableNames)) {
             InlineVariableRender candidate = buildInlineVariableRender(value, stopTargetVariableNames, valueColor, variableHighlightColor);
             if (editing) {
                 stopTargetRenderData = candidate;
@@ -7331,7 +7353,7 @@ public class NodeGraph {
         int variableHighlightColor = isOverSidebar ? toGrayscale(getSelectedNodeAccentColor(), 0.85f) : getSelectedNodeAccentColor();
         Set<String> variableFieldVariableNames = collectRuntimeVariableNames(node);
         InlineVariableRender variableFieldRenderData = null;
-        if (!variableFieldVariableNames.isEmpty() && value.indexOf('~') >= 0) {
+        if (shouldBuildInlineExpressionRender(value, variableFieldVariableNames)) {
             InlineVariableRender candidate = buildInlineVariableRender(value, variableFieldVariableNames, valueColor, variableHighlightColor);
             if (editing) {
                 variableFieldRenderData = candidate;

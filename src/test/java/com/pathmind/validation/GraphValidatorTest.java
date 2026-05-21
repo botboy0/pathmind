@@ -94,6 +94,24 @@ class GraphValidatorTest {
     }
 
     @Test
+    void validateDoesNotWarnForUnconnectedStickyNotes() {
+        Node start = new Node(NodeType.START, 0, 0);
+        Node wait = new Node(NodeType.WAIT, 100, 0);
+        Node stickyNote = new Node(NodeType.STICKY_NOTE, 40, 80);
+        NodeConnection connection = new NodeConnection(start, wait, 0, 0);
+
+        GraphValidationResult result = GraphValidator.validate(
+            List.of(start, wait, stickyNote),
+            List.of(connection),
+            PresetManager.getDefaultPresetName(),
+            true,
+            true
+        );
+
+        assertFalse(hasIssueCode(result, "unreachable_node"));
+    }
+
+    @Test
     void validateAcceptsExistingPresetReference() throws Exception {
         Files.writeString(PresetManager.getPresetPath(PRESET_NAME), "{}");
 

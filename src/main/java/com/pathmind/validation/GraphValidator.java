@@ -99,7 +99,7 @@ public final class GraphValidator {
                     tr("pathmind.validation.deadEntry", type.getDisplayName()), node));
             }
 
-            if (!isEntryOrAttached(node) && !reachableNodeIds.contains(node.getId())) {
+            if (!isEntryOrAttached(node) && !isReachabilityExempt(node) && !reachableNodeIds.contains(node.getId())) {
                 issues.add(issue(GraphValidationSeverity.WARNING, "unreachable_node",
                     tr("pathmind.validation.unreachableNode", type.getDisplayName()), node));
             }
@@ -357,6 +357,10 @@ public final class GraphValidator {
             || node.getParentControl() != null
             || node.getParentActionControl() != null
             || node.getParentParameterHost() != null;
+    }
+
+    private static boolean isReachabilityExempt(Node node) {
+        return node != null && node.getType() == NodeType.STICKY_NOTE;
     }
 
     private static String getParameterValue(Node node, String parameterName) {
