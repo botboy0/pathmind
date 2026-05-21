@@ -149,7 +149,9 @@ public class NodeGraphPersistence {
             }
         }
         List<NodeConnection> connections = convertToConnections(data, nodeMap);
-        return saveNodeGraphToPath(nodes, connections, targetPath);
+        NodeGraphData normalized = buildNodeGraphData(null, nodes, connections, data);
+        preserveStickyNoteFields(data, normalized);
+        return writeNodeGraphDataToPath(normalized, targetPath);
     }
 
     public static ParameterType parseParameterType(String rawType) {
@@ -908,6 +910,37 @@ public class NodeGraphPersistence {
         }
 
         return data;
+    }
+
+    private static void preserveStickyNoteFields(NodeGraphData source, NodeGraphData target) {
+        if (source == null || target == null || source.getNodes() == null || target.getNodes() == null) {
+            return;
+        }
+        Map<String, NodeGraphData.NodeData> sourceStickyNotes = new HashMap<>();
+        for (NodeGraphData.NodeData sourceNode : source.getNodes()) {
+            if (sourceNode != null && sourceNode.getType() == NodeType.STICKY_NOTE && sourceNode.getId() != null) {
+                sourceStickyNotes.put(sourceNode.getId(), sourceNode);
+            }
+        }
+        if (sourceStickyNotes.isEmpty()) {
+            return;
+        }
+        for (NodeGraphData.NodeData targetNode : target.getNodes()) {
+            if (targetNode == null || targetNode.getType() != NodeType.STICKY_NOTE) {
+                continue;
+            }
+            NodeGraphData.NodeData sourceNode = sourceStickyNotes.get(targetNode.getId());
+            if (sourceNode == null) {
+                continue;
+            }
+            targetNode.setStickyNoteText(sourceNode.getStickyNoteText());
+            if (sourceNode.getStickyNoteWidth() != null) {
+                targetNode.setStickyNoteWidth(sourceNode.getStickyNoteWidth());
+            }
+            if (sourceNode.getStickyNoteHeight() != null) {
+                targetNode.setStickyNoteHeight(sourceNode.getStickyNoteHeight());
+            }
+        }
     }
 
     public static NodeGraphData.CustomNodeDefinition resolveCustomNodeDefinition(String presetName, NodeGraphData data) {

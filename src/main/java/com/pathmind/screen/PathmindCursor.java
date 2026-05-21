@@ -14,6 +14,10 @@ final class PathmindCursor {
     static final Identifier GRABBING_TEXTURE = PathmindMod.id("textures/cursor/cursor_grabbing.png");
     static final Identifier CUT_TEXTURE = PathmindMod.id("textures/cursor/cursor_cut.png");
     static final Identifier POINTER_TEXTURE = PathmindMod.id("textures/cursor/cursor_pointer.png");
+    static final Identifier SCALE_TEXTURE = PathmindMod.id("textures/cursor/cursor_scale.png");
+    static final Identifier SCALE_BOTTOM_LEFT_TEXTURE = PathmindMod.id("textures/cursor/cursor_scale_bottom_left.png");
+    static final Identifier SCALE_TOP_RIGHT_TEXTURE = PathmindMod.id("textures/cursor/cursor_scale_top_right.png");
+    static final Identifier SCALE_TOP_LEFT_TEXTURE = PathmindMod.id("textures/cursor/cursor_scale_top_left.png");
     static final Identifier DISABLED_TEXTURE = PathmindMod.id("textures/cursor/cursor_disabled.png");
     private static final int SOURCE_SIZE = 16;
     static final int SIZE = 8;

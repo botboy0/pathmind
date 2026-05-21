@@ -849,6 +849,10 @@ public class PathmindMarketplaceScreen extends Screen {
         if (node == null) {
             return;
         }
+        if (node.isStickyNote()) {
+            renderPreviewStickyNote(context, node, offsetX, offsetY, scale, interactive, popup);
+            return;
+        }
         int nodeX = Math.round(offsetX + node.getX() * scale);
         int nodeY = Math.round(offsetY + node.getY() * scale);
         int nodeWidth = Math.max(18, Math.round(node.getWidth() * scale));
@@ -897,6 +901,96 @@ public class PathmindMarketplaceScreen extends Screen {
             }
         }
         renderNodeSockets(context, node, offsetX, offsetY, scale, popup);
+    }
+
+    private void renderPreviewStickyNote(DrawContext context, Node node, float offsetX, float offsetY, float scale,
+                                         boolean interactive, boolean popup) {
+        int nodeX = Math.round(offsetX + node.getX() * scale);
+        int nodeY = Math.round(offsetY + node.getY() * scale);
+        int nodeWidth = Math.max(18, Math.round(node.getWidth() * scale));
+        int nodeHeight = Math.max(14, Math.round(node.getHeight() * scale));
+        int paperColor = interactive ? 0xFFF3E28A : 0xFFE0CE70;
+        int headerColor = interactive ? 0xFFE2C65A : 0xFFC9AE4C;
+        int borderColor = 0xFFC2A748;
+        int textColor = 0xFF3F3420;
+        int resolvedPaper = popup ? presetPopupAnimation.getAnimatedPopupColor(paperColor) : paperColor;
+        int resolvedHeader = popup ? presetPopupAnimation.getAnimatedPopupColor(headerColor) : headerColor;
+        int resolvedBorder = popup ? presetPopupAnimation.getAnimatedPopupColor(borderColor) : borderColor;
+        int resolvedText = popup ? presetPopupAnimation.getAnimatedPopupColor(textColor) : textColor;
+
+        context.fill(nodeX, nodeY, nodeX + nodeWidth, nodeY + nodeHeight, resolvedPaper);
+        int headerHeight = Math.max(3, Math.round(node.getStickyNoteHeaderHeight() * scale));
+        context.fill(nodeX + 1, nodeY + 1, nodeX + nodeWidth - 1, nodeY + headerHeight, resolvedHeader);
+        DrawContextBridge.drawBorderInLayer(context, nodeX, nodeY, nodeWidth, nodeHeight, resolvedBorder);
+
+        if (!interactive || scale <= 0.12f) {
+            return;
+        }
+        int margin = Math.max(2, Math.round(8f * scale));
+        int bodyX = nodeX + margin;
+        int bodyY = nodeY + headerHeight + margin;
+        int bodyWidth = Math.max(8, nodeWidth - margin * 2);
+        int bottom = nodeY + nodeHeight - margin;
+        int lineHeight = Math.max(9, this.textRenderer.fontHeight + 1);
+        int textY = bodyY;
+        for (String line : wrapStickyNotePreviewText(fallback(node.getStickyNoteText(), ""), bodyWidth)) {
+            if (textY + this.textRenderer.fontHeight > bottom) {
+                break;
+            }
+            context.drawText(this.textRenderer, Text.literal(line), bodyX, textY, resolvedText, false);
+            textY += lineHeight;
+        }
+    }
+
+    private List<String> wrapStickyNotePreviewText(String text, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        String[] rawLines = fallback(text, "").split("\\n", -1);
+        for (String rawLine : rawLines) {
+            appendWrappedStickyNoteLine(lines, rawLine == null ? "" : rawLine, Math.max(1, maxWidth));
+        }
+        if (lines.isEmpty()) {
+            lines.add("");
+        }
+        return lines;
+    }
+
+    private void appendWrappedStickyNoteLine(List<String> lines, String rawLine, int maxWidth) {
+        if (rawLine.isEmpty()) {
+            lines.add("");
+            return;
+        }
+        StringBuilder current = new StringBuilder();
+        for (String word : rawLine.split(" ", -1)) {
+            if (word.isEmpty()) {
+                if (current.length() == 0 || this.textRenderer.getWidth(current + " ") <= maxWidth) {
+                    current.append(' ');
+                }
+                continue;
+            }
+            String candidate = current.length() == 0 ? word : current + " " + word;
+            if (this.textRenderer.getWidth(candidate) <= maxWidth) {
+                current.setLength(0);
+                current.append(candidate);
+                continue;
+            }
+            if (current.length() > 0) {
+                lines.add(current.toString());
+                current.setLength(0);
+            }
+            appendWrappedStickyNoteWord(lines, current, word, maxWidth);
+        }
+        lines.add(current.toString());
+    }
+
+    private void appendWrappedStickyNoteWord(List<String> lines, StringBuilder current, String word, int maxWidth) {
+        for (int index = 0; index < word.length(); index++) {
+            String candidate = current.toString() + word.charAt(index);
+            if (current.length() > 0 && this.textRenderer.getWidth(candidate) > maxWidth) {
+                lines.add(current.toString());
+                current.setLength(0);
+            }
+            current.append(word.charAt(index));
+        }
     }
 
     private void renderNodeSockets(DrawContext context, Node node, float offsetX, float offsetY, float scale, boolean popup) {

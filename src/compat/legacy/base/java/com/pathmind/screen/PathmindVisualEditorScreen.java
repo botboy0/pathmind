@@ -747,10 +747,15 @@ public class PathmindVisualEditorScreen extends Screen {
     }
 
     private void renderCustomCursor(DrawContext context, int mouseX, int mouseY) {
-        PathmindCursor.render(context, resolveCursorTexture(mouseX, mouseY), mouseX, mouseY);
+        NodeGraph.StickyNoteResizeCorner resizeCorner = getHoveredStickyNoteResizeCorner(mouseX, mouseY);
+        PathmindCursor.render(context, resolveCursorTexture(mouseX, mouseY, resizeCorner), mouseX, mouseY);
     }
 
     private Identifier resolveCursorTexture(int mouseX, int mouseY) {
+        return resolveCursorTexture(mouseX, mouseY, getHoveredStickyNoteResizeCorner(mouseX, mouseY));
+    }
+
+    private Identifier resolveCursorTexture(int mouseX, int mouseY, NodeGraph.StickyNoteResizeCorner resizeCorner) {
         if (nodeGraph.isConnectionCutActive()) {
             return PathmindCursor.CUT_TEXTURE;
         }
@@ -769,6 +774,14 @@ public class PathmindVisualEditorScreen extends Screen {
             return PathmindCursor.GRAB_TEXTURE;
         }
         Node hoveredNode = overWorkspace ? nodeGraph.getNodeAt(mouseX, mouseY) : null;
+        if (resizeCorner != null) {
+            return switch (resizeCorner) {
+                case TOP_LEFT -> PathmindCursor.SCALE_TOP_LEFT_TEXTURE;
+                case TOP_RIGHT -> PathmindCursor.SCALE_TOP_RIGHT_TEXTURE;
+                case BOTTOM_LEFT -> PathmindCursor.SCALE_BOTTOM_LEFT_TEXTURE;
+                case BOTTOM_RIGHT -> PathmindCursor.SCALE_TEXTURE;
+            };
+        }
         if (hoveredNode != null && nodeGraph.isPointInsideInteractiveNodeControl(hoveredNode, mouseX, mouseY)) {
             return PathmindCursor.DEFAULT_TEXTURE;
         }
@@ -781,6 +794,15 @@ public class PathmindVisualEditorScreen extends Screen {
         }
 
         return PathmindCursor.DEFAULT_TEXTURE;
+    }
+
+    private NodeGraph.StickyNoteResizeCorner getHoveredStickyNoteResizeCorner(int mouseX, int mouseY) {
+        boolean overWorkspace = mouseX >= sidebar.getWidth() && mouseY > TITLE_BAR_HEIGHT;
+        if (!overWorkspace) {
+            return null;
+        }
+        Node hoveredNode = nodeGraph.getNodeAt(mouseX, mouseY);
+        return hoveredNode == null ? null : nodeGraph.getStickyNoteResizeCornerAt(hoveredNode, mouseX, mouseY);
     }
     private boolean isPopupObscuringWorkspace() {
         boolean overlayVisible = parameterOverlay != null && parameterOverlay.isVisible();
@@ -1292,6 +1314,8 @@ public class PathmindVisualEditorScreen extends Screen {
                 return true;
             }
             if (isMarketplaceButtonClicked((int) mouseX, (int) mouseY, button)) {
+                nodeGraph.save();
+                PresetManager.setActivePreset(activePresetName);
                 if (this.client != null) {
                     this.client.setScreen(new PathmindMarketplaceScreen(this));
                 }
@@ -3236,6 +3260,7 @@ public class PathmindVisualEditorScreen extends Screen {
         nodeGraph.stopMessageEditing(true);
         nodeGraph.stopParameterEditing(true);
         nodeGraph.stopParameterEditing(true);
+        nodeGraph.stopStickyNoteEditing(true);
         persistActiveWorkspaceToTabs();
         syncAllTemplateTabsIntoParents();
         restoreRootWorkspaceIfNeeded();

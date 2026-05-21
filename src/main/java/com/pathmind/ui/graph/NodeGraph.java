@@ -228,6 +228,7 @@ public class NodeGraph {
     private long stickyNoteCaretLastToggleTime = 0L;
     private boolean stickyNoteCaretVisible = true;
     private int stickyNoteCaretPosition = 0;
+    private long deferredStickyNoteSaveAtMillis = 0L;
     private Node eventNameEditingNode = null;
     private String eventNameEditBuffer = "";
     private String eventNameEditOriginalValue = "";
@@ -344,7 +345,7 @@ public class NodeGraph {
     private final Map<Node, DragStartInfo> multiDragStartPositions = new HashMap<>();
     private boolean selectionDeletionPreviewActive = false;
 
-    private enum StickyNoteResizeCorner {
+    public enum StickyNoteResizeCorner {
         TOP_LEFT,
         TOP_RIGHT,
         BOTTOM_LEFT,
@@ -403,6 +404,16 @@ public class NodeGraph {
             this.minY = minY;
             this.maxX = maxX;
             this.maxY = maxY;
+        }
+    }
+
+    private static final class StickyNoteCaretRenderPosition {
+        final int lineIndex;
+        final String lineTextBeforeCaret;
+
+        StickyNoteCaretRenderPosition(int lineIndex, String lineTextBeforeCaret) {
+            this.lineIndex = lineIndex;
+            this.lineTextBeforeCaret = lineTextBeforeCaret;
         }
     }
 
@@ -889,11 +900,21 @@ public class NodeGraph {
             return hit;
         }
 
-        if (node.containsPoint(worldX, worldY)) {
+        if (isNodeHitAt(node, worldX, worldY)) {
             return node;
         }
 
         return null;
+    }
+
+    private boolean isNodeHitAt(Node node, int worldX, int worldY) {
+        if (node == null) {
+            return false;
+        }
+        if (node.containsPoint(worldX, worldY)) {
+            return true;
+        }
+        return node.isSelected() && getStickyNoteResizeCornerAtWorld(node, worldX, worldY) != null;
     }
 
     public void selectNode(Node node) {
@@ -1821,7 +1842,7 @@ public class NodeGraph {
             return hit;
         }
 
-        if (node != excluded && node.containsPoint(worldX, worldY)) {
+        if (node != excluded && isNodeHitAt(node, worldX, worldY)) {
             return node;
         }
 
@@ -2951,6 +2972,7 @@ public class NodeGraph {
     }
 
     public void render(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY, float delta, boolean onlyDragged) {
+        flushDeferredStickyNoteSaveIfDue();
         var matrices = context.getMatrices();
         MatrixStackBridge.push(matrices);
         MatrixStackBridge.scale(matrices, getZoomScale(), getZoomScale());
@@ -4213,26 +4235,16 @@ public class NodeGraph {
             drawNodeText(context, textRenderer, lines.get(i), bodyLeft, lineY, textColor);
         }
 
-        if (stickyNoteEditingNode == node && stickyNoteCaretVisible) {
+        if (stickyNoteEditingNode == node) {
             updateStickyNoteCaretBlink();
-            int caretLine = 0;
-            int caretColumn = 0;
-            int remaining = MathHelper.clamp(stickyNoteCaretPosition, 0, stickyNoteEditBuffer.length());
-            String[] rawLines = stickyNoteEditBuffer.split("\\n", -1);
-            for (int i = 0; i < rawLines.length; i++) {
-                String rawLine = rawLines[i] == null ? "" : rawLines[i];
-                if (remaining <= rawLine.length()) {
-                    caretLine = i;
-                    caretColumn = remaining;
-                    break;
+            if (stickyNoteCaretVisible) {
+                StickyNoteCaretRenderPosition caretPosition = getStickyNoteCaretRenderPosition(node, textRenderer, maxLines);
+                if (caretPosition != null) {
+                    int caretY = bodyTop + caretPosition.lineIndex * (textRenderer.fontHeight + 1);
+                    int caretX = bodyLeft + textRenderer.getWidth(caretPosition.lineTextBeforeCaret);
+                    UIStyleHelper.drawTextCaretAtBaseline(context, textRenderer, caretX, caretY + textRenderer.fontHeight - 1, x + width - 6, 0xFF000000);
                 }
-                remaining -= rawLine.length() + 1;
-                caretLine = i;
-                caretColumn = rawLine.length();
             }
-            int caretY = bodyTop + caretLine * (textRenderer.fontHeight + 1);
-            int caretX = bodyLeft + textRenderer.getWidth(rawLines[Math.min(caretLine, rawLines.length - 1)].substring(0, Math.min(caretColumn, rawLines[Math.min(caretLine, rawLines.length - 1)].length())));
-            UIStyleHelper.drawTextCaretAtBaseline(context, textRenderer, caretX, caretY + textRenderer.fontHeight - 1, x + width - 6, 0xFF000000);
         }
 
         if (node.isSelected()) {
@@ -4245,20 +4257,93 @@ public class NodeGraph {
 
     private List<String> getStickyNoteDisplayLines(Node node, TextRenderer textRenderer, int maxLines) {
         String source = stickyNoteEditingNode == node ? stickyNoteEditBuffer : node.getStickyNoteText();
+        return getStickyNoteDisplayLines(source, textRenderer, Math.max(1, node.getStickyNoteBodyWidth()), maxLines);
+    }
+
+    private List<String> getStickyNoteDisplayLines(String source, TextRenderer textRenderer, int maxWidth, int maxLines) {
         List<String> lines = new ArrayList<>();
-        int maxWidth = Math.max(1, node.getStickyNoteBodyWidth());
         String[] rawLines = (source == null ? "" : source).split("\\n", -1);
         for (String rawLine : rawLines) {
-            String safeLine = rawLine == null ? "" : rawLine;
-            lines.add(trimTextToWidth(safeLine, textRenderer, maxWidth));
+            appendWrappedStickyNoteDisplayLine(lines, rawLine == null ? "" : rawLine, textRenderer, Math.max(1, maxWidth));
             if (lines.size() >= maxLines) {
-                return lines;
+                return new ArrayList<>(lines.subList(0, maxLines));
             }
         }
         if (lines.isEmpty()) {
             lines.add("");
         }
         return lines;
+    }
+
+    private StickyNoteCaretRenderPosition getStickyNoteCaretRenderPosition(Node node, TextRenderer textRenderer, int maxLines) {
+        if (!isEditingStickyNote() || stickyNoteEditingNode != node) {
+            return null;
+        }
+        int caretOffset = MathHelper.clamp(stickyNoteCaretPosition, 0, stickyNoteEditBuffer.length());
+        String textBeforeCaret = stickyNoteEditBuffer.substring(0, caretOffset);
+        List<String> wrappedBeforeCaret = getStickyNoteDisplayLines(
+            textBeforeCaret,
+            textRenderer,
+            Math.max(1, node.getStickyNoteBodyWidth()),
+            maxLines + 1);
+        if (wrappedBeforeCaret.isEmpty()) {
+            return new StickyNoteCaretRenderPosition(0, "");
+        }
+        int lineIndex = wrappedBeforeCaret.size() - 1;
+        if (lineIndex >= maxLines) {
+            return null;
+        }
+        return new StickyNoteCaretRenderPosition(lineIndex, wrappedBeforeCaret.get(lineIndex));
+    }
+
+    private void appendWrappedStickyNoteDisplayLine(List<String> lines, String rawLine, TextRenderer textRenderer, int maxWidth) {
+        if (rawLine.isEmpty()) {
+            lines.add("");
+            return;
+        }
+
+        StringBuilder current = new StringBuilder();
+        for (String word : rawLine.split(" ", -1)) {
+            if (word.isEmpty()) {
+                appendStickyNoteDisplayWhitespace(lines, current, textRenderer, maxWidth);
+                continue;
+            }
+
+            String candidate = current.length() == 0 ? word : current + " " + word;
+            if (textRenderer.getWidth(candidate) <= maxWidth) {
+                current.setLength(0);
+                current.append(candidate);
+                continue;
+            }
+
+            if (current.length() > 0) {
+                lines.add(current.toString());
+                current.setLength(0);
+            }
+            appendWrappedStickyNoteDisplayWord(lines, current, word, textRenderer, maxWidth);
+        }
+        lines.add(current.toString());
+    }
+
+    private void appendStickyNoteDisplayWhitespace(List<String> lines, StringBuilder current, TextRenderer textRenderer, int maxWidth) {
+        if (current.length() == 0 || textRenderer.getWidth(current + " ") <= maxWidth) {
+            current.append(' ');
+            return;
+        }
+        lines.add(current.toString());
+        current.setLength(0);
+    }
+
+    private void appendWrappedStickyNoteDisplayWord(List<String> lines, StringBuilder current, String word,
+                                                    TextRenderer textRenderer, int maxWidth) {
+        for (int index = 0; index < word.length(); index++) {
+            String candidate = current.toString() + word.charAt(index);
+            if (current.length() > 0 && textRenderer.getWidth(candidate) > maxWidth) {
+                lines.add(current.toString());
+                current.setLength(0);
+            }
+            current.append(word.charAt(index));
+        }
     }
 
     private void renderStickyNoteResizeHandle(DrawContext context, Node node, StickyNoteResizeCorner corner, int color) {
@@ -8720,10 +8805,7 @@ public class NodeGraph {
             return;
         }
         if (commit) {
-            stickyNoteEditingNode.setStickyNoteText(stickyNoteEditBuffer);
-            if (!Objects.equals(stickyNoteEditOriginalValue, stickyNoteEditBuffer)) {
-                markWorkspaceDirty();
-            }
+            commitStickyNoteEditBuffer(true);
         } else {
             stickyNoteEditingNode.setStickyNoteText(stickyNoteEditOriginalValue);
         }
@@ -8732,6 +8814,44 @@ public class NodeGraph {
         stickyNoteEditOriginalValue = "";
         stickyNoteCaretPosition = 0;
         stickyNoteCaretVisible = true;
+    }
+
+    private void commitStickyNoteEditBuffer(boolean saveNow) {
+        if (!isEditingStickyNote()) {
+            return;
+        }
+        boolean changed = !Objects.equals(stickyNoteEditingNode.getStickyNoteText(), stickyNoteEditBuffer);
+        if (!changed) {
+            stickyNoteEditOriginalValue = stickyNoteEditBuffer;
+            if (saveNow && workspaceDirty) {
+                markWorkspaceDirty();
+            }
+            return;
+        }
+        stickyNoteEditingNode.setStickyNoteText(stickyNoteEditBuffer);
+        stickyNoteEditOriginalValue = stickyNoteEditBuffer;
+        if (saveNow) {
+            markWorkspaceDirty();
+        } else {
+            markWorkspaceDirtyWithoutSaving();
+        }
+    }
+
+    private void markWorkspaceDirtyWithoutSaving() {
+        workspaceDirty = true;
+        invalidateValidation();
+        invalidateRenderCaches();
+        deferredStickyNoteSaveAtMillis = System.currentTimeMillis() + 750L;
+    }
+
+    private void flushDeferredStickyNoteSaveIfDue() {
+        if (deferredStickyNoteSaveAtMillis <= 0L || System.currentTimeMillis() < deferredStickyNoteSaveAtMillis) {
+            return;
+        }
+        deferredStickyNoteSaveAtMillis = 0L;
+        if (workspaceDirty) {
+            save();
+        }
     }
 
     public boolean isPointInsideStickyNoteTextArea(Node node, int screenX, int screenY) {
@@ -8770,12 +8890,23 @@ public class NodeGraph {
         return true;
     }
 
-    private StickyNoteResizeCorner getStickyNoteResizeCornerAt(Node node, int screenX, int screenY) {
+    public boolean isPointInsideStickyNoteResizeHandle(Node node, int screenX, int screenY) {
+        return getStickyNoteResizeCornerAt(node, screenX, screenY) != null;
+    }
+
+    public StickyNoteResizeCorner getStickyNoteResizeCornerAt(Node node, int screenX, int screenY) {
         if (node == null || !node.isStickyNote()) {
             return null;
         }
         int worldX = screenToWorldX(screenX);
         int worldY = screenToWorldY(screenY);
+        return getStickyNoteResizeCornerAtWorld(node, worldX, worldY);
+    }
+
+    private StickyNoteResizeCorner getStickyNoteResizeCornerAtWorld(Node node, int worldX, int worldY) {
+        if (node == null || !node.isStickyNote()) {
+            return null;
+        }
         int size = node.getStickyNoteResizeHandleSize();
         int half = size / 2;
         if (ContextMenuRenderer.isPointInRect(worldX, worldY, node.getX() - half, node.getY() - half, size, size)) {
@@ -8844,6 +8975,7 @@ public class NodeGraph {
                         + stickyNoteEditBuffer.substring(stickyNoteCaretPosition);
                     stickyNoteCaretPosition--;
                     resetStickyNoteCaretBlink();
+                    commitStickyNoteEditBuffer(false);
                 }
                 return true;
             case GLFW.GLFW_KEY_DELETE:
@@ -8851,6 +8983,7 @@ public class NodeGraph {
                     stickyNoteEditBuffer = stickyNoteEditBuffer.substring(0, stickyNoteCaretPosition)
                         + stickyNoteEditBuffer.substring(stickyNoteCaretPosition + 1);
                     resetStickyNoteCaretBlink();
+                    commitStickyNoteEditBuffer(false);
                 }
                 return true;
             case GLFW.GLFW_KEY_LEFT:
@@ -8892,6 +9025,7 @@ public class NodeGraph {
                     setClipboardText(stickyNoteEditBuffer);
                     stickyNoteEditBuffer = "";
                     stickyNoteCaretPosition = 0;
+                    commitStickyNoteEditBuffer(false);
                     return true;
                 }
                 break;
@@ -8930,6 +9064,7 @@ public class NodeGraph {
             + stickyNoteEditBuffer.substring(stickyNoteCaretPosition);
         stickyNoteCaretPosition += safe.length();
         resetStickyNoteCaretBlink();
+        commitStickyNoteEditBuffer(false);
         return true;
     }
 
@@ -14369,6 +14504,8 @@ public class NodeGraph {
      * Save the current node graph to disk
      */
     public boolean save() {
+        deferredStickyNoteSaveAtMillis = 0L;
+        commitStickyNoteEditBuffer(false);
         boolean saved = NodeGraphPersistence.saveNodeGraphForPreset(activePreset, nodes, connections);
         if (saved) {
             workspaceDirty = false;
@@ -14655,6 +14792,17 @@ public class NodeGraph {
             Node textNode = nodeMap.get(nodeData.getId());
             if (textNode != null && textNode.hasBookTextInput() && nodeData.getBookText() != null) {
                 textNode.setBookText(nodeData.getBookText());
+            }
+            if (textNode != null && textNode.isStickyNote()) {
+                textNode.setStickyNoteText(nodeData.getStickyNoteText());
+                Integer stickyNoteWidth = nodeData.getStickyNoteWidth();
+                Integer stickyNoteHeight = nodeData.getStickyNoteHeight();
+                if (stickyNoteWidth != null || stickyNoteHeight != null) {
+                    textNode.setStickyNoteSize(
+                        stickyNoteWidth != null ? stickyNoteWidth : textNode.getWidth(),
+                        stickyNoteHeight != null ? stickyNoteHeight : textNode.getHeight()
+                    );
+                }
             }
             if (textNode != null && (textNode.getType() == NodeType.TEMPLATE || textNode.getType() == NodeType.CUSTOM_NODE)) {
                 textNode.setTemplateName(nodeData.getTemplateName());
