@@ -13784,42 +13784,12 @@ public class NodeGraph {
 
         if (!onlyDragged) {
             for (NodeConnection connection : connections) {
-                Node outputNode = connection.getOutputNode();
-                Node inputNode = connection.getInputNode();
-
-                if (!outputNode.shouldRenderSockets() || !inputNode.shouldRenderSockets()) {
-                    continue;
-                }
-
-                int outputX = outputNode.getSocketX(false) - cameraX;
-                int outputY = outputNode.getSocketY(connection.getOutputSocket(), false) - cameraY;
-                int inputX = inputNode.getSocketX(true) - cameraX;
-                int inputY = inputNode.getSocketY(connection.getInputSocket(), true) - cameraY;
-                int minX = Math.min(outputX, inputX) - VIEWPORT_CULL_MARGIN;
-                int maxX = Math.max(outputX, inputX) + VIEWPORT_CULL_MARGIN;
-                int minY = Math.min(outputY, inputY) - VIEWPORT_CULL_MARGIN;
-                int maxY = Math.max(outputY, inputY) + VIEWPORT_CULL_MARGIN;
-                if (viewportWidth > 0 && viewportHeight > 0
-                    && (maxX < 0 || minX > viewportWidth || maxY < 0 || minY > viewportHeight)) {
-                    continue;
-                }
-
-                int color = outputNode.getOutputSocketColor(connection.getOutputSocket());
-                if (!denseViewportMode && shouldGrayOutConnection(outputNode, inputNode)) {
-                    color = toGrayscale(color, 0.65f);
-                }
-                if (connection == insertionPreviewConnection) {
-                    color = getSelectedNodeAccentColor();
-                }
-
-                if (animateConnections && manager.shouldAnimateConnection(connection)) {
-                    renderAnimatedConnectionCurve(context, outputX, outputY, inputX, inputY,
-                            color, animationTimestamp);
-                } else if (denseViewportMode) {
-                    renderDenseConnectionCurve(context, outputX, outputY, inputX, inputY, color);
-                } else {
-                    renderConnectionCurve(context, outputX, outputY, inputX, inputY,
-                            color);
+                renderConnection(context, connection, animateConnections, animationTimestamp, viewportWidth, viewportHeight, manager);
+            }
+        } else if (shouldRenderConnectionsOnTop()) {
+            for (NodeConnection connection : connections) {
+                if (shouldRenderConnectionInDraggedPass(connection)) {
+                    renderConnection(context, connection, animateConnections, animationTimestamp, viewportWidth, viewportHeight, manager);
                 }
             }
         }
@@ -13865,6 +13835,59 @@ public class NodeGraph {
         if (!onlyDragged && connectionCutActive) {
             renderConnectionCutPreview(context);
         }
+    }
+
+    private void renderConnection(DrawContext context, NodeConnection connection, boolean animateConnections,
+                                  long animationTimestamp, int viewportWidth, int viewportHeight,
+                                  ExecutionManager manager) {
+        if (connection == null) {
+            return;
+        }
+
+        Node outputNode = connection.getOutputNode();
+        Node inputNode = connection.getInputNode();
+
+        if (outputNode == null || inputNode == null
+            || !outputNode.shouldRenderSockets() || !inputNode.shouldRenderSockets()) {
+            return;
+        }
+
+        int outputX = outputNode.getSocketX(false) - cameraX;
+        int outputY = outputNode.getSocketY(connection.getOutputSocket(), false) - cameraY;
+        int inputX = inputNode.getSocketX(true) - cameraX;
+        int inputY = inputNode.getSocketY(connection.getInputSocket(), true) - cameraY;
+        int minX = Math.min(outputX, inputX) - VIEWPORT_CULL_MARGIN;
+        int maxX = Math.max(outputX, inputX) + VIEWPORT_CULL_MARGIN;
+        int minY = Math.min(outputY, inputY) - VIEWPORT_CULL_MARGIN;
+        int maxY = Math.max(outputY, inputY) + VIEWPORT_CULL_MARGIN;
+        if (viewportWidth > 0 && viewportHeight > 0
+            && (maxX < 0 || minX > viewportWidth || maxY < 0 || minY > viewportHeight)) {
+            return;
+        }
+
+        int color = outputNode.getOutputSocketColor(connection.getOutputSocket());
+        if (!denseViewportMode && shouldGrayOutConnection(outputNode, inputNode)) {
+            color = toGrayscale(color, 0.65f);
+        }
+        if (connection == insertionPreviewConnection) {
+            color = getSelectedNodeAccentColor();
+        }
+
+        if (animateConnections && manager.shouldAnimateConnection(connection)) {
+            renderAnimatedConnectionCurve(context, outputX, outputY, inputX, inputY, color, animationTimestamp);
+        } else if (denseViewportMode) {
+            renderDenseConnectionCurve(context, outputX, outputY, inputX, inputY, color);
+        } else {
+            renderConnectionCurve(context, outputX, outputY, inputX, inputY, color);
+        }
+    }
+
+    boolean shouldRenderConnectionInDraggedPass(NodeConnection connection) {
+        if (connection == null) {
+            return false;
+        }
+        return isNodeInDraggedHierarchy(connection.getOutputNode())
+            || isNodeInDraggedHierarchy(connection.getInputNode());
     }
 
     private boolean isNodeOverSidebarForRender(Node node, int screenX, int screenWidth) {
