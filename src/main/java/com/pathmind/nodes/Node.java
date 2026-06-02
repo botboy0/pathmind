@@ -74,6 +74,8 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.RaycastContext;
+import net.minecraft.world.chunk.ChunkSection;
+import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen;
 import net.minecraft.client.gui.screen.ingame.BookEditScreen;
@@ -5081,23 +5083,48 @@ public class Node {
                 if (!client.world.isChunkLoaded(chunkX, chunkZ)) {
                     continue;
                 }
-                BlockPos.Mutable mutable = new BlockPos.Mutable();
+                WorldChunk chunk = client.world.getChunk(chunkX, chunkZ);
+                if (chunk == null || chunk.isEmpty()) {
+                    continue;
+                }
+                ChunkSection[] sections = chunk.getSectionArray();
+                if (sections == null || sections.length == 0) {
+                    continue;
+                }
                 int startX = chunkX << 4;
                 int startZ = chunkZ << 4;
-                for (int localX = 0; localX < 16; localX++) {
-                    for (int localZ = 0; localZ < 16; localZ++) {
+                int bottomSectionCoord = client.world.getBottomSectionCoord();
+                BlockPos.Mutable mutable = new BlockPos.Mutable();
+                for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+                    ChunkSection section = sections[sectionIndex];
+                    if (section == null || section.isEmpty()) {
+                        continue;
+                    }
+                    if (!section.hasAny(state -> !state.isAir() && matchesAnyBlock(selections, state))) {
+                        continue;
+                    }
+
+                    int sectionMinY = (bottomSectionCoord + sectionIndex) << 4;
+                    int yStart = Math.max(minY, sectionMinY);
+                    int yEnd = Math.min(maxY, sectionMinY + 15);
+                    if (yStart > yEnd) {
+                        continue;
+                    }
+
+                    for (int localX = 0; localX < 16; localX++) {
                         int worldX = startX + localX;
-                        int worldZ = startZ + localZ;
-                        for (int y = minY; y <= maxY; y++) {
-                            mutable.set(worldX, y, worldZ);
-                            if (mutable.getSquaredDistance(playerPos) > maxDistanceSq) {
-                                continue;
-                            }
-                            BlockState state = client.world.getBlockState(mutable);
-                            if (state.isAir()) {
-                                continue;
-                            }
-                            if (matchesAnyBlock(selections, state)) {
+                        for (int localZ = 0; localZ < 16; localZ++) {
+                            int worldZ = startZ + localZ;
+                            for (int y = yStart; y <= yEnd; y++) {
+                                int localY = y - sectionMinY;
+                                BlockState state = section.getBlockState(localX, localY, localZ);
+                                if (state.isAir() || !matchesAnyBlock(selections, state)) {
+                                    continue;
+                                }
+                                mutable.set(worldX, y, worldZ);
+                                if (mutable.getSquaredDistance(playerPos) > maxDistanceSq) {
+                                    continue;
+                                }
                                 matches.add(mutable.toImmutable());
                             }
                         }
