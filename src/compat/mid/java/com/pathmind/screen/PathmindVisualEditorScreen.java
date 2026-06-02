@@ -752,6 +752,9 @@ public class PathmindVisualEditorScreen extends Screen {
         }
 
         boolean overWorkspace = mouseX >= sidebar.getWidth() && mouseY > TITLE_BAR_HEIGHT;
+        if (overWorkspace && InputCompatibilityBridge.hasControlDown()) {
+            return PathmindCursor.CUT_TEXTURE;
+        }
         if (sidebar.isHoveringNode()) {
             NodeType hoveredType = sidebar.getHoveredNodeType();
             if (!sidebar.isHoveringCustomNode() && (shouldBlockBaritoneNode(hoveredType) || shouldBlockUiUtilsNode(hoveredType))) {
@@ -1117,7 +1120,9 @@ public class PathmindVisualEditorScreen extends Screen {
     }
 
     private void renderDraggedWorkspaceLayer(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderNodeGraph(context, mouseX, mouseY, delta, true);
+        if (nodeGraph.isAnyNodeBeingDragged()) {
+            renderNodeGraph(context, mouseX, mouseY, delta, true);
+        }
         nodeGraph.renderSelectionBox(context);
     }
     
@@ -6645,8 +6650,15 @@ public class PathmindVisualEditorScreen extends Screen {
         context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, settingDividerY,
             getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
 
-        int footerDividerY = settingDividerY + 22;
-        int tooltipRowCenterY = (settingDividerY + footerDividerY) / 2;
+        int lowDetailDividerY = settingDividerY + 22;
+        int lowDetailRowCenterY = (settingDividerY + lowDetailDividerY) / 2;
+        renderToggleRow(context, mouseX, mouseY, contentX, lowDetailRowCenterY, "Low detail mode",
+            Boolean.TRUE.equals(currentSettings.lowDetailMode), popupX, scaledWidth);
+        context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, lowDetailDividerY,
+            getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
+
+        int footerDividerY = lowDetailDividerY + 22;
+        int tooltipRowCenterY = (lowDetailDividerY + footerDividerY) / 2;
         renderToggleRow(context, mouseX, mouseY, contentX, tooltipRowCenterY, Text.translatable("pathmind.settings.showTooltips").getString(), showWorkspaceTooltips, popupX, scaledWidth);
         context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, footerDividerY,
             getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
@@ -7295,7 +7307,8 @@ public class PathmindVisualEditorScreen extends Screen {
         int accentOptionsY = accentLabelY + 12;
         int sectionDividerY = accentOptionsY + SETTINGS_OPTION_HEIGHT + 10;
         int settingDividerY = sectionDividerY + 22;
-        int footerDividerY = settingDividerY + 22;
+        int lowDetailDividerY = settingDividerY + 22;
+        int footerDividerY = lowDetailDividerY + 22;
         int chatDividerY = footerDividerY + 22;
         int overlayDividerY = chatDividerY + 22;
         int hudDividerY = overlayDividerY + 22;
@@ -7908,8 +7921,18 @@ public class PathmindVisualEditorScreen extends Screen {
             return true;
         }
 
-        int footerDividerY = settingDividerY + 22;
-        int tooltipRowCenterY = (settingDividerY + footerDividerY) / 2;
+        int lowDetailDividerY = settingDividerY + 22;
+        int lowDetailRowCenterY = (settingDividerY + lowDetailDividerY) / 2;
+        int lowDetailToggleX = gridToggleX;
+        int lowDetailToggleY = lowDetailRowCenterY - SETTINGS_TOGGLE_HEIGHT / 2;
+        if (bodyHovered && isPointInRect(mouseXi, mouseYi, lowDetailToggleX, lowDetailToggleY, SETTINGS_TOGGLE_WIDTH, SETTINGS_TOGGLE_HEIGHT)) {
+            currentSettings.lowDetailMode = !Boolean.TRUE.equals(currentSettings.lowDetailMode);
+            SettingsManager.save(currentSettings);
+            return true;
+        }
+
+        int footerDividerY = lowDetailDividerY + 22;
+        int tooltipRowCenterY = (lowDetailDividerY + footerDividerY) / 2;
         int tooltipToggleX = gridToggleX;
         int tooltipToggleY = tooltipRowCenterY - SETTINGS_TOGGLE_HEIGHT / 2;
         if (bodyHovered && isPointInRect(mouseXi, mouseYi, tooltipToggleX, tooltipToggleY, SETTINGS_TOGGLE_WIDTH, SETTINGS_TOGGLE_HEIGHT)) {

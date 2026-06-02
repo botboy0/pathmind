@@ -35,6 +35,7 @@ public final class SettingsManager {
         public String language = "en_us";
         public String accentColor = "sky";
         public Boolean showGrid = true;
+        public Boolean lowDetailMode = false;
         public Boolean renderConnectionsOnTop = false;
         public Boolean showTooltips = true;
         public Boolean showChatErrors = true;
@@ -202,6 +203,9 @@ public final class SettingsManager {
         }
         if (settings.showGrid == null) {
             settings.showGrid = true;
+        }
+        if (settings.lowDetailMode == null) {
+            settings.lowDetailMode = false;
         }
         if (settings.renderConnectionsOnTop == null) {
             settings.renderConnectionsOnTop = false;
