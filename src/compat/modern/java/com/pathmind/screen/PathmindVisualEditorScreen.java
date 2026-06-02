@@ -57,6 +57,7 @@ import net.minecraft.client.input.KeyInput;
 import com.pathmind.util.RenderStateBridge;
 import com.pathmind.util.OverlayProtection;
 import com.pathmind.util.UiUtilsProxy;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Util;
 import net.minecraft.util.Identifier;
@@ -6792,29 +6793,33 @@ public class PathmindVisualEditorScreen extends Screen {
 
         List<GraphValidationIssue> visibleIssues = getVisibleValidationIssues(validationResult);
         int contentTop = panelY + VALIDATION_PANEL_HEADER_HEIGHT;
+        int issueTop = contentTop;
         for (int index = 0; index < visibleIssues.size(); index++) {
             GraphValidationIssue issue = visibleIssues.get(index);
-            int rowY = contentTop + index * VALIDATION_PANEL_ROW_HEIGHT;
+            List<OrderedText> wrappedLines = getValidationIssueLines(issue, panelWidth);
+            int rowHeight = getValidationIssueRowHeight(wrappedLines);
+            int rowY = issueTop;
             boolean clickable = issue != null && issue.hasNodeTarget();
-            boolean hovered = clickable && isPointInRect(mouseX, mouseY, panelX + 1, rowY, panelWidth - 2, VALIDATION_PANEL_ROW_HEIGHT);
+            boolean hovered = clickable && isPointInRect(mouseX, mouseY, panelX + 1, rowY, panelWidth - 2, rowHeight);
             float hoverProgress = getValidationIssueHoverProgress(issue, index, hovered);
             int rowBg = AnimationHelper.lerpColor(UITheme.BACKGROUND_SECONDARY, UITheme.TOOLBAR_BG_HOVER, hoverProgress);
-            context.fill(panelX + 1, rowY, panelX + panelWidth - 1, rowY + VALIDATION_PANEL_ROW_HEIGHT, rowBg);
+            context.fill(panelX + 1, rowY, panelX + panelWidth - 1, rowY + rowHeight, rowBg);
             context.drawHorizontalLine(panelX + 1, panelX + panelWidth - 2, rowY, UITheme.BORDER_SUBTLE);
 
             int severityColor = issue.getSeverity() == GraphValidationSeverity.ERROR ? UITheme.STATE_ERROR : UITheme.ACCENT_AMBER;
-            int dotTop = rowY + 7;
+            int dotTop = rowY + Math.max(7, (rowHeight - 4) / 2);
             context.fill(panelX + 8, dotTop, panelX + 12, dotTop + 4, severityColor);
 
-            String prefix = issue.getSeverity() == GraphValidationSeverity.ERROR ? "Error" : "Warning";
-            String message = TextRenderUtil.trimWithEllipsis(this.textRenderer,
-                prefix + ": " + issue.getMessage(), panelWidth - 34);
             int rowTextColor = AnimationHelper.lerpColor(UITheme.TEXT_HEADER, UITheme.TEXT_PRIMARY, hoverProgress);
-            context.drawTextWithShadow(this.textRenderer, Text.literal(message), panelX + 18, rowY + 7,
-                rowTextColor);
+            int textY = rowY + Math.max(6, (rowHeight - getValidationIssueTextHeight(wrappedLines)) / 2);
+            for (OrderedText line : wrappedLines) {
+                context.drawTextWithShadow(this.textRenderer, line, panelX + 18, textY, rowTextColor);
+                textY += this.textRenderer.fontHeight + 2;
+            }
+            issueTop += rowHeight;
         }
 
-        int presetInputsTop = contentTop + visibleIssues.size() * VALIDATION_PANEL_ROW_HEIGHT;
+        int presetInputsTop = issueTop;
         presetInputsTop = renderValidationPresetInputs(context, mouseX, mouseY, panelX, panelWidth, presetInputsTop);
 
         int hiddenCount = validationResult.getIssues().size() - visibleIssues.size();
@@ -6848,10 +6853,13 @@ public class PathmindVisualEditorScreen extends Screen {
 
         List<GraphValidationIssue> visibleIssues = getVisibleValidationIssues(validationResult);
         int contentTop = bounds[1] + VALIDATION_PANEL_HEADER_HEIGHT;
+        int issueTop = contentTop;
         for (int index = 0; index < visibleIssues.size(); index++) {
             GraphValidationIssue issue = visibleIssues.get(index);
-            int rowY = contentTop + index * VALIDATION_PANEL_ROW_HEIGHT;
-            if (!isPointInRect(mouseX, mouseY, bounds[0] + 1, rowY, bounds[2] - 2, VALIDATION_PANEL_ROW_HEIGHT)) {
+            int rowHeight = getValidationIssueRowHeight(issue, bounds[2]);
+            int rowY = issueTop;
+            if (!isPointInRect(mouseX, mouseY, bounds[0] + 1, rowY, bounds[2] - 2, rowHeight)) {
+                issueTop += rowHeight;
                 continue;
             }
             if (issue != null && issue.hasNodeTarget()) {
@@ -6859,7 +6867,7 @@ public class PathmindVisualEditorScreen extends Screen {
             }
             return true;
         }
-        if (handleValidationPresetInputClick(mouseX, mouseY, bounds[0], bounds[2], contentTop + visibleIssues.size() * VALIDATION_PANEL_ROW_HEIGHT)) {
+        if (handleValidationPresetInputClick(mouseX, mouseY, bounds[0], bounds[2], issueTop)) {
             return true;
         }
         return true;
@@ -6875,13 +6883,13 @@ public class PathmindVisualEditorScreen extends Screen {
 
     private int[] getValidationPanelBounds(GraphValidationResult validationResult, float progress) {
         List<GraphValidationIssue> visibleIssues = getVisibleValidationIssues(validationResult);
-        int rowCount = visibleIssues.size();
+        int issuesHeight = getValidationIssuesHeight(visibleIssues, VALIDATION_PANEL_WIDTH);
         int presetInputHeight = getValidationPresetInputSectionHeight();
-        int footerHeight = validationResult != null && validationResult.getIssues().size() > rowCount
+        int footerHeight = validationResult != null && validationResult.getIssues().size() > visibleIssues.size()
             ? VALIDATION_PANEL_FOOTER_HEIGHT : 0;
         int fullWidth = VALIDATION_PANEL_WIDTH;
         int fullHeight = VALIDATION_PANEL_HEADER_HEIGHT
-            + rowCount * VALIDATION_PANEL_ROW_HEIGHT
+            + issuesHeight
             + presetInputHeight
             + footerHeight
             + VALIDATION_PANEL_BOTTOM_PADDING;
@@ -6890,6 +6898,37 @@ public class PathmindVisualEditorScreen extends Screen {
         int x = getValidationButtonX() + VALIDATION_BUTTON_SIZE - width;
         int y = getValidationButtonY();
         return new int[]{x, y, width, height};
+    }
+
+    private List<OrderedText> getValidationIssueLines(GraphValidationIssue issue, int panelWidth) {
+        if (issue == null) {
+            return List.of(Text.literal("").asOrderedText());
+        }
+        String prefix = issue.getSeverity() == GraphValidationSeverity.ERROR ? "Error" : "Warning";
+        String fullMessage = prefix + ": " + issue.getMessage();
+        int textWidth = Math.max(40, panelWidth - 34);
+        List<OrderedText> wrappedLines = this.textRenderer.wrapLines(Text.literal(fullMessage), textWidth);
+        return wrappedLines.isEmpty() ? List.of(Text.literal(fullMessage).asOrderedText()) : wrappedLines;
+    }
+
+    private int getValidationIssueRowHeight(GraphValidationIssue issue, int panelWidth) {
+        return getValidationIssueRowHeight(getValidationIssueLines(issue, panelWidth));
+    }
+
+    private int getValidationIssueRowHeight(List<OrderedText> wrappedLines) {
+        return Math.max(VALIDATION_PANEL_ROW_HEIGHT, getValidationIssueTextHeight(wrappedLines) + 12);
+    }
+
+    private int getValidationIssueTextHeight(List<OrderedText> wrappedLines) {
+        return wrappedLines.size() * this.textRenderer.fontHeight + Math.max(0, wrappedLines.size() - 1) * 2;
+    }
+
+    private int getValidationIssuesHeight(List<GraphValidationIssue> visibleIssues, int panelWidth) {
+        int totalHeight = 0;
+        for (GraphValidationIssue issue : visibleIssues) {
+            totalHeight += getValidationIssueRowHeight(issue, panelWidth);
+        }
+        return totalHeight;
     }
 
     private int renderValidationPresetInputs(DrawContext context, int mouseX, int mouseY, int panelX, int panelWidth, int topY) {
