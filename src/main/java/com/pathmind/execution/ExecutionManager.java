@@ -82,6 +82,7 @@ public class ExecutionManager {
     private static class ChainController {
         final Node startNode;
         final int rootExecutionId;
+        final ChainController parentScope;
         volatile boolean cancelRequested;
         volatile Node pendingRepeatUntilExitControl;
         final AtomicInteger activeExecutions;
@@ -94,12 +95,18 @@ public class ExecutionManager {
         final List<NodeConnection> functionSourceConnections;
 
         ChainController(Node startNode, int rootExecutionId) {
-            this(startNode, rootExecutionId, List.of(), List.of());
+            this(startNode, rootExecutionId, null, List.of(), List.of());
         }
 
         ChainController(Node startNode, int rootExecutionId, List<Node> graphNodes, List<NodeConnection> graphConnections) {
+            this(startNode, rootExecutionId, null, graphNodes, graphConnections);
+        }
+
+        ChainController(Node startNode, int rootExecutionId, ChainController parentScope,
+                        List<Node> graphNodes, List<NodeConnection> graphConnections) {
             this.startNode = startNode;
             this.rootExecutionId = rootExecutionId;
+            this.parentScope = parentScope;
             this.cancelRequested = false;
             this.pendingRepeatUntilExitControl = null;
             this.activeExecutions = new AtomicInteger(1);
@@ -320,13 +327,7 @@ public class ExecutionManager {
             return false;
         }
         ChainController controller = activeChains.get(startNode);
-        if (controller == null) {
-            globalRuntimeVariables.put(name.trim(), value);
-            return true;
-        }
-        controller.runtimeVariables.put(name.trim(), value);
-        globalRuntimeVariables.put(name.trim(), value);
-        return true;
+        return storeRuntimeVariable(controller, name.trim(), value, true);
     }
 
     public RuntimeVariable getRuntimeVariable(Node startNode, String name) {
@@ -334,21 +335,19 @@ public class ExecutionManager {
             return null;
         }
         ChainController controller = activeChains.get(startNode);
-        if (controller == null) {
-            return globalRuntimeVariables.get(name.trim());
-        }
-        RuntimeVariable value = controller.runtimeVariables.get(name.trim());
-        return value != null ? value : globalRuntimeVariables.get(name.trim());
+        return resolveRuntimeVariable(controller, name.trim());
     }
 
     public boolean setRuntimeVariableForAnyActiveChain(String name, RuntimeVariable value) {
         if (name == null || name.trim().isEmpty() || value == null) {
             return false;
         }
+        ChainController currentController = resolveCurrentChainController();
+        if (currentController != null) {
+            return storeRuntimeVariable(currentController, name.trim(), value, true);
+        }
         for (ChainController controller : activeChains.values()) {
-            controller.runtimeVariables.put(name.trim(), value);
-            globalRuntimeVariables.put(name.trim(), value);
-            return true;
+            return storeRuntimeVariable(controller, name.trim(), value, true);
         }
         globalRuntimeVariables.put(name.trim(), value);
         return false;
@@ -358,8 +357,15 @@ public class ExecutionManager {
         if (name == null || name.trim().isEmpty()) {
             return null;
         }
+        ChainController currentController = resolveCurrentChainController();
+        if (currentController != null) {
+            RuntimeVariable currentValue = resolveRuntimeVariable(currentController, name.trim());
+            if (currentValue != null) {
+                return currentValue;
+            }
+        }
         for (ChainController controller : activeChains.values()) {
-            RuntimeVariable value = controller.runtimeVariables.get(name.trim());
+            RuntimeVariable value = resolveRuntimeVariable(controller, name.trim());
             if (value != null) {
                 return value;
             }
@@ -372,13 +378,7 @@ public class ExecutionManager {
             return false;
         }
         ChainController controller = activeChains.get(startNode);
-        if (controller == null) {
-            globalRuntimeLists.put(name.trim(), list);
-            return true;
-        }
-        controller.runtimeLists.put(name.trim(), list);
-        globalRuntimeLists.put(name.trim(), list);
-        return true;
+        return storeRuntimeList(controller, name.trim(), list, true);
     }
 
     public RuntimeList getRuntimeList(Node startNode, String name) {
@@ -386,11 +386,7 @@ public class ExecutionManager {
             return null;
         }
         ChainController controller = activeChains.get(startNode);
-        if (controller == null) {
-            return globalRuntimeLists.get(name.trim());
-        }
-        RuntimeList list = controller.runtimeLists.get(name.trim());
-        return list != null ? list : globalRuntimeLists.get(name.trim());
+        return resolveRuntimeList(controller, name.trim());
     }
 
     public List<RuntimeVariableEntry> getRuntimeVariableEntries() {
@@ -705,7 +701,7 @@ public class ExecutionManager {
         ChainController controller = new ChainController(launchData.rootNode, executionId,
             launchData.branchData.nodes, launchData.branchData.connections);
         activeChains.put(launchData.rootNode, controller);
-        seedPresetInputRuntimeVariables(launchData.rootNode, presetName, nodes, connections);
+        seedPresetInputRuntimeVariables(controller, presetName, nodes, connections);
         CompletableFuture<Void> chainFuture = runChain(launchData.rootNode, controller, controller.rootExecutionId);
         chainFuture.whenComplete((ignored, throwable) ->
             handleChainCompletion(controller, throwable, controller.rootExecutionId));
@@ -762,7 +758,7 @@ public class ExecutionManager {
         ChainController controller = new ChainController(launchData.rootNode, executionId,
             launchData.branchData.nodes, launchData.branchData.connections);
         activeChains.put(launchData.rootNode, controller);
-        seedPresetInputRuntimeVariables(launchData.rootNode, presetName, nodes, connections);
+        seedPresetInputRuntimeVariables(controller, presetName, nodes, connections);
         CompletableFuture<Void> chainFuture = runChain(launchData.rootNode, controller, controller.rootExecutionId);
         chainFuture.whenComplete((ignored, throwable) ->
             handleChainCompletion(controller, throwable, controller.rootExecutionId));
@@ -822,10 +818,11 @@ public class ExecutionManager {
         }
 
         int executionId = allocateExecutionId();
-        ChainController controller = new ChainController(launchData.rootNode, executionId,
+        ChainController parentController = resolveCurrentChainController();
+        ChainController controller = new ChainController(launchData.rootNode, executionId, parentController,
             launchData.branchData.nodes, launchData.branchData.connections);
         activeChains.put(launchData.rootNode, controller);
-        seedPresetInputRuntimeVariables(launchData.rootNode, presetName, nodes, connections);
+        seedPresetInputRuntimeVariables(controller, presetName, nodes, connections);
         CompletableFuture<Void> chainFuture = runChain(launchData.rootNode, controller, controller.rootExecutionId);
         chainFuture.whenComplete((ignored, throwable) ->
             handleChainCompletion(controller, throwable, controller.rootExecutionId));
@@ -833,8 +830,10 @@ public class ExecutionManager {
         return chainFuture;
     }
 
-    private void seedPresetInputRuntimeVariables(Node startNode, String presetName, List<Node> nodes, List<NodeConnection> connections) {
-        if (startNode == null || presetName == null || presetName.isBlank() || nodes == null || connections == null) {
+    private void seedPresetInputRuntimeVariables(ChainController controller, String presetName, List<Node> nodes,
+                                                 List<NodeConnection> connections) {
+        if (controller == null || controller.startNode == null || presetName == null || presetName.isBlank()
+            || nodes == null || connections == null) {
             return;
         }
         NodeGraphData.CustomNodeDefinition definition = NodeGraphPersistence.resolveCustomNodeDefinition(presetName, nodes, connections);
@@ -852,7 +851,7 @@ public class ExecutionManager {
             String rawValue = configured != null ? configured : port.getDefaultValue();
             RuntimeVariable runtimeVariable = createPresetInputRuntimeVariable(port, rawValue);
             if (runtimeVariable != null) {
-                setRuntimeVariable(startNode, port.getName().trim(), runtimeVariable);
+                storeRuntimeVariable(controller, port.getName().trim(), runtimeVariable, false);
             }
         }
     }
@@ -1138,6 +1137,18 @@ public class ExecutionManager {
         return CURRENT_EXECUTION_ID.get();
     }
 
+    private ChainController resolveCurrentChainController() {
+        Integer executionId = CURRENT_EXECUTION_ID.get();
+        if (executionId == null || executionId < 0) {
+            return null;
+        }
+        Node activeExecutionNode = activeExecutionNodes.get(executionId);
+        if (activeExecutionNode == null) {
+            return null;
+        }
+        return findChainControllerForStart(activeExecutionNode.getOwningStartNode());
+    }
+
     public boolean isStopRequested() {
         return cancelRequested;
     }
@@ -1320,6 +1331,90 @@ public class ExecutionManager {
             }
         }
 
+        return null;
+    }
+
+    private boolean storeRuntimeVariable(ChainController controller, String name, RuntimeVariable value, boolean preferExistingScope) {
+        if (name == null || name.isEmpty() || value == null) {
+            return false;
+        }
+        if (controller == null) {
+            globalRuntimeVariables.put(name, value);
+            return true;
+        }
+        ChainController target = preferExistingScope ? findControllerDefiningRuntimeVariable(controller, name) : null;
+        if (target == null) {
+            target = controller;
+        }
+        target.runtimeVariables.put(name, value);
+        globalRuntimeVariables.put(name, value);
+        return true;
+    }
+
+    private RuntimeVariable resolveRuntimeVariable(ChainController controller, String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        for (ChainController current = controller; current != null; current = current.parentScope) {
+            RuntimeVariable value = current.runtimeVariables.get(name);
+            if (value != null) {
+                return value;
+            }
+        }
+        return globalRuntimeVariables.get(name);
+    }
+
+    private ChainController findControllerDefiningRuntimeVariable(ChainController controller, String name) {
+        if (controller == null || name == null || name.isEmpty()) {
+            return null;
+        }
+        for (ChainController current = controller; current != null; current = current.parentScope) {
+            if (current.runtimeVariables.containsKey(name)) {
+                return current;
+            }
+        }
+        return null;
+    }
+
+    private boolean storeRuntimeList(ChainController controller, String name, RuntimeList list, boolean preferExistingScope) {
+        if (name == null || name.isEmpty() || list == null) {
+            return false;
+        }
+        if (controller == null) {
+            globalRuntimeLists.put(name, list);
+            return true;
+        }
+        ChainController target = preferExistingScope ? findControllerDefiningRuntimeList(controller, name) : null;
+        if (target == null) {
+            target = controller;
+        }
+        target.runtimeLists.put(name, list);
+        globalRuntimeLists.put(name, list);
+        return true;
+    }
+
+    private RuntimeList resolveRuntimeList(ChainController controller, String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        for (ChainController current = controller; current != null; current = current.parentScope) {
+            RuntimeList value = current.runtimeLists.get(name);
+            if (value != null) {
+                return value;
+            }
+        }
+        return globalRuntimeLists.get(name);
+    }
+
+    private ChainController findControllerDefiningRuntimeList(ChainController controller, String name) {
+        if (controller == null || name == null || name.isEmpty()) {
+            return null;
+        }
+        for (ChainController current = controller; current != null; current = current.parentScope) {
+            if (current.runtimeLists.containsKey(name)) {
+                return current;
+            }
+        }
         return null;
     }
 

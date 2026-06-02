@@ -6089,6 +6089,7 @@ public class NodeGraph {
                 names.add(trimmed);
             }
         }
+        collectActivePresetInputNames(names);
         ExecutionManager manager = ExecutionManager.getInstance();
         List<ExecutionManager.RuntimeVariableEntry> entries = manager.getRuntimeVariableEntries();
         if (!entries.isEmpty()) {
@@ -6111,6 +6112,30 @@ public class NodeGraph {
             }
         }
         return names;
+    }
+
+    private void collectActivePresetInputNames(Set<String> names) {
+        if (names == null) {
+            return;
+        }
+        String presetName = activePreset == null ? "" : activePreset.trim();
+        if (presetName.isEmpty()) {
+            return;
+        }
+        NodeGraphData snapshot = exportGraphDataSnapshot();
+        NodeGraphData.CustomNodeDefinition definition = NodeGraphPersistence.resolveCustomNodeDefinition(presetName, snapshot);
+        if (definition == null || definition.getInputs() == null || definition.getInputs().isEmpty()) {
+            return;
+        }
+        for (NodeGraphData.CustomNodePort port : definition.getInputs()) {
+            if (port == null || port.getName() == null) {
+                continue;
+            }
+            String trimmed = port.getName().trim();
+            if (!trimmed.isEmpty()) {
+                names.add(trimmed);
+            }
+        }
     }
 
     private static final class InlineVariableRender {

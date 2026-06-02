@@ -705,6 +705,7 @@ final class NodeInventoryCommandExecutor {
     }
 
     SlotSelectionType resolveInventorySlotSelectionType(Node parameterNode) {
+        parameterNode = resolveVariableSelectionParameterNode(parameterNode);
         if (parameterNode == null) {
             return SlotSelectionType.PLAYER_INVENTORY;
         }
@@ -761,6 +762,18 @@ final class NodeInventoryCommandExecutor {
             return SlotSelectionType.GUI_CONTAINER;
         }
         return SlotSelectionType.PLAYER_INVENTORY;
+    }
+
+    private Node resolveVariableSelectionParameterNode(Node parameterNode) {
+        if (parameterNode == null || parameterNode.getType() != NodeType.VARIABLE) {
+            return parameterNode;
+        }
+        int slotIndex = parameterNode.getParentParameterSlotIndex();
+        if (slotIndex < 0) {
+            slotIndex = 0;
+        }
+        Node resolved = owner.resolveVariableValueNode(parameterNode, slotIndex, null);
+        return resolved != null ? resolved : parameterNode;
     }
 
     SlotResolution resolveInventorySlot(ScreenHandler handler, PlayerInventory inventory, int slotValue, SlotSelectionType selectionType) {

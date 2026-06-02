@@ -777,6 +777,79 @@ class ExecutionManagerValidationTest {
     }
 
     @Test
+    void externalBranchInheritsAndUpdatesCallerRuntimeVariableScope() throws Exception {
+        Node parentStart = new Node(NodeType.START, 0, 0);
+        parentStart.setStartNodeNumber(1);
+        Node activeCaller = new Node(NodeType.RUN_PRESET, 100, 0);
+        activeCaller.setOwningStartNode(parentStart);
+
+        Class<?> controllerClass = Arrays.stream(ExecutionManager.class.getDeclaredClasses())
+            .filter(candidate -> "ChainController".equals(candidate.getSimpleName()))
+            .findFirst()
+            .orElseThrow();
+        Constructor<?> constructor = controllerClass.getDeclaredConstructor(Node.class, int.class);
+        constructor.setAccessible(true);
+        Object parentController = constructor.newInstance(parentStart, 41);
+
+        Field activeChainsField = ExecutionManager.class.getDeclaredField("activeChains");
+        activeChainsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Node, Object> activeChains = (Map<Node, Object>) activeChainsField.get(manager);
+        activeChains.put(parentStart, parentController);
+
+        Field activeExecutionNodesField = ExecutionManager.class.getDeclaredField("activeExecutionNodes");
+        activeExecutionNodesField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Integer, Node> activeExecutionNodes = (Map<Integer, Node>) activeExecutionNodesField.get(manager);
+        activeExecutionNodes.put(41, activeCaller);
+
+        manager.setRuntimeVariable(parentStart, "distance", new ExecutionManager.RuntimeVariable(
+            NodeType.PARAM_AMOUNT,
+            Map.of("Amount", "4", "amount", "4")
+        ));
+
+        Node nestedStart = new Node(NodeType.START, 0, 0);
+        nestedStart.setStartNodeNumber(1);
+        Node forever = new Node(NodeType.CONTROL_FOREVER, 120, 0);
+        Node wait = new Node(NodeType.WAIT, 220, 0);
+        wait.getParameter("Duration").setStringValue("5.0");
+        assertTrue(forever.attachActionNode(wait));
+        NodeConnection connection = new NodeConnection(nestedStart, forever, 0, 0);
+
+        CompletableFuture<Void>[] futureHolder = new CompletableFuture[1];
+        manager.runWithExecutionContext(41, () -> futureHolder[0] = manager.executeExternalBranchAndWait(
+            nestedStart,
+            List.of(nestedStart, forever, wait),
+            List.of(connection),
+            "NestedPreset"
+        ));
+
+        CompletableFuture<Void> future = futureHolder[0];
+        assertNotNull(future);
+        assertEquals(2, activeChains.size());
+
+        Node launchedStart = activeChains.keySet().stream()
+            .filter(node -> node != parentStart)
+            .findFirst()
+            .orElseThrow();
+
+        ExecutionManager.RuntimeVariable inherited = manager.getRuntimeVariable(launchedStart, "distance");
+        assertNotNull(inherited);
+        assertEquals("4", inherited.getValues().get("Amount"));
+
+        assertTrue(manager.setRuntimeVariable(launchedStart, "distance", new ExecutionManager.RuntimeVariable(
+            NodeType.PARAM_AMOUNT,
+            Map.of("Amount", "9", "amount", "9")
+        )));
+        ExecutionManager.RuntimeVariable updatedParent = manager.getRuntimeVariable(parentStart, "distance");
+        assertNotNull(updatedParent);
+        assertEquals("9", updatedParent.getValues().get("Amount"));
+
+        manager.requestStopAll();
+        future.cancel(true);
+    }
+
+    @Test
     void missingSecondaryOutputDoesNotFallBackToPrimaryOutput() throws Exception {
         Node ifElse = new Node(NodeType.CONTROL_IF_ELSE, 0, 0);
         Node forever = new Node(NodeType.CONTROL_FOREVER, 100, 0);

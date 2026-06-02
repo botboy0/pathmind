@@ -1042,6 +1042,9 @@ public class NodeGraphPersistence {
             if (node == null || node.getType() != NodeType.VARIABLE) {
                 continue;
             }
+            if (!isVariableInputCandidate(node)) {
+                continue;
+            }
             NodeParameter variableParam = node.getParameter("Variable");
             if (variableParam == null) {
                 continue;
@@ -1061,6 +1064,37 @@ public class NodeGraphPersistence {
             mergeDiscoveredInput(inputs, normalized, inferred);
         }
         return new ArrayList<>(inputs.values());
+    }
+
+    private static boolean isVariableInputCandidate(Node variableNode) {
+        if (variableNode == null) {
+            return false;
+        }
+        Node host = variableNode.getParentParameterHost();
+        if (host == null) {
+            return true;
+        }
+        int slotIndex = resolveAttachedParameterSlotIndex(host, variableNode);
+        if (slotIndex < 0) {
+            return true;
+        }
+        NodeType hostType = host.getType();
+        if ((hostType == NodeType.SET_VARIABLE || hostType == NodeType.CHANGE_VARIABLE) && slotIndex == 0) {
+            return false;
+        }
+        return true;
+    }
+
+    private static int resolveAttachedParameterSlotIndex(Node host, Node parameterNode) {
+        if (host == null || parameterNode == null) {
+            return -1;
+        }
+        for (Map.Entry<Integer, Node> entry : host.getAttachedParameters().entrySet()) {
+            if (entry.getValue() == parameterNode) {
+                return entry.getKey();
+            }
+        }
+        return -1;
     }
 
     private static Map<String, NodeGraphData.CustomNodePort> discoverInitializedCustomNodeInputs(List<Node> nodes) {

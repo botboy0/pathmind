@@ -509,6 +509,32 @@ class NodeCompatibilityTest {
     }
 
     @Test
+    void moveItemResolvesInventorySlotVariableSelectionMode() {
+        ExecutionManager manager = ExecutionManager.getInstance();
+        Node start = new Node(NodeType.START, 0, 0);
+        Node moveItem = new Node(NodeType.MOVE_ITEM, 0, 0);
+        Node variable = new Node(NodeType.VARIABLE, 0, 0);
+
+        moveItem.setOwningStartNode(start);
+        variable.getParameter("Variable").setStringValue("slot");
+        manager.setRuntimeVariable(start, "slot", new ExecutionManager.RuntimeVariable(
+            NodeType.PARAM_INVENTORY_SLOT,
+            Map.of(
+                "Slot", "0",
+                "slot", "0",
+                "SourceSlot", "0",
+                "sourceslot", "0",
+                "Mode", "double_chest|container",
+                "mode", "double_chest|container"
+            )
+        ));
+
+        assertTrue(moveItem.attachParameter(variable, 0));
+
+        assertEquals(SlotSelectionType.GUI_CONTAINER, moveItem.resolveInventorySlotSelectionType(variable));
+    }
+
+    @Test
     void equalsFailsWhenCoordinateAndGroupContainsMismatch() {
         Node equals = new Node(NodeType.OPERATOR_EQUALS, 0, 0);
         Node position = coordinateNode(10, 64, 10);

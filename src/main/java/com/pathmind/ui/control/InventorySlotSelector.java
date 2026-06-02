@@ -91,6 +91,7 @@ public class InventorySlotSelector {
         }
         if (this.mode != resolved) {
             this.mode = resolved;
+            this.selectedSlotIsPlayerSection = null;
             if (listener != null) {
                 listener.onModeChanged(this.mode.id);
                 listener.requestLayoutRefresh();
@@ -147,11 +148,10 @@ public class InventorySlotSelector {
         sectionY += gridHeight + INFO_TEXT_MARGIN;
 
         String selectionText = Text.translatable("pathmind.inventorySlot.selectedSlot", selectedSlotId).getString();
-        if (selectedSlotIsPlayerSection != null) {
-            selectionText += " " + Text.translatable(selectedSlotIsPlayerSection
-                ? "pathmind.inventorySlot.section.inventory"
-                : "pathmind.inventorySlot.section.gui").getString();
-        }
+        boolean selectedPlayerSection = getEffectiveSelectedSlotIsPlayerSection();
+        selectionText += " " + Text.translatable(selectedPlayerSection
+            ? "pathmind.inventorySlot.section.inventory"
+            : "pathmind.inventorySlot.section.gui").getString();
         context.drawTextWithShadow(
             textRenderer,
             Text.literal(selectionText),
@@ -232,10 +232,14 @@ public class InventorySlotSelector {
         if (selectedSlotId != slotId) {
             return false;
         }
-        if (selectedSlotIsPlayerSection == null) {
-            return true;
+        return getEffectiveSelectedSlotIsPlayerSection() == playerSection;
+    }
+
+    private boolean getEffectiveSelectedSlotIsPlayerSection() {
+        if (selectedSlotIsPlayerSection != null) {
+            return selectedSlotIsPlayerSection;
         }
-        return selectedSlotIsPlayerSection == playerSection;
+        return mode == InventoryGuiMode.PLAYER_INVENTORY;
     }
 
     private void renderDropdown(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY, float alpha) {
@@ -407,6 +411,7 @@ public class InventorySlotSelector {
             InventoryGuiMode selected = modes[actualIndex];
             if (selected != mode) {
                 mode = selected;
+                selectedSlotIsPlayerSection = null;
                 if (listener != null) {
                     listener.onModeChanged(mode.id);
                     listener.requestLayoutRefresh();
