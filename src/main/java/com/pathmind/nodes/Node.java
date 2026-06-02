@@ -3982,6 +3982,18 @@ public class Node {
     }
 
     Optional<Vec3d> resolvePositionTarget(Node parameterNode, RuntimeParameterData data, CompletableFuture<Void> future) {
+        if (parameterNode == null) {
+            return Optional.empty();
+        }
+        if (parameterNode.getType() == NodeType.OPERATOR_BOOLEAN_OR) {
+            Optional<Vec3d> resolved = resolveNearestPositionTargetFromOrNode(parameterNode, future);
+            if (resolved.isPresent() && data != null) {
+                Vec3d vec = resolved.get();
+                data.targetVector = vec;
+                data.targetBlockPos = new BlockPos(MathHelper.floor(vec.x), MathHelper.floor(vec.y), MathHelper.floor(vec.z));
+            }
+            return resolved;
+        }
         if (parameterNode != null && parameterNode.getType() == NodeType.LIST_ITEM) {
             Node resolved = resolveListItemValueNode(parameterNode, future, false, data);
             if (resolved != null) {
@@ -4058,6 +4070,51 @@ public class Node {
         }
 
         return Optional.empty();
+    }
+
+    private Optional<Vec3d> resolveNearestPositionTargetFromOrNode(Node orNode, CompletableFuture<Void> future) {
+        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+        Vec3d reference = client != null && client.player != null
+            ? EntityCompatibilityBridge.getPos(client.player)
+            : null;
+        if (reference == null && client != null && client.player != null) {
+            reference = Vec3d.ofCenter(client.player.getBlockPos());
+        }
+
+        Optional<Vec3d> firstResolved = Optional.empty();
+        Vec3d nearest = null;
+        double nearestDistanceSq = Double.MAX_VALUE;
+        List<Integer> slotIndices = orNode.getAttachedParameterSlotIndices();
+        Collections.sort(slotIndices);
+        for (Integer slotIndex : slotIndices) {
+            Node child = orNode.getAttachedParameter(slotIndex);
+            if (child == null) {
+                continue;
+            }
+            Optional<Vec3d> candidate = resolvePositionTarget(child, null, future);
+            if (candidate.isEmpty()) {
+                if (future != null && future.isDone()) {
+                    return Optional.empty();
+                }
+                continue;
+            }
+            if (firstResolved.isEmpty()) {
+                firstResolved = candidate;
+            }
+            if (reference == null) {
+                continue;
+            }
+            double distanceSq = candidate.get().squaredDistanceTo(reference);
+            if (nearest == null || distanceSq < nearestDistanceSq) {
+                nearest = candidate.get();
+                nearestDistanceSq = distanceSq;
+            }
+        }
+
+        if (nearest != null) {
+            return Optional.of(nearest);
+        }
+        return firstResolved;
     }
 
     Optional<Vec3d> resolveDistanceBetweenTarget(Node parameterNode) {

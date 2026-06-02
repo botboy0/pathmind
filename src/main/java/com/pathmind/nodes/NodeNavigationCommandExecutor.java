@@ -679,6 +679,12 @@ final class NodeNavigationCommandExecutor {
             }
             return parameterData.targetEntity.getBlockPos();
         }
+        if (parameterData != null && parameterData.targetBlockPos != null) {
+            if (handled != null && handled.length > 0) {
+                handled[0] = true;
+            }
+            return parameterData.targetBlockPos;
+        }
 
         Node parameterNode = getAttachedParameter();
         if (parameterNode == null) {

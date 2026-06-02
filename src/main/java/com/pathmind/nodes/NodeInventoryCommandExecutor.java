@@ -1120,42 +1120,89 @@ final class NodeInventoryCommandExecutor {
         }
 
         PlayerInventory inventory = client.player.getInventory();
+        if (parameterNode.getType() == NodeType.OPERATOR_BOOLEAN_OR) {
+            UseSelectionResult orResult = resolveUseSelectionFromOr(parameterNode, inventory);
+            if (orResult != null) {
+                applyUseSelectionResult(orResult);
+                return true;
+            }
+            sendParameterSearchFailure("None of the OR options are available in inventory for " + type.getDisplayName() + ".", future);
+            return false;
+        }
+
+        UseSelectionResult result = resolveUseSelectionResult(parameterNode, inventory, client, future, true);
+        if (result == null) {
+            return false;
+        }
+        applyUseSelectionResult(result);
+        return true;
+    }
+
+    private UseSelectionResult resolveUseSelectionFromOr(Node orNode, PlayerInventory inventory) {
+        if (orNode == null || inventory == null) {
+            return null;
+        }
+        java.util.List<Integer> slotIndices = new java.util.ArrayList<>(orNode.getAttachedParameterSlotIndices());
+        java.util.Collections.sort(slotIndices);
+        for (Integer slotIndex : slotIndices) {
+            Node child = orNode.getAttachedParameter(slotIndex);
+            if (child == null) {
+                continue;
+            }
+            child = resolveVariableSelectionParameterNode(child);
+            UseSelectionResult result = resolveUseSelectionResult(
+                child,
+                inventory,
+                net.minecraft.client.MinecraftClient.getInstance(),
+                null,
+                false
+            );
+            if (result != null) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    private UseSelectionResult resolveUseSelectionResult(Node parameterNode,
+                                                         PlayerInventory inventory,
+                                                         net.minecraft.client.MinecraftClient client,
+                                                         CompletableFuture<Void> future,
+                                                         boolean reportErrors) {
+        if (parameterNode == null || inventory == null) {
+            return null;
+        }
         EnumSet<NodeValueTrait> traits = parameterNode.getProvidedTraits();
         boolean isListItem = parameterNode.getType() == NodeType.LIST_ITEM;
         boolean treatAsItem = traits.contains(NodeValueTrait.ITEM)
             || (isListItem && runtimeState.runtimeParameterData != null && runtimeState.runtimeParameterData.targetItemId != null);
         if (traits.contains(NodeValueTrait.BLOCK)) {
-            {
-                String rawBlock = getParameterString(parameterNode, "Block");
-                boolean anySelection = isAnySelectionValue(rawBlock);
-                List<BlockSelection> selections = resolveBlocksFromParameter(parameterNode);
-                if (selections.isEmpty() && !anySelection) {
+            String rawBlock = getParameterString(parameterNode, "Block");
+            boolean anySelection = isAnySelectionValue(rawBlock);
+            List<BlockSelection> selections = resolveBlocksFromParameter(parameterNode);
+            if (selections.isEmpty() && !anySelection) {
+                if (reportErrors) {
                     sendParameterSearchFailure(tr("pathmind.error.noBlockSelectedOnParameter", type.getDisplayName()), future);
-                    return false;
                 }
+                return null;
+            }
 
-                ItemSearchResult result = null;
-                if (anySelection || selections.isEmpty()) {
-                    result = findFirstBlockItemSlot(inventory);
-                } else {
-                    result = findUseBlockSlot(inventory, selections);
-                }
+            ItemSearchResult result = anySelection || selections.isEmpty()
+                ? findFirstBlockItemSlot(inventory)
+                : findUseBlockSlot(inventory, selections);
 
-                if (result == null) {
+            if (result == null) {
+                if (reportErrors) {
                     String reference = anySelection ? tr("pathmind.error.blockReference") : selections.stream()
                         .map(BlockSelection::getBlockIdString)
                         .filter(id -> id != null && !id.isEmpty())
                         .findFirst()
                         .orElse(tr("pathmind.error.blockReference"));
                     sendParameterSearchFailure(tr("pathmind.error.noItemFoundInInventory", reference, type.getDisplayName()), future);
-                    return false;
                 }
-                runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
-                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                runtimeState.runtimeParameterData.targetItem = result.item();
-                runtimeState.runtimeParameterData.targetItemId = result.itemId();
-                return true;
+                return null;
             }
+            return new UseSelectionResult(result.slotIndex(), SlotSelectionType.PLAYER_INVENTORY, result.item(), result.itemId());
         }
         if (treatAsItem) {
             List<String> itemIds;
@@ -1165,40 +1212,55 @@ final class NodeInventoryCommandExecutor {
                 itemIds = resolveItemIdsFromParameter(parameterNode);
             }
             if (itemIds.isEmpty()) {
-                sendParameterSearchFailure(tr("pathmind.error.noItemSelectedOnParameter", type.getDisplayName()), future);
-                return false;
+                if (reportErrors) {
+                    sendParameterSearchFailure(tr("pathmind.error.noItemSelectedOnParameter", type.getDisplayName()), future);
+                }
+                return null;
             }
-                ItemSearchResult result = findUseItemSlot(inventory, itemIds);
-                if (result == null) {
+            ItemSearchResult result = findUseItemSlot(inventory, itemIds);
+            if (result == null) {
+                if (reportErrors) {
                     String reference = String.join(", ", itemIds);
                     sendParameterSearchFailure(tr("pathmind.error.noItemFoundInInventory", reference, type.getDisplayName()), future);
-                    return false;
                 }
-                runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
-                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                runtimeState.runtimeParameterData.targetItem = result.item();
-                runtimeState.runtimeParameterData.targetItemId = result.itemId();
-                return true;
+                return null;
+            }
+            return new UseSelectionResult(result.slotIndex(), SlotSelectionType.PLAYER_INVENTORY, result.item(), result.itemId());
         }
         if (traits.contains(NodeValueTrait.INVENTORY_SLOT)) {
-                SlotSelectionType selectionType = resolveInventorySlotSelectionType(parameterNode);
-                if (selectionType == SlotSelectionType.GUI_CONTAINER) {
+            SlotSelectionType selectionType = resolveInventorySlotSelectionType(parameterNode);
+            if (selectionType == SlotSelectionType.GUI_CONTAINER) {
+                if (reportErrors) {
                     sendNodeErrorMessage(client, tr("pathmind.error.useOnlyPlayerInventorySlots"));
                     if (future != null && !future.isDone()) {
                         future.complete(null);
                     }
-                    return false;
                 }
-                int slotValue = clampInventorySlot(inventory, parseNodeInt(parameterNode, "Slot", 0));
-                runtimeState.runtimeParameterData.slotIndex = slotValue;
-                runtimeState.runtimeParameterData.slotSelectionType = SlotSelectionType.PLAYER_INVENTORY;
-                return true;
+                return null;
+            }
+            int slotValue = clampInventorySlot(inventory, parseNodeInt(parameterNode, "Slot", 0));
+            return new UseSelectionResult(slotValue, SlotSelectionType.PLAYER_INVENTORY, null, null);
         }
-        sendIncompatibleParameterMessage(parameterNode);
-        return false;
+        if (reportErrors) {
+            sendIncompatibleParameterMessage(parameterNode);
+        }
+        return null;
     }
 
     private record ItemSearchResult(int slotIndex, Item item, String itemId) {
+    }
+
+    private record UseSelectionResult(int slotIndex, SlotSelectionType selectionType, Item item, String itemId) {
+    }
+
+    private void applyUseSelectionResult(UseSelectionResult result) {
+        if (result == null) {
+            return;
+        }
+        runtimeState.runtimeParameterData.slotIndex = result.slotIndex();
+        runtimeState.runtimeParameterData.slotSelectionType = result.selectionType();
+        runtimeState.runtimeParameterData.targetItem = result.item();
+        runtimeState.runtimeParameterData.targetItemId = result.itemId();
     }
 
     private ItemSearchResult findUseItemSlot(PlayerInventory inventory, List<String> itemIds) {
