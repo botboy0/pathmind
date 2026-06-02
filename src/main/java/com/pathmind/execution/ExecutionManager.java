@@ -27,13 +27,16 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Objects;
 
 /**
  * Manages the execution state of the node graph.
@@ -41,6 +44,7 @@ import java.util.Objects;
  */
 public class ExecutionManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ExecutionManager.class);
+    private static final Executor CHAIN_COMPLETION_BOUNDARY_EXECUTOR = ForkJoinPool.commonPool();
     private static volatile ExecutionManager instance;
     private Node activeNode;
     private boolean isExecuting;
@@ -1739,7 +1743,21 @@ public class ExecutionManager {
 
         CompletableFuture<Void> handlersComplete = CompletableFuture.allOf(
             handlerFutures.toArray(new CompletableFuture[0]));
-        return handlersComplete;
+        return deferCompletion(handlersComplete);
+    }
+
+    public <T> CompletableFuture<T> deferCompletion(CompletableFuture<T> future) {
+        if (future == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return future.handleAsync((result, throwable) -> {
+            if (throwable != null) {
+                throw throwable instanceof CompletionException completionException
+                    ? completionException
+                    : new CompletionException(throwable);
+            }
+            return result;
+        }, CHAIN_COMPLETION_BOUNDARY_EXECUTOR);
     }
 
     private List<EventHandlerLaunchData> resolveFunctionInvocationHandlers(String eventName, ChainController controller) {
