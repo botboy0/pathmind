@@ -44,6 +44,9 @@ final class NodePlayerStateSensorEvaluator {
         if (client == null || client.player == null || client.world == null) {
             return Optional.empty();
         }
+        if (client.player.isOnGround()) {
+            return Optional.of(0.0);
+        }
 
         Box box = client.player.getBoundingBox();
         double bottomY = box.minY;
