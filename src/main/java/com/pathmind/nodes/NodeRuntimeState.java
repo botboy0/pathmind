@@ -20,9 +20,6 @@ final class NodeRuntimeState {
     int startNodeNumber;
     Random randomGenerator;
     String randomSeedCache;
-    double fallingPeakY = Double.NaN;
-    boolean fallingPeakInitialized;
-    long lastFallingDetectedAtMs = Long.MIN_VALUE;
 
     void resetControlState() {
         repeatRemainingIterations = 0;
@@ -30,8 +27,5 @@ final class NodeRuntimeState {
         repeatExecuteAttachedAction = false;
         lastSensorResult = false;
         nextOutputSocket = 0;
-        fallingPeakY = Double.NaN;
-        fallingPeakInitialized = false;
-        lastFallingDetectedAtMs = Long.MIN_VALUE;
     }
 }

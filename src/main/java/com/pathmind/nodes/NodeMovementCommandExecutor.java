@@ -5,7 +5,6 @@ import static com.pathmind.util.PathmindI18n.tr;
 import com.pathmind.util.EntityCompatibilityBridge;
 import com.pathmind.util.InputCompatibilityBridge;
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.EntityPose;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
@@ -243,7 +242,7 @@ final class NodeMovementCommandExecutor {
         try {
             owner.runOnClientThread(client, () -> {
                 if (client.currentScreen != null) {
-                    handledByScreen[0] = client.currentScreen.keyPressed(new KeyInput(keyCode, 0, 0));
+                    handledByScreen[0] = InputCompatibilityBridge.dispatchScreenKeyPressed(client.currentScreen, keyCode, 0, 0);
                 }
                 KeyBinding.onKeyPressed(inputKey);
             });

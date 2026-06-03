@@ -93,6 +93,7 @@ public class ExecutionManager {
         final Map<String, RuntimeVariable> runtimeVariables;
         final Map<String, RuntimeList> runtimeLists;
         final Map<Node, Set<Integer>> joinBarrierInputs;
+        final Map<String, List<HandlerTemplate>> functionHandlerTemplates;
         final List<Node> graphNodes;
         final List<NodeConnection> graphConnections;
         final List<Node> functionSourceNodes;
@@ -117,6 +118,7 @@ public class ExecutionManager {
             this.runtimeVariables = new ConcurrentHashMap<>();
             this.runtimeLists = new ConcurrentHashMap<>();
             this.joinBarrierInputs = new ConcurrentHashMap<>();
+            this.functionHandlerTemplates = new ConcurrentHashMap<>();
             this.graphNodes = Collections.synchronizedList(new ArrayList<>(graphNodes == null ? List.of() : graphNodes));
             this.graphConnections = Collections.synchronizedList(new ArrayList<>(graphConnections == null ? List.of() : graphConnections));
             this.functionSourceNodes = Collections.synchronizedList(new ArrayList<>(graphNodes == null ? List.of() : graphNodes));
@@ -1765,6 +1767,26 @@ public class ExecutionManager {
             return List.of();
         }
 
+        if (controller != null) {
+            List<HandlerTemplate> templates = controller.functionHandlerTemplates.computeIfAbsent(
+                eventName,
+                ignored -> buildFunctionHandlerTemplates(eventName, controller)
+            );
+            if (templates.isEmpty()) {
+                return List.of();
+            }
+            List<EventHandlerLaunchData> handlers = new ArrayList<>();
+            for (HandlerTemplate template : templates) {
+                BranchLaunchData launchData = createBranchLaunchData(template.graphSnapshot, template.rootNodeId);
+                if (launchData == null) {
+                    LOGGER.debug("Skipping function handler clone for {}", eventName);
+                    continue;
+                }
+                handlers.add(new EventHandlerLaunchData(launchData));
+            }
+            return handlers;
+        }
+
         List<Node> sourceNodes = controller != null && controller.functionSourceNodes != null && !controller.functionSourceNodes.isEmpty()
             ? snapshotList(controller.functionSourceNodes)
             : (workspaceNodes != null && !workspaceNodes.isEmpty() ? workspaceNodes : activeNodes);
@@ -1799,6 +1821,39 @@ public class ExecutionManager {
         }
 
         return handlers;
+    }
+
+    private List<HandlerTemplate> buildFunctionHandlerTemplates(String eventName, ChainController controller) {
+        List<Node> sourceNodes = controller != null && controller.functionSourceNodes != null && !controller.functionSourceNodes.isEmpty()
+            ? snapshotList(controller.functionSourceNodes)
+            : (workspaceNodes != null && !workspaceNodes.isEmpty() ? workspaceNodes : activeNodes);
+        List<NodeConnection> sourceConnections = controller != null && controller.functionSourceConnections != null && !controller.functionSourceConnections.isEmpty()
+            ? snapshotList(controller.functionSourceConnections)
+            : (workspaceConnections != null && !workspaceConnections.isEmpty() ? workspaceConnections : activeConnections);
+        if (sourceNodes == null || sourceNodes.isEmpty() || sourceConnections == null) {
+            return List.of();
+        }
+
+        List<NodeConnection> filteredConnections = filterConnections(sourceConnections);
+        List<HandlerTemplate> templates = new ArrayList<>();
+        for (Node candidate : sourceNodes) {
+            if (candidate == null || candidate.getType() != NodeType.EVENT_FUNCTION) {
+                continue;
+            }
+
+            NodeParameter candidateParam = candidate.getParameter("Name");
+            String candidateName = normalizeEventName(candidateParam != null ? candidateParam.getStringValue() : null);
+            if (!candidateName.equals(eventName)) {
+                continue;
+            }
+
+            BranchData handlerBranch = buildBranchData(candidate, sourceNodes, filteredConnections);
+            if (handlerBranch == null || handlerBranch.nodes.isEmpty()) {
+                continue;
+            }
+            templates.add(new HandlerTemplate(createGraphSnapshot(handlerBranch.nodes, handlerBranch.connections), candidate.getId()));
+        }
+        return templates;
     }
 
     private List<Node> resolveFunctionInvocationHandlers(String eventName) {
@@ -2626,6 +2681,33 @@ public class ExecutionManager {
         return new BranchLaunchData(isolatedBranchData, isolatedRootNode);
     }
 
+    private BranchLaunchData createBranchLaunchData(NodeGraphData graphSnapshot, String rootNodeId) {
+        if (graphSnapshot == null || rootNodeId == null || rootNodeId.isEmpty()) {
+            return null;
+        }
+
+        List<Node> clonedNodes = NodeGraphPersistence.convertToNodes(graphSnapshot);
+        if (clonedNodes == null || clonedNodes.isEmpty()) {
+            return null;
+        }
+
+        Map<String, Node> nodeMap = new HashMap<>();
+        for (Node node : clonedNodes) {
+            if (node != null && node.getId() != null) {
+                nodeMap.put(node.getId(), node);
+            }
+        }
+
+        List<NodeConnection> clonedConnections = NodeGraphPersistence.convertToConnections(graphSnapshot, nodeMap);
+        Node isolatedRootNode = findNodeById(clonedNodes, rootNodeId);
+        if (isolatedRootNode == null) {
+            return null;
+        }
+
+        assignRuntimeNodeIds(clonedNodes);
+        return new BranchLaunchData(new BranchData(clonedNodes, clonedConnections), isolatedRootNode);
+    }
+
     private BranchData cloneBranchData(BranchData branchData) {
         if (branchData == null || branchData.nodes == null || branchData.connections == null) {
             return null;
@@ -2700,6 +2782,16 @@ public class ExecutionManager {
             this.branchNodes = launchData.branchData.nodes;
             this.branchConnections = launchData.branchData.connections;
             this.rootNode = launchData.rootNode;
+        }
+    }
+
+    private static final class HandlerTemplate {
+        final NodeGraphData graphSnapshot;
+        final String rootNodeId;
+
+        HandlerTemplate(NodeGraphData graphSnapshot, String rootNodeId) {
+            this.graphSnapshot = graphSnapshot;
+            this.rootNodeId = rootNodeId;
         }
     }
 

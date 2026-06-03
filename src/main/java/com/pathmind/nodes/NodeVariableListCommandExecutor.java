@@ -820,6 +820,13 @@ final class NodeVariableListCommandExecutor {
         if (source == null) {
             return Collections.emptyMap();
         }
+        if (source.getType() == NodeType.LIST_ITEM) {
+            Node resolved = owner.resolveListItemValueNode(source, null, false, null);
+            if (resolved == null || resolved == source) {
+                return Collections.emptyMap();
+            }
+            return exportResolvedParameterValues(resolved);
+        }
         Map<String, String> values = source.exportParameterValues();
         if (values == null || values.isEmpty()) {
             return values;

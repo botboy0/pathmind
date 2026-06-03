@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -548,6 +549,57 @@ class ExecutionManagerValidationTest {
         assertEquals("10", stored.getValues().get("X"));
         assertEquals("64", stored.getValues().get("Y"));
         assertEquals("-3", stored.getValues().get("Z"));
+    }
+
+    @Test
+    void setVariableStoresResolvedListItemValueInsteadOfListSelectorMetadata() throws Exception {
+        Node start = new Node(NodeType.START, 0, 0);
+        Node setVariable = new Node(NodeType.SET_VARIABLE, 100, 0);
+        setVariable.setOwningStartNode(start);
+
+        Class<?> controllerClass = Arrays.stream(ExecutionManager.class.getDeclaredClasses())
+            .filter(candidate -> "ChainController".equals(candidate.getSimpleName()))
+            .findFirst()
+            .orElseThrow();
+        Constructor<?> constructor = controllerClass.getDeclaredConstructor(Node.class, int.class);
+        constructor.setAccessible(true);
+        Object controller = constructor.newInstance(start, 1);
+
+        Field activeChainsField = ExecutionManager.class.getDeclaredField("activeChains");
+        activeChainsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Node, Object> activeChains = (Map<Node, Object>) activeChainsField.get(manager);
+        activeChains.put(start, controller);
+
+        Node variable = new Node(NodeType.VARIABLE, 0, 0);
+        variable.getParameter("Variable").setStringValue("stored_item");
+
+        Node listItem = new Node(NodeType.LIST_ITEM, 0, 0);
+        listItem.getParameter("List").setStringValue("source_list");
+        listItem.getParameter("Index").setStringValue("1");
+
+        assertTrue(setVariable.attachParameter(variable, 0));
+        assertTrue(setVariable.attachParameter(listItem, 1));
+
+        manager.setRuntimeList(start, "source_list", new ExecutionManager.RuntimeList(
+            NodeType.PARAM_ITEM,
+            List.of("pm_list:{\"Item\":\"minecraft:stone\",\"item\":\"minecraft:stone\"}")
+        ));
+
+        Method executeSetVariable = Node.class.getDeclaredMethod("executeSetVariableCommand", CompletableFuture.class);
+        executeSetVariable.setAccessible(true);
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        executeSetVariable.invoke(setVariable, future);
+        future.get(1, TimeUnit.SECONDS);
+
+        ExecutionManager.RuntimeVariable stored = manager.getRuntimeVariable(start, "stored_item");
+        assertNotNull(stored);
+        assertEquals(NodeType.PARAM_ITEM, stored.getType());
+        assertEquals("minecraft:stone", stored.getValues().get("Item"));
+        assertEquals("minecraft:stone", stored.getValues().get("item"));
+        assertFalse(stored.getValues().containsKey("List"));
+        assertFalse(stored.getValues().containsKey("Index"));
     }
 
     @Test

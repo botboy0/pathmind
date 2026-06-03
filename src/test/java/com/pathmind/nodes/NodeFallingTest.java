@@ -28,7 +28,7 @@ class NodeFallingTest {
     }
 
     @Test
-    void fallingStateReturnsFalseWhenNotMovingDownward() {
+    void fallingStateReturnsFalseWhenThereIsNoDescentEvidence() {
         assertFalse(Node.isFallingState(
             false,
             false,
@@ -36,9 +36,28 @@ class NodeFallingTest {
             false,
             false,
             0.0,
-            4.0,
+            0.0,
             70.0,
-            66.0,
+            70.0,
+            0.0,
+            2.0,
+            NOW,
+            Long.MIN_VALUE
+        ));
+    }
+
+    @Test
+    void fallingStateReturnsTrueWhenAccumulatedDropMeetsThresholdWithoutInstantaneousVelocity() {
+        assertTrue(Node.isFallingState(
+            false,
+            false,
+            false,
+            false,
+            false,
+            0.0,
+            0.0,
+            70.0,
+            67.5,
             1.2,
             2.0,
             NOW,
