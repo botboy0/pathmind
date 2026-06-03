@@ -282,9 +282,11 @@ public class NodeGraphPersistence {
                     node.setBooleanToggleValue(true);
                 }
             }
-            if (node.getType() == NodeType.MESSAGE && nodeData.getMessageLines() != null) {
+            if (node.hasMessageInputFields() && nodeData.getMessageLines() != null) {
                 node.setMessageLines(LegacyVariableSyntaxCompat.normalizeLegacyVariableSyntax(nodeData.getMessageLines()));
-                node.setMessageClientSide(Boolean.TRUE.equals(nodeData.getMessageClientSide()));
+                if (node.hasMessageScopeToggle()) {
+                    node.setMessageClientSide(Boolean.TRUE.equals(nodeData.getMessageClientSide()));
+                }
             }
             if (node.hasBookTextInput() && nodeData.getBookText() != null) {
                 node.setBookText(LegacyVariableSyntaxCompat.normalizeLegacyVariableSyntax(nodeData.getBookText()));
@@ -856,7 +858,7 @@ public class NodeGraphPersistence {
             nodeData.setStartNodeNumber(node.getStartNodeNumber());
             if (node.hasMessageInputFields()) {
                 nodeData.setMessageLines(new ArrayList<>(node.getMessageLines()));
-                nodeData.setMessageClientSide(node.isMessageClientSide());
+                nodeData.setMessageClientSide(node.hasMessageScopeToggle() ? node.isMessageClientSide() : null);
             } else {
                 nodeData.setMessageLines(null);
                 nodeData.setMessageClientSide(null);

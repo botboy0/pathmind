@@ -6,6 +6,7 @@ import com.pathmind.execution.ExecutionManager;
 import com.pathmind.execution.PathmindNavigator;
 import com.pathmind.marketplace.MarketplaceAuthManager;
 import com.pathmind.nodes.Node;
+import com.pathmind.nodes.NodeType;
 import com.pathmind.screen.PathmindMainMenuIntegration;
 import com.pathmind.screen.PathmindScreens;
 import com.pathmind.ui.overlay.ActiveNodeOverlay;
@@ -59,8 +60,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -214,7 +217,13 @@ public class PathmindClientMod implements ClientModInitializer {
                 return;
             }
             long timestamp = receptionTimestamp != null ? receptionTimestamp.toEpochMilli() : System.currentTimeMillis();
-            ChatMessageTracker.record(com.pathmind.util.GameProfileCompatibilityBridge.getName(sender), message.getString(), timestamp);
+            String senderName = com.pathmind.util.GameProfileCompatibilityBridge.getName(sender);
+            String rawMessage = message.getString();
+            ChatMessageTracker.record(senderName, rawMessage, timestamp);
+            ExecutionManager.getInstance().triggerEventFunction(
+                ExecutionManager.CHAT_MESSAGE_EVENT_NAME,
+                createChatRuntimeVariables(senderName, rawMessage)
+            );
             fireFabricEvent(EVT_MESSAGE_RECEIVE_CHAT);
         });
         
@@ -382,6 +391,27 @@ public class PathmindClientMod implements ClientModInitializer {
             return;
         }
         FabricEventTracker.record(eventName);
+    }
+
+    private Map<String, ExecutionManager.RuntimeVariable> createChatRuntimeVariables(String senderName, String rawMessage) {
+        Map<String, ExecutionManager.RuntimeVariable> variables = new LinkedHashMap<>();
+        variables.put(
+            ExecutionManager.CHAT_SENDER_VARIABLE_NAME,
+            createRuntimeVariable(NodeType.PARAM_PLAYER, "Player", senderName)
+        );
+        variables.put(
+            ExecutionManager.CHAT_MESSAGE_VARIABLE_NAME,
+            createRuntimeVariable(NodeType.PARAM_MESSAGE, "Text", rawMessage)
+        );
+        return variables;
+    }
+
+    private ExecutionManager.RuntimeVariable createRuntimeVariable(NodeType type, String key, String value) {
+        Map<String, String> values = new LinkedHashMap<>();
+        String safeValue = value == null ? "" : value;
+        values.put(key, safeValue);
+        values.put(key.toLowerCase(Locale.ROOT), safeValue);
+        return new ExecutionManager.RuntimeVariable(type, values);
     }
 
     private void handleClientShutdown(String reason) {

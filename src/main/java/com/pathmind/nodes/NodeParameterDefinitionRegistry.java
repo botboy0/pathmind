@@ -207,9 +207,6 @@ final class NodeParameterDefinitionRegistry {
             of("random_use_rounding", "UseRounding", ParameterType.BOOLEAN, "false"));
         registerTypes(List.of(NodeType.OPERATOR_GREATER, NodeType.OPERATOR_LESS),
             of("Inclusive", ParameterType.BOOLEAN, "false"));
-        registerType(NodeType.CHANGE_VARIABLE,
-            of("change_variable_amount", "Amount", ParameterType.INTEGER, "1"),
-            of("change_variable_operation", "Operation", ParameterType.STRING, "+"));
         registerTypes(
             List.of(NodeType.SENSOR_TOUCHING_BLOCK, NodeType.SENSOR_TOUCHING_ENTITY, NodeType.SENSOR_AT_COORDINATES,
                 NodeType.SENSOR_IS_DAYTIME, NodeType.SENSOR_IS_RAINING, NodeType.SENSOR_ITEM_IN_INVENTORY,

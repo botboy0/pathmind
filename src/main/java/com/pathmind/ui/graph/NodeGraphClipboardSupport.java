@@ -115,9 +115,11 @@ final class NodeGraphClipboardSupport {
                 }
             }
             newNode.ensureVillagerTradeNumberParameter();
-            if (nodeData.getType() == NodeType.MESSAGE && nodeData.getMessageLines() != null) {
+            if (newNode.hasMessageInputFields() && nodeData.getMessageLines() != null) {
                 newNode.setMessageLines(nodeData.getMessageLines());
-                newNode.setMessageClientSide(Boolean.TRUE.equals(nodeData.getMessageClientSide()));
+                if (newNode.hasMessageScopeToggle()) {
+                    newNode.setMessageClientSide(Boolean.TRUE.equals(nodeData.getMessageClientSide()));
+                }
             }
             if (newNode.hasBookTextInput() && nodeData.getBookText() != null) {
                 newNode.setBookText(nodeData.getBookText());

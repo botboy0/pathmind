@@ -158,6 +158,23 @@ class NodeGraphPersistenceTest {
     }
 
     @Test
+    void saveAndLoadRoundTripPreservesMathNodeExpressions() {
+        Node math = new Node(NodeType.CHANGE_VARIABLE, 32, 48);
+        math.setMessageLines(List.of("1 + 2", "$count * 4", "7 / 2"));
+
+        Path savePath = tempDir.resolve("math-graph.json");
+        assertTrue(NodeGraphPersistence.saveNodeGraphToPath(List.of(math), List.of(), savePath));
+
+        NodeGraphData loaded = NodeGraphPersistence.loadNodeGraphFromPath(savePath);
+        assertNotNull(loaded);
+
+        List<Node> restoredNodes = NodeGraphPersistence.convertToNodes(loaded);
+        assertEquals(1, restoredNodes.size());
+        assertEquals(NodeType.CHANGE_VARIABLE, restoredNodes.getFirst().getType());
+        assertEquals(List.of("1 + 2", "$count * 4", "7 / 2"), restoredNodes.getFirst().getMessageLines());
+    }
+
+    @Test
     void convertToConnectionsKeepsOnlyOneIncomingConnectionPerInputSocket() {
         NodeGraphData data = new NodeGraphData(
             List.of(

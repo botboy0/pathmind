@@ -240,7 +240,7 @@ final class NodeDimensionCalculator {
             }
         } else if (hasSlots) {
             contentHeight += Node.SLOT_AREA_PADDING_TOP;
-        } else if (type == NodeType.MESSAGE) {
+        } else if (node.hasMessageInputFields()) {
             contentHeight += node.getMessageFieldDisplayHeight();
         } else if (node.hasBookTextInput()) {
             contentHeight += node.getBookTextDisplayHeight();

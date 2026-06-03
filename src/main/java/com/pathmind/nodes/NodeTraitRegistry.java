@@ -113,6 +113,7 @@ public final class NodeTraitRegistry {
 
         traits.put(NodeType.OPERATOR_RANDOM, EnumSet.of(NodeValueTrait.NUMBER));
         traits.put(NodeType.OPERATOR_MOD, EnumSet.of(NodeValueTrait.NUMBER));
+        traits.put(NodeType.CHANGE_VARIABLE, EnumSet.of(NodeValueTrait.NUMBER));
         traits.put(NodeType.OPERATOR_BOOLEAN_OR, EnumSet.of(NodeValueTrait.BOOLEAN));
         traits.put(NodeType.OPERATOR_BOOLEAN_AND, EnumSet.of(NodeValueTrait.BOOLEAN));
         traits.put(NodeType.OPERATOR_BOOLEAN_XOR, EnumSet.of(NodeValueTrait.BOOLEAN));
@@ -333,7 +334,6 @@ public final class NodeTraitRegistry {
         accepted.put(NodeType.EQUIP_HAND, EnumSet.of(NodeValueTrait.INVENTORY_SLOT));
 
         accepted.put(NodeType.SET_VARIABLE, EnumSet.of(NodeValueTrait.VARIABLE, NodeValueTrait.ANY));
-        accepted.put(NodeType.CHANGE_VARIABLE, EnumSet.of(NodeValueTrait.VARIABLE));
         accepted.put(NodeType.ADD_TO_LIST, EnumSet.of(NodeValueTrait.ANY));
         accepted.put(NodeType.REMOVE_FROM_LIST, EnumSet.of(NodeValueTrait.ANY));
         accepted.put(NodeType.CREATE_LIST, EnumSet.of(NodeValueTrait.ANY));
@@ -344,7 +344,6 @@ public final class NodeTraitRegistry {
 
         EnumMap<NodeType, Integer> slotCounts = new EnumMap<>(NodeType.class);
         slotCounts.put(NodeType.SET_VARIABLE, 2);
-        slotCounts.put(NodeType.CHANGE_VARIABLE, 1);
         slotCounts.put(NodeType.ADD_TO_LIST, 1);
         slotCounts.put(NodeType.REMOVE_FROM_LIST, 1);
         slotCounts.put(NodeType.OPERATOR_MOD, 2);
@@ -371,7 +370,6 @@ public final class NodeTraitRegistry {
 
         EnumMap<NodeType, String[]> slotLabels = new EnumMap<>(NodeType.class);
         slotLabels.put(NodeType.SET_VARIABLE, new String[]{"Variable", "Value"});
-        slotLabels.put(NodeType.CHANGE_VARIABLE, new String[]{"Variable"});
         slotLabels.put(NodeType.OPERATOR_BOOLEAN_NOT, new String[]{"Value"});
         slotLabels.put(NodeType.OPERATOR_BOOLEAN_OR, new String[]{"Left", "Right"});
         slotLabels.put(NodeType.OPERATOR_BOOLEAN_AND, new String[]{"Left", "Right"});
@@ -498,9 +496,6 @@ public final class NodeTraitRegistry {
         if (hostType == NodeType.SET_VARIABLE && slotIndex == 0) {
             return EnumSet.of(NodeValueTrait.VARIABLE);
         }
-        if (hostType == NodeType.CHANGE_VARIABLE && slotIndex == 0) {
-            return EnumSet.of(NodeValueTrait.VARIABLE);
-        }
         return EnumSet.copyOf(traits);
     }
 
@@ -541,9 +536,6 @@ public final class NodeTraitRegistry {
         }
         if (hostType == NodeType.SET_VARIABLE) {
             return slotIndex == 0 || slotIndex == 1;
-        }
-        if (hostType == NodeType.CHANGE_VARIABLE) {
-            return slotIndex == 0;
         }
         if (hostType == NodeType.OPERATOR_MOD) {
             return slotIndex == 0 || slotIndex == 1;

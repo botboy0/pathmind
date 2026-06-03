@@ -356,8 +356,8 @@ public class Node {
         this.runtimeState = new NodeRuntimeState();
         this.parameters = new ArrayList<>();
         this.messageLines = new ArrayList<>();
-        if (type == NodeType.MESSAGE) {
-            this.messageLines.add("Hello World");
+        if (type == NodeType.MESSAGE || type == NodeType.CHANGE_VARIABLE) {
+            this.messageLines.add(getDefaultMessageLineValue());
         }
         this.messageClientSide = false;
         this.bookText = "";
@@ -404,8 +404,6 @@ public class Node {
     private static final String PARAM_ID_CREATE_LIST_MAX_BLOCKS = "create_list_max_blocks";
     private static final String PARAM_ID_RANDOM_ROUNDING = "random_rounding_mode";
     private static final String PARAM_ID_RANDOM_USE_ROUNDING = "random_use_rounding";
-    private static final String PARAM_ID_CHANGE_VARIABLE_AMOUNT = "change_variable_amount";
-    private static final String PARAM_ID_CHANGE_VARIABLE_OPERATION = "change_variable_operation";
     private static final String PARAM_ID_TRADE_NUMBER = "trade_number";
     private static final String PARAM_ID_TRADE_COUNT = "trade_count";
     private static final String PARAM_ID_DIRECTION_MODE = "direction_mode";
@@ -1305,6 +1303,7 @@ public class Node {
             case SENSOR_LOOK_DIRECTION -> isSensorLookSingleAxisMode() ? NodeType.PARAM_AMOUNT : NodeType.PARAM_ROTATION;
             case SENSOR_CURRENT_HAND -> NodeType.PARAM_INVENTORY_SLOT;
             case SENSOR_SLOT_ITEM_COUNT, LIST_LENGTH -> NodeType.PARAM_AMOUNT;
+            case CHANGE_VARIABLE -> NodeType.PARAM_AMOUNT;
             default -> type;
         };
     }
@@ -1383,7 +1382,6 @@ public class Node {
             || type == NodeType.SENSOR_CHAT_MESSAGE
             || type == NodeType.SENSOR_VILLAGER_TRADE
             || type == NodeType.SENSOR_IN_STOCK
-            || type == NodeType.CHANGE_VARIABLE
             || type == NodeType.WAIT
             || type == NodeType.PARAM_DURATION
             || type == NodeType.USE
@@ -1507,16 +1505,10 @@ public class Node {
         if (hasAmountToggle()) {
             width = Math.max(40, width - (AMOUNT_TOGGLE_WIDTH + AMOUNT_TOGGLE_SPACING));
         }
-        if (hasAmountSignToggle()) {
-            width = Math.max(40, width - (AMOUNT_SIGN_TOGGLE_WIDTH + AMOUNT_TOGGLE_SPACING));
-        }
         return Math.max(width, layoutState.getAmountFieldWidthOverride());
     }
 
     public int getAmountFieldLeft() {
-        if (hasAmountSignToggle()) {
-            return getParameterSlotLeft() + AMOUNT_SIGN_TOGGLE_WIDTH + AMOUNT_TOGGLE_SPACING;
-        }
         return getParameterSlotLeft();
     }
 
@@ -1531,7 +1523,7 @@ public class Node {
     }
 
     public boolean hasAmountSignToggle() {
-        return type == NodeType.CHANGE_VARIABLE;
+        return false;
     }
 
     public boolean isAmountInputEnabled() {
@@ -1685,35 +1677,6 @@ public class Node {
             parameters.add(createParameter(PARAM_ID_RANDOM_ROUNDING, "Rounding", ParameterType.STRING, normalized));
         } else {
             modeParam.setStringValueFromUser(normalized);
-        }
-    }
-
-    public String getAmountOperation() {
-        NodeParameter param = getParameter("Operation");
-        String value = param != null ? param.getStringValue() : null;
-        if (value == null || value.trim().isEmpty()) {
-            NodeParameter legacy = getParameter("Increase");
-            if (legacy != null) {
-                String op = legacy.getBoolValue() ? "+" : "-";
-                if (param == null) {
-                    parameters.add(createParameter(PARAM_ID_CHANGE_VARIABLE_OPERATION, "Operation", ParameterType.STRING, op));
-                } else {
-                    param.setStringValue(op);
-                }
-                return op;
-            }
-            return "+";
-        }
-        return normalizeOperation(value);
-    }
-
-    public void setAmountOperation(String operation) {
-        String normalized = normalizeOperation(operation);
-        NodeParameter param = getParameter("Operation");
-        if (param == null) {
-            parameters.add(createParameter(PARAM_ID_CHANGE_VARIABLE_OPERATION, "Operation", ParameterType.STRING, normalized));
-        } else {
-            param.setStringValueFromUser(normalized);
         }
     }
 
@@ -2982,7 +2945,7 @@ public class Node {
     }
 
     public boolean hasMessageInputFields() {
-        return type == NodeType.MESSAGE;
+        return type == NodeType.MESSAGE || type == NodeType.CHANGE_VARIABLE;
     }
 
     public String getStickyNoteText() {
@@ -3110,7 +3073,7 @@ public class Node {
             return;
         }
         while (index >= messageLines.size()) {
-            messageLines.add("Hello World");
+            messageLines.add(getDefaultMessageLineValue());
         }
         messageLines.set(index, value == null ? "" : value);
     }
@@ -3123,7 +3086,7 @@ public class Node {
             }
         }
         if (messageLines.isEmpty()) {
-            messageLines.add("Hello World");
+            messageLines.add(getDefaultMessageLineValue());
         }
         layoutState.clearMessageFieldContentWidthOverride();
         recalculateDimensions();
@@ -3155,6 +3118,10 @@ public class Node {
         return type == NodeType.MESSAGE && messageClientSide;
     }
 
+    public boolean hasMessageScopeToggle() {
+        return type == NodeType.MESSAGE;
+    }
+
     public void setMessageClientSide(boolean messageClientSide) {
         if (type != NodeType.MESSAGE) {
             return;
@@ -3167,6 +3134,31 @@ public class Node {
             return;
         }
         messageClientSide = !messageClientSide;
+    }
+
+    public String getAmountOperation() {
+        NodeParameter operation = getParameter("Operation");
+        String value = operation == null ? "" : operation.getStringValue();
+        return value == null || value.isBlank() ? "+" : value;
+    }
+
+    public void setAmountOperation(String operation) {
+        NodeParameter parameter = getParameter("Operation");
+        if (parameter == null) {
+            return;
+        }
+        parameter.setStringValue(operation == null || operation.isBlank() ? "+" : operation);
+    }
+
+    public String getMessageFieldLabelText(int index) {
+        if (type == NodeType.CHANGE_VARIABLE) {
+            return getMessageFieldCount() > 1 ? "Expr " + (index + 1) : "Expression";
+        }
+        return getMessageFieldCount() > 1 ? "Message " + (index + 1) : "Message";
+    }
+
+    private String getDefaultMessageLineValue() {
+        return type == NodeType.CHANGE_VARIABLE ? "0" : "Hello World";
     }
 
     public int getMessageFieldDisplayHeight() {
@@ -3271,7 +3263,7 @@ public class Node {
     }
 
     public int getMessageScopeToggleDisplayHeight() {
-        if (!hasMessageInputFields()) {
+        if (!hasMessageScopeToggle()) {
             return 0;
         }
         return MESSAGE_SCOPE_TOP_MARGIN + MESSAGE_SCOPE_LABEL_HEIGHT + MESSAGE_SCOPE_TOGGLE_HEIGHT + MESSAGE_SCOPE_BOTTOM_MARGIN;

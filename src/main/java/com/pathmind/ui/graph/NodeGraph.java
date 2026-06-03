@@ -4396,7 +4396,9 @@ public class NodeGraph {
                 }
                 if (node.hasMessageInputFields()) {
                     renderMessageInputFields(context, textRenderer, node, isOverSidebar, mouseX, mouseY);
-                    renderMessageScopeToggle(context, textRenderer, node, isOverSidebar, mouseX, mouseY);
+                    if (node.hasMessageScopeToggle()) {
+                        renderMessageScopeToggle(context, textRenderer, node, isOverSidebar, mouseX, mouseY);
+                    }
                     renderMessageButtons(context, textRenderer, node, isOverSidebar, mouseX, mouseY);
                 }
                 if (node.hasBookTextInput()) {
@@ -5290,7 +5292,7 @@ public class NodeGraph {
     }
 
     private boolean isPointInsideMessageScopeToggle(Node node, int mouseX, int mouseY) {
-        if (node == null || !node.hasMessageInputFields()) {
+        if (node == null || !node.hasMessageScopeToggle()) {
             return false;
         }
         int worldMouseX = screenToWorldX(mouseX);
@@ -5304,6 +5306,9 @@ public class NodeGraph {
     }
 
     public boolean handleMessageScopeToggleClick(Node node, int mouseX, int mouseY) {
+        if (node == null || !node.hasMessageScopeToggle()) {
+            return false;
+        }
         if (!isPointInsideMessageScopeToggle(node, mouseX, mouseY)) {
             return false;
         }
@@ -6127,7 +6132,7 @@ public class NodeGraph {
 
             boolean editingThis = editing && messageEditingIndex == i;
             int labelY = labelTop + Math.max(0, (labelHeight - textRenderer.fontHeight) / 2);
-            String label = fieldCount > 1 ? "Message " + (i + 1) : "Message";
+            String label = node.getMessageFieldLabelText(i);
             drawNodeText(context, textRenderer, Text.literal(label), fieldLeft + 2, labelY, baseLabelColor);
 
             int fieldBottom = fieldTop + fieldHeight;
@@ -6911,6 +6916,9 @@ public class NodeGraph {
     }
 
     private void renderMessageScopeToggle(DrawContext context, TextRenderer textRenderer, Node node, boolean isOverSidebar, int mouseX, int mouseY) {
+        if (!node.hasMessageScopeToggle()) {
+            return;
+        }
         int labelColor = isOverSidebar ? UITheme.NODE_LABEL_DIMMED : UITheme.NODE_LABEL_COLOR;
         int fieldBackground = isOverSidebar ? UITheme.BACKGROUND_SECONDARY : UITheme.BACKGROUND_SIDEBAR;
         int borderColor = isOverSidebar ? UITheme.BORDER_SUBTLE : UITheme.BORDER_DEFAULT;
@@ -15309,11 +15317,13 @@ public class NodeGraph {
                     control.attachActionNode(child);
                 }
             }
-            if (nodeData.getType() == NodeType.MESSAGE && nodeData.getMessageLines() != null) {
+            if (nodeData.getMessageLines() != null) {
                 Node messageNode = nodeMap.get(nodeData.getId());
-                if (messageNode != null) {
+                if (messageNode != null && messageNode.hasMessageInputFields()) {
                     messageNode.setMessageLines(nodeData.getMessageLines());
-                    messageNode.setMessageClientSide(Boolean.TRUE.equals(nodeData.getMessageClientSide()));
+                    if (messageNode.hasMessageScopeToggle()) {
+                        messageNode.setMessageClientSide(Boolean.TRUE.equals(nodeData.getMessageClientSide()));
+                    }
                 }
             }
             Node textNode = nodeMap.get(nodeData.getId());

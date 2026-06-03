@@ -48,6 +48,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ExecutionManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ExecutionManager.class);
     private static final Executor CHAIN_COMPLETION_BOUNDARY_EXECUTOR = ForkJoinPool.commonPool();
+    public static final String CHAT_MESSAGE_EVENT_NAME = "chat_message";
+    public static final String CHAT_SENDER_VARIABLE_NAME = "chat_sender";
+    public static final String CHAT_MESSAGE_VARIABLE_NAME = "chat_message";
     private static volatile ExecutionManager instance;
     private Node activeNode;
     private boolean isExecuting;
@@ -380,6 +383,66 @@ public class ExecutionManager {
             }
         }
         return globalRuntimeVariables.get(name.trim());
+    }
+
+    public boolean triggerEventFunction(String eventName, Map<String, RuntimeVariable> runtimeVariables) {
+        String normalizedEventName = normalizeEventName(eventName);
+        if (normalizedEventName.isEmpty()) {
+            return false;
+        }
+
+        List<EventHandlerLaunchData> handlers = resolveFunctionInvocationHandlers(normalizedEventName, null);
+        if (handlers.isEmpty()) {
+            return false;
+        }
+
+        boolean startFresh = activeChains.isEmpty();
+        if (startFresh) {
+            this.activeNodes = new ArrayList<>();
+            this.activeConnections = new ArrayList<>();
+        }
+
+        this.cancelRequested = false;
+        List<Node> rootNodes = new ArrayList<>();
+        for (EventHandlerLaunchData handler : handlers) {
+            if (handler == null || handler.rootNode == null) {
+                continue;
+            }
+            mergeActiveGraph(handler.branchNodes, handler.branchConnections);
+            rootNodes.add(handler.rootNode);
+        }
+
+        if (rootNodes.isEmpty()) {
+            return false;
+        }
+
+        rebuildConnectionState(this.activeNodes, this.activeConnections);
+        if (startFresh) {
+            startExecution(rootNodes, false);
+        } else {
+            this.isExecuting = true;
+        }
+
+        for (EventHandlerLaunchData handler : handlers) {
+            if (handler == null || handler.rootNode == null) {
+                continue;
+            }
+
+            int executionId = allocateExecutionId();
+            ChainController controller = new ChainController(handler.rootNode, executionId,
+                handler.branchNodes, handler.branchConnections);
+            activeChains.put(handler.rootNode, controller);
+            seedRuntimeVariables(handler.rootNode, runtimeVariables);
+            setEventFunctionActive(handler.rootNode, true);
+
+            CompletableFuture<Void> chainFuture = runChain(handler.rootNode, controller, controller.rootExecutionId);
+            chainFuture.whenComplete((ignored, throwable) -> {
+                setEventFunctionActive(handler.rootNode, false);
+                handleChainCompletion(controller, throwable, controller.rootExecutionId);
+            });
+        }
+
+        return true;
     }
 
     public boolean setRuntimeList(Node startNode, String name, RuntimeList list) {
@@ -1383,6 +1446,18 @@ public class ExecutionManager {
             }
         }
         return null;
+    }
+
+    private void seedRuntimeVariables(Node startNode, Map<String, RuntimeVariable> runtimeVariables) {
+        if (startNode == null || runtimeVariables == null || runtimeVariables.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, RuntimeVariable> entry : runtimeVariables.entrySet()) {
+            if (entry == null || entry.getKey() == null || entry.getValue() == null) {
+                continue;
+            }
+            setRuntimeVariable(startNode, entry.getKey(), entry.getValue());
+        }
     }
 
     private boolean storeRuntimeList(ChainController controller, String name, RuntimeList list, boolean preferExistingScope) {
