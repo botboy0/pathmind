@@ -90,6 +90,8 @@ public class NodeGraph {
     private static final int STICKY_NOTE_MAX_CHARS = 4096;
     private static final int DENSE_VIEW_VISIBLE_NODE_THRESHOLD = 120;
     private static final int COMPACT_VIEW_VISIBLE_NODE_THRESHOLD = 40;
+    private static final int PROFILER_OVERLAY_MARGIN = 10;
+    private static final int PROFILER_OVERLAY_PADDING = 6;
 
     private final List<Node> nodes;
     private final List<NodeConnection> connections;
@@ -118,6 +120,20 @@ public class NodeGraph {
     private int cameraX = 0;
     private int cameraY = 0;
     private boolean isPanning = false;
+    private double profilerRenderMs = 0.0;
+    private double profilerNodeMs = 0.0;
+    private double profilerConnectionMs = 0.0;
+    private double profilerDropdownMs = 0.0;
+    private double profilerHoverMs = 0.0;
+    private double profilerHitTestAvgMs = 0.0;
+    private double profilerHitTestAvgRoots = 0.0;
+    private int profilerVisibleNodes = 0;
+    private int profilerDrawnNodes = 0;
+    private int profilerVisibleRoots = 0;
+    private int profilerDrawnConnections = 0;
+    private long profilerHitTestTotalNanos = 0L;
+    private long profilerHitTestCallCount = 0L;
+    private long profilerHitTestTotalRoots = 0L;
     private int panStartX, panStartY;
     private int panStartCameraX, panStartCameraY;
     
@@ -865,15 +881,24 @@ public class NodeGraph {
     }
 
     private Node getNodeAtWorld(int worldX, int worldY) {
+        long startNanos = System.nanoTime();
         List<Node> visibleRoots = getVisibleRootsForViewport();
+        int rootCount = visibleRoots.size();
+        Node hit = null;
         for (int i = visibleRoots.size() - 1; i >= 0; i--) {
             Node root = visibleRoots.get(i);
-            Node hit = findNodeInHierarchyAt(root, worldX, worldY);
+            hit = findNodeInHierarchyAt(root, worldX, worldY);
             if (hit != null) {
-                return hit;
+                break;
             }
         }
-        return null;
+        long duration = System.nanoTime() - startNanos;
+        profilerHitTestTotalNanos += duration;
+        profilerHitTestCallCount++;
+        profilerHitTestTotalRoots += rootCount;
+        profilerHitTestAvgMs = (profilerHitTestTotalNanos / (double) profilerHitTestCallCount) / 1_000_000.0;
+        profilerHitTestAvgRoots = profilerHitTestTotalRoots / (double) profilerHitTestCallCount;
+        return hit;
     }
 
     private Node findNodeInHierarchyAt(Node node, int worldX, int worldY) {
@@ -2034,6 +2059,7 @@ public class NodeGraph {
     }
     
     public void updateMouseHover(int mouseX, int mouseY) {
+        long startNanos = System.nanoTime();
         List<Node> visibleRoots = getVisibleRootsForViewport();
         // Reset hover state
         hoveredSocketNode = null;
@@ -2052,6 +2078,7 @@ public class NodeGraph {
         
         // Don't check for socket hover if we're currently dragging a connection
         if (isDraggingConnection) {
+            profilerHoverMs = (System.nanoTime() - startNanos) / 1_000_000.0;
             return;
         }
 
@@ -2069,10 +2096,12 @@ public class NodeGraph {
         } else {
             for (int i = visibleRoots.size() - 1; i >= 0; i--) {
                 if (updateHoveredSocketInHierarchy(visibleRoots.get(i), worldMouseX, worldMouseY, false, false)) {
+                    profilerHoverMs = (System.nanoTime() - startNanos) / 1_000_000.0;
                     return;
                 }
             }
         }
+        profilerHoverMs = (System.nanoTime() - startNanos) / 1_000_000.0;
     }
 
     public void stopDragging() {
@@ -3042,6 +3071,7 @@ public class NodeGraph {
     }
 
     public void render(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY, float delta, boolean onlyDragged) {
+        long totalStartNanos = !onlyDragged ? System.nanoTime() : 0L;
         flushDeferredStickyNoteSaveIfDue();
         var matrices = context.getMatrices();
         MatrixStackBridge.push(matrices);
@@ -3057,30 +3087,46 @@ public class NodeGraph {
         List<Node> visibleRoots = getVisibleRootsForViewport();
         visibleNodeCountForFrame = cachedVisibleNodeCount;
         if (!onlyDragged) {
+            profilerVisibleRoots = visibleRoots.size();
+            profilerVisibleNodes = cachedVisibleNodeCount;
+        }
+        if (!onlyDragged) {
             runtimeVariableNamesFrameCache.clear();
         }
         compactViewportMode = isLowDetailModeEnabled();
         denseViewportMode = false;
         boolean renderConnectionsOnTop = shouldRenderConnectionsOnTop();
+        int drawnConnections = 0;
         if (!renderConnectionsOnTop) {
-            renderConnections(context, onlyDragged);
+            drawnConnections += renderConnections(context, onlyDragged, !onlyDragged);
         }
 
         Set<Node> renderedNodes = new HashSet<>();
+        long nodesStartNanos = !onlyDragged ? System.nanoTime() : 0L;
 
         for (Node root : visibleRoots) {
             renderHierarchy(root, context, textRenderer, mouseX, mouseY, delta, onlyDragged, false, renderedNodes);
         }
+        if (!onlyDragged) {
+            profilerNodeMs = (System.nanoTime() - nodesStartNanos) / 1_000_000.0;
+            profilerDrawnNodes = renderedNodes.size();
+        }
 
+        long dropdownStartNanos = !onlyDragged ? System.nanoTime() : 0L;
         if (!onlyDragged) {
             renderParameterDropdownList(context, textRenderer, mouseX, mouseY);
             renderRandomRoundingDropdownList(context, textRenderer, mouseX, mouseY);
             renderModeDropdownList(context, textRenderer, mouseX, mouseY);
             renderAmountSignDropdownList(context, textRenderer, mouseX, mouseY);
+            profilerDropdownMs = (System.nanoTime() - dropdownStartNanos) / 1_000_000.0;
         }
 
         if (renderConnectionsOnTop) {
-            renderConnections(context, onlyDragged);
+            drawnConnections += renderConnections(context, onlyDragged, !onlyDragged);
+        }
+        if (!onlyDragged) {
+            profilerDrawnConnections = drawnConnections;
+            profilerRenderMs = (System.nanoTime() - totalStartNanos) / 1_000_000.0;
         }
 
         MatrixStackBridge.pop(matrices);
@@ -3092,6 +3138,65 @@ public class NodeGraph {
     private boolean shouldRenderConnectionsOnTop() {
         SettingsManager.Settings settings = SettingsManager.getCurrent();
         return settings != null && Boolean.TRUE.equals(settings.renderConnectionsOnTop);
+    }
+
+    public PerformanceSnapshot getPerformanceSnapshot() {
+        return new PerformanceSnapshot(
+            profilerRenderMs,
+            profilerNodeMs,
+            profilerConnectionMs,
+            profilerDropdownMs,
+            profilerHoverMs,
+            profilerHitTestAvgMs,
+            profilerHitTestAvgRoots,
+            profilerVisibleNodes,
+            profilerDrawnNodes,
+            profilerVisibleRoots,
+            profilerDrawnConnections
+        );
+    }
+
+    public void renderProfilerOverlay(DrawContext context, TextRenderer textRenderer) {
+        PerformanceSnapshot snapshot = getPerformanceSnapshot();
+        List<String> lines = List.of(
+            String.format(Locale.ROOT, "render %.2f ms", snapshot.renderMs()),
+            String.format(Locale.ROOT, "nodes %.2f ms (%d visible, %d drawn, %d roots)", snapshot.nodeMs(), snapshot.visibleNodes(), snapshot.drawnNodes(), snapshot.visibleRoots()),
+            String.format(Locale.ROOT, "connections %.2f ms (%d drawn)", snapshot.connectionMs(), snapshot.drawnConnections()),
+            String.format(Locale.ROOT, "dropdowns %.2f ms", snapshot.dropdownMs()),
+            String.format(Locale.ROOT, "hover %.2f ms", snapshot.hoverMs()),
+            String.format(Locale.ROOT, "hit-test %.2f ms (%.1f roots/call)", snapshot.hitTestAvgMs(), snapshot.hitTestAvgRoots())
+        );
+        int maxWidth = 0;
+        for (String line : lines) {
+            maxWidth = Math.max(maxWidth, textRenderer.getWidth(line));
+        }
+        int lineHeight = textRenderer.fontHeight + 2;
+        int overlayWidth = maxWidth + PROFILER_OVERLAY_PADDING * 2;
+        int overlayHeight = lines.size() * lineHeight + PROFILER_OVERLAY_PADDING * 2;
+        int overlayX = PROFILER_OVERLAY_MARGIN;
+        int overlayY = PROFILER_OVERLAY_MARGIN;
+        context.fill(overlayX, overlayY, overlayX + overlayWidth, overlayY + overlayHeight, 0xD0101010);
+        DrawContextBridge.drawBorder(context, overlayX, overlayY, overlayWidth, overlayHeight, 0xFF505050);
+        int textY = overlayY + PROFILER_OVERLAY_PADDING;
+        for (String line : lines) {
+            context.drawTextWithShadow(textRenderer, Text.literal(line), overlayX + PROFILER_OVERLAY_PADDING, textY, 0xFFFFFFFF);
+            textY += lineHeight;
+        }
+    }
+
+    public record PerformanceSnapshot(
+        double renderMs,
+        double nodeMs,
+        double connectionMs,
+        double dropdownMs,
+        double hoverMs,
+        double hitTestAvgMs,
+        double hitTestAvgRoots,
+        int visibleNodes,
+        int drawnNodes,
+        int visibleRoots,
+        int drawnConnections
+    ) {
     }
 
     public void renderScreenCoordinateCaptureOverlay(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY) {
@@ -14047,25 +14152,31 @@ public class NodeGraph {
         return (alpha << 24) | (red << 16) | (green << 8) | blue;
     }
 
-    private void renderConnections(DrawContext context, boolean onlyDragged) {
+    private int renderConnections(DrawContext context, boolean onlyDragged, boolean trackProfiler) {
         ExecutionManager manager = ExecutionManager.getInstance();
         boolean animateConnections = manager.isExecuting() && !denseViewportMode;
         long animationTimestamp = System.currentTimeMillis();
         int viewportWidth = getViewportWorldWidth();
         int viewportHeight = getViewportWorldHeight();
         Set<Node> visibleRoots = new HashSet<>(getVisibleRootsForViewport());
+        long startNanos = trackProfiler ? System.nanoTime() : 0L;
+        int drawnConnections = 0;
 
         if (!onlyDragged) {
             for (NodeConnection connection : connections) {
                 if (!shouldConsiderConnectionForViewport(connection, visibleRoots, viewportWidth, viewportHeight)) {
                     continue;
                 }
-                renderConnection(context, connection, animateConnections, animationTimestamp, viewportWidth, viewportHeight, manager);
+                if (renderConnection(context, connection, animateConnections, animationTimestamp, viewportWidth, viewportHeight, manager)) {
+                    drawnConnections++;
+                }
             }
         } else if (shouldRenderConnectionsOnTop()) {
             for (NodeConnection connection : connections) {
                 if (shouldRenderConnectionInDraggedPass(connection)) {
-                    renderConnection(context, connection, animateConnections, animationTimestamp, viewportWidth, viewportHeight, manager);
+                    if (renderConnection(context, connection, animateConnections, animationTimestamp, viewportWidth, viewportHeight, manager)) {
+                        drawnConnections++;
+                    }
                 }
             }
         }
@@ -14111,6 +14222,10 @@ public class NodeGraph {
         if (!onlyDragged && connectionCutActive) {
             renderConnectionCutPreview(context);
         }
+        if (trackProfiler) {
+            profilerConnectionMs = (System.nanoTime() - startNanos) / 1_000_000.0;
+        }
+        return drawnConnections;
     }
 
     private boolean shouldConsiderConnectionForViewport(NodeConnection connection, Set<Node> visibleRoots, int viewportWidth, int viewportHeight) {
@@ -14146,11 +14261,11 @@ public class NodeGraph {
         return intersectsViewport(combinedBounds, viewportWidth, viewportHeight);
     }
 
-    private void renderConnection(DrawContext context, NodeConnection connection, boolean animateConnections,
+    private boolean renderConnection(DrawContext context, NodeConnection connection, boolean animateConnections,
                                   long animationTimestamp, int viewportWidth, int viewportHeight,
                                   ExecutionManager manager) {
         if (connection == null) {
-            return;
+            return false;
         }
 
         Node outputNode = connection.getOutputNode();
@@ -14158,7 +14273,7 @@ public class NodeGraph {
 
         if (outputNode == null || inputNode == null
             || !outputNode.shouldRenderSockets() || !inputNode.shouldRenderSockets()) {
-            return;
+            return false;
         }
 
         int outputX = outputNode.getSocketX(false) - cameraX;
@@ -14171,7 +14286,7 @@ public class NodeGraph {
         int maxY = Math.max(outputY, inputY) + VIEWPORT_CULL_MARGIN;
         if (viewportWidth > 0 && viewportHeight > 0
             && (maxX < 0 || minX > viewportWidth || maxY < 0 || minY > viewportHeight)) {
-            return;
+            return false;
         }
 
         int color = outputNode.getOutputSocketColor(connection.getOutputSocket());
@@ -14189,6 +14304,7 @@ public class NodeGraph {
         } else {
             renderConnectionCurve(context, outputX, outputY, inputX, inputY, color);
         }
+        return true;
     }
 
     boolean shouldRenderConnectionInDraggedPass(NodeConnection connection) {

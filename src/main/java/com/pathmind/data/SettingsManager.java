@@ -40,6 +40,7 @@ public final class SettingsManager {
         public Boolean showTooltips = true;
         public Boolean showChatErrors = true;
         public Boolean showHudOverlays = true;
+        public Boolean showProfilerOverlay = false;
         public Boolean skipPresetDeleteConfirm = false;
         public Boolean skipMarketplaceDeleteConfirm = false;
         public Boolean skipMarketplaceUpdateConfirm = false;
@@ -218,6 +219,9 @@ public final class SettingsManager {
         }
         if (settings.showHudOverlays == null) {
             settings.showHudOverlays = true;
+        }
+        if (settings.showProfilerOverlay == null) {
+            settings.showProfilerOverlay = false;
         }
         if (settings.skipPresetDeleteConfirm == null) {
             settings.skipPresetDeleteConfirm = false;

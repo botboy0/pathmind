@@ -705,6 +705,10 @@ public class PathmindVisualEditorScreen extends Screen {
         }
         DrawContextBridge.startNewRootLayer(context);
         NodeErrorNotificationOverlay.getInstance().render(context, this.textRenderer, this.width, this.height);
+        if (currentSettings != null && Boolean.TRUE.equals(currentSettings.showProfilerOverlay)) {
+            DrawContextBridge.startNewRootLayer(context);
+            nodeGraph.renderProfilerOverlay(context, this.textRenderer);
+        }
         if (nodeGraph.isScreenCoordinateCaptureActive()) {
             DrawContextBridge.startNewRootLayer(context);
             nodeGraph.renderScreenCoordinateCaptureOverlay(context, this.textRenderer, mouseX, mouseY);
@@ -6675,8 +6679,15 @@ public class PathmindVisualEditorScreen extends Screen {
         context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, overlayDividerY,
             getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
 
-        int delayDividerY = overlayDividerY + 26;
-        int delayRowCenterY = (overlayDividerY + delayDividerY) / 2;
+        int profilerDividerY = overlayDividerY + 22;
+        int profilerRowCenterY = (overlayDividerY + profilerDividerY) / 2;
+        renderToggleRow(context, mouseX, mouseY, contentX, profilerRowCenterY, "Show profiler overlay",
+            currentSettings != null && Boolean.TRUE.equals(currentSettings.showProfilerOverlay), popupX, scaledWidth);
+        context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, profilerDividerY,
+            getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
+
+        int delayDividerY = profilerDividerY + 26;
+        int delayRowCenterY = (profilerDividerY + delayDividerY) / 2;
         renderNodeDelayRow(context, mouseX, mouseY, contentX, delayRowCenterY, nodeDelayMs, NODE_DELAY_MIN_MS, NODE_DELAY_MAX_MS, popupX, scaledWidth);
         context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, delayDividerY,
             getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
@@ -7312,7 +7323,8 @@ public class PathmindVisualEditorScreen extends Screen {
         int chatDividerY = footerDividerY + 22;
         int overlayDividerY = chatDividerY + 22;
         int hudDividerY = overlayDividerY + 22;
-        int delayDividerY = hudDividerY + 26;
+        int profilerDividerY = hudDividerY + 22;
+        int delayDividerY = profilerDividerY + 26;
         return delayDividerY + 12;
     }
 
@@ -7964,8 +7976,18 @@ public class PathmindVisualEditorScreen extends Screen {
             return true;
         }
 
-        int delayDividerY = overlayDividerY + 26;
-        int delayRowCenterY = (overlayDividerY + delayDividerY) / 2;
+        int profilerDividerY = overlayDividerY + 22;
+        int profilerRowCenterY = (overlayDividerY + profilerDividerY) / 2;
+        int profilerToggleX = gridToggleX;
+        int profilerToggleY = profilerRowCenterY - SETTINGS_TOGGLE_HEIGHT / 2;
+        if (bodyHovered && isPointInRect(mouseXi, mouseYi, profilerToggleX, profilerToggleY, SETTINGS_TOGGLE_WIDTH, SETTINGS_TOGGLE_HEIGHT)) {
+            currentSettings.showProfilerOverlay = !Boolean.TRUE.equals(currentSettings.showProfilerOverlay);
+            SettingsManager.save(currentSettings);
+            return true;
+        }
+
+        int delayDividerY = profilerDividerY + 26;
+        int delayRowCenterY = (profilerDividerY + delayDividerY) / 2;
         int sliderX = popupX + SETTINGS_POPUP_WIDTH - SETTINGS_SLIDER_WIDTH - 20;
         int sliderY = delayRowCenterY - SETTINGS_SLIDER_HEIGHT / 2;
         String delayText = nodeDelayField != null ? nodeDelayField.getText() : Integer.toString(nodeDelayMs);
