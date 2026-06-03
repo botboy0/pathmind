@@ -366,10 +366,10 @@ public class NodeGraph {
     private static final int MAX_HISTORY = 50;
     private static final Map<String, SessionViewportState> SESSION_VIEWPORT_STATES = new ConcurrentHashMap<>();
     private boolean selectionBoxActive = false;
-    private int selectionBoxStartX = 0;
-    private int selectionBoxStartY = 0;
-    private int selectionBoxCurrentX = 0;
-    private int selectionBoxCurrentY = 0;
+    private int selectionBoxStartWorldX = 0;
+    private int selectionBoxStartWorldY = 0;
+    private int selectionBoxCurrentWorldX = 0;
+    private int selectionBoxCurrentWorldY = 0;
     private boolean multiDragActive = false;
     private final Map<Node, DragStartInfo> multiDragStartPositions = new HashMap<>();
     private boolean selectionDeletionPreviewActive = false;
@@ -1265,19 +1265,21 @@ public class NodeGraph {
     }
 
     public void beginSelectionBox(int screenX, int screenY) {
+        int worldX = screenToWorldX(screenX);
+        int worldY = screenToWorldY(screenY);
         selectionBoxActive = true;
-        selectionBoxStartX = screenX;
-        selectionBoxStartY = screenY;
-        selectionBoxCurrentX = screenX;
-        selectionBoxCurrentY = screenY;
+        selectionBoxStartWorldX = worldX;
+        selectionBoxStartWorldY = worldY;
+        selectionBoxCurrentWorldX = worldX;
+        selectionBoxCurrentWorldY = worldY;
     }
 
     public void updateSelectionBox(int screenX, int screenY) {
         if (!selectionBoxActive) {
             return;
         }
-        selectionBoxCurrentX = screenX;
-        selectionBoxCurrentY = screenY;
+        selectionBoxCurrentWorldX = screenToWorldX(screenX);
+        selectionBoxCurrentWorldY = screenToWorldY(screenY);
         if (hasSelectionBoxDrag()) {
             applySelectionBoxSelection();
         }
@@ -1298,20 +1300,20 @@ public class NodeGraph {
     }
 
     private boolean hasSelectionBoxDrag() {
-        int deltaX = Math.abs(selectionBoxCurrentX - selectionBoxStartX);
-        int deltaY = Math.abs(selectionBoxCurrentY - selectionBoxStartY);
+        float scale = getZoomScale();
+        if (scale == 0.0f) {
+            scale = 1.0f;
+        }
+        int deltaX = Math.round(Math.abs(selectionBoxCurrentWorldX - selectionBoxStartWorldX) * scale);
+        int deltaY = Math.round(Math.abs(selectionBoxCurrentWorldY - selectionBoxStartWorldY) * scale);
         return deltaX >= SELECTION_BOX_MIN_DRAG || deltaY >= SELECTION_BOX_MIN_DRAG;
     }
 
     private void applySelectionBoxSelection() {
-        int left = Math.min(selectionBoxStartX, selectionBoxCurrentX);
-        int right = Math.max(selectionBoxStartX, selectionBoxCurrentX);
-        int top = Math.min(selectionBoxStartY, selectionBoxCurrentY);
-        int bottom = Math.max(selectionBoxStartY, selectionBoxCurrentY);
-        int worldLeft = screenToWorldX(left);
-        int worldRight = screenToWorldX(right);
-        int worldTop = screenToWorldY(top);
-        int worldBottom = screenToWorldY(bottom);
+        int worldLeft = Math.min(selectionBoxStartWorldX, selectionBoxCurrentWorldX);
+        int worldRight = Math.max(selectionBoxStartWorldX, selectionBoxCurrentWorldX);
+        int worldTop = Math.min(selectionBoxStartWorldY, selectionBoxCurrentWorldY);
+        int worldBottom = Math.max(selectionBoxStartWorldY, selectionBoxCurrentWorldY);
 
         List<Node> inside = new ArrayList<>();
         for (Node node : nodes) {
@@ -3248,10 +3250,10 @@ public class NodeGraph {
         if (!selectionBoxActive || !hasSelectionBoxDrag()) {
             return;
         }
-        int left = Math.min(selectionBoxStartX, selectionBoxCurrentX);
-        int right = Math.max(selectionBoxStartX, selectionBoxCurrentX);
-        int top = Math.min(selectionBoxStartY, selectionBoxCurrentY);
-        int bottom = Math.max(selectionBoxStartY, selectionBoxCurrentY);
+        int left = worldToScreenX(Math.min(selectionBoxStartWorldX, selectionBoxCurrentWorldX));
+        int right = worldToScreenX(Math.max(selectionBoxStartWorldX, selectionBoxCurrentWorldX));
+        int top = worldToScreenY(Math.min(selectionBoxStartWorldY, selectionBoxCurrentWorldY));
+        int bottom = worldToScreenY(Math.max(selectionBoxStartWorldY, selectionBoxCurrentWorldY));
         if (left == right || top == bottom) {
             return;
         }
