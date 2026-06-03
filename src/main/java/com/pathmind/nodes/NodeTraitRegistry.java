@@ -64,6 +64,7 @@ public final class NodeTraitRegistry {
         NodeType.SENSOR_DISTANCE_BETWEEN,
         NodeType.SENSOR_ITEM_IN_INVENTORY,
         NodeType.SENSOR_ITEM_IN_SLOT,
+        NodeType.SENSOR_FIND_TRADE,
         NodeType.SENSOR_SLOT_ITEM_COUNT,
         NodeType.SENSOR_ATTRIBUTE_DETECTION,
         NodeType.SENSOR_CHAT_MESSAGE,
@@ -118,6 +119,7 @@ public final class NodeTraitRegistry {
         traits.put(NodeType.OPERATOR_BOOLEAN_AND, EnumSet.of(NodeValueTrait.BOOLEAN));
         traits.put(NodeType.OPERATOR_BOOLEAN_XOR, EnumSet.of(NodeValueTrait.BOOLEAN));
         traits.put(NodeType.SENSOR_SLOT_ITEM_COUNT, EnumSet.of(NodeValueTrait.NUMBER));
+        traits.put(NodeType.SENSOR_FIND_TRADE, EnumSet.of(NodeValueTrait.NUMBER));
         traits.put(NodeType.LIST_ITEM, EnumSet.of(
             NodeValueTrait.LIST_ITEM,
             NodeValueTrait.ANY,
@@ -204,6 +206,7 @@ public final class NodeTraitRegistry {
         accepted.put(NodeType.SENSOR_ITEM_IN_INVENTORY, EnumSet.of(NodeValueTrait.ITEM, NodeValueTrait.NUMBER));
         accepted.put(NodeType.SENSOR_ITEM_IN_SLOT, EnumSet.of(NodeValueTrait.ITEM, NodeValueTrait.INVENTORY_SLOT));
         accepted.put(NodeType.SENSOR_SLOT_ITEM_COUNT, EnumSet.of(NodeValueTrait.INVENTORY_SLOT));
+        accepted.put(NodeType.SENSOR_FIND_TRADE, EnumSet.of(NodeValueTrait.ITEM));
         accepted.put(NodeType.SENSOR_ATTRIBUTE_DETECTION, EnumSet.of(
             NodeValueTrait.ENTITY,
             NodeValueTrait.PLAYER,
@@ -338,6 +341,7 @@ public final class NodeTraitRegistry {
         accepted.put(NodeType.REMOVE_FROM_LIST, EnumSet.of(NodeValueTrait.ANY));
         accepted.put(NodeType.CREATE_LIST, EnumSet.of(NodeValueTrait.ANY));
         accepted.put(NodeType.TRADE, EnumSet.of(NodeValueTrait.NUMBER));
+        accepted.put(NodeType.EVENT_FUNCTION, EnumSet.of(NodeValueTrait.PLAYER));
         accepted.put(NodeType.PARAM_BLOCK_FACE, EnumSet.of(NodeValueTrait.COORDINATE, NodeValueTrait.BLOCK));
 
         PARAMETER_ACCEPTED_TRAITS = accepted;
@@ -360,10 +364,12 @@ public final class NodeTraitRegistry {
         slotCounts.put(NodeType.WALK, 2);
         slotCounts.put(NodeType.BREAK, 1);
         slotCounts.put(NodeType.PRESS_KEY, 1);
+        slotCounts.put(NodeType.EVENT_FUNCTION, 1);
         slotCounts.put(NodeType.SENSOR_CHAT_MESSAGE, 2);
         slotCounts.put(NodeType.SENSOR_JOINED_SERVER, 1);
         slotCounts.put(NodeType.SENSOR_ITEM_IN_SLOT, 2);
         slotCounts.put(NodeType.SENSOR_SLOT_ITEM_COUNT, 1);
+        slotCounts.put(NodeType.SENSOR_FIND_TRADE, 1);
         slotCounts.put(NodeType.SENSOR_DISTANCE_BETWEEN, 2);
         slotCounts.put(NodeType.PARAM_BLOCK_FACE, 1);
         PARAMETER_SLOT_COUNTS = slotCounts;
@@ -385,10 +391,12 @@ public final class NodeTraitRegistry {
         slotLabels.put(NodeType.WALK, new String[]{"Direction", "Duration/Distance"});
         slotLabels.put(NodeType.BREAK, new String[]{"Target"});
         slotLabels.put(NodeType.PRESS_KEY, new String[]{"Button"});
+        slotLabels.put(NodeType.EVENT_FUNCTION, new String[]{"User"});
         slotLabels.put(NodeType.SENSOR_CHAT_MESSAGE, new String[]{"User", "Message"});
         slotLabels.put(NodeType.SENSOR_JOINED_SERVER, new String[]{"User"});
         slotLabels.put(NodeType.SENSOR_ITEM_IN_SLOT, new String[]{"Item", "Selection"});
         slotLabels.put(NodeType.SENSOR_SLOT_ITEM_COUNT, new String[]{"Slot"});
+        slotLabels.put(NodeType.SENSOR_FIND_TRADE, new String[]{"Item"});
         slotLabels.put(NodeType.SENSOR_ATTRIBUTE_DETECTION, new String[]{"Target"});
         slotLabels.put(NodeType.SENSOR_POSITION_OF, new String[]{"Target"});
         slotLabels.put(NodeType.SENSOR_DISTANCE_BETWEEN, new String[]{"Target A", "Target B"});
@@ -432,6 +440,7 @@ public final class NodeTraitRegistry {
             || type == NodeType.SENSOR_LOOK_DIRECTION
             || type == NodeType.SENSOR_CURRENT_HAND
             || type == NodeType.SENSOR_IS_ON_GROUND
+            || type == NodeType.SENSOR_FIND_TRADE
             || type == NodeType.SENSOR_SLOT_ITEM_COUNT) {
             return true;
         }

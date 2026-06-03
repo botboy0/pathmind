@@ -406,6 +406,7 @@ public class Sidebar {
         ));
         groups.add(createGroup(
             "pathmind.sidebar.group.trading",
+            NodeType.SENSOR_FIND_TRADE,
             NodeType.SENSOR_VILLAGER_TRADE,
             NodeType.SENSOR_IN_STOCK
         ));

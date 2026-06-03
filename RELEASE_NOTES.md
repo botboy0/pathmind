@@ -1,4 +1,4 @@
-# Pathmind 1.1.4 Release Notes
+# Pathmind 1.1.5 Release Notes
 
 ## User-visible Changes
 

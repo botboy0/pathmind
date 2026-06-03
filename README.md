@@ -157,7 +157,7 @@ Convenience tasks:
 
 | Component | Version |
 |-----------|---------|
-| Mod Version | `1.1.4` |
+| Mod Version | `1.1.5` |
 | Supported Minecraft Versions | `1.21 - 1.21.11` |
 | Fabric Loader | `0.17.3+` |
 | Java | `21+` |

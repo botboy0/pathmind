@@ -671,6 +671,8 @@
   "pathmind.node.type.sensorPositionOf.desc": "Gets the position of a target (entity, user, block, or item)",
   "pathmind.node.type.sensorSlotItemCount": "Slot Item Count",
   "pathmind.node.type.sensorSlotItemCount.desc": "Gets the current item count in the selected inventory slot",
+  "pathmind.node.type.sensorFindTrade": "Find Trade",
+  "pathmind.node.type.sensorFindTrade.desc": "Finds the first villager trade that sells the selected item and returns its trade number",
   "pathmind.node.type.sensorInStock": "Is In Stock",
   "pathmind.node.type.sensorInStock.desc": "Detect if the villager trade at the selected number is currently in stock",
   "pathmind.node.type.sensorTargetedBlock": "Targeted Block",

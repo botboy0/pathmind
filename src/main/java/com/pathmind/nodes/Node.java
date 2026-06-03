@@ -705,6 +705,7 @@ public class Node {
             && type != NodeType.PARAM_DURATION
             && type != NodeType.SENSOR_POSITION_OF
             && type != NodeType.SENSOR_DISTANCE_BETWEEN
+            && type != NodeType.SENSOR_FIND_TRADE
             && type != NodeType.SENSOR_SLOT_ITEM_COUNT;
     }
 
@@ -735,6 +736,7 @@ public class Node {
 					|| type == NodeType.PARAM_BLOCK_FACE
 					|| type == NodeType.SENSOR_POSITION_OF
 					|| type == NodeType.SENSOR_DISTANCE_BETWEEN
+					|| type == NodeType.SENSOR_FIND_TRADE
 					|| type == NodeType.SENSOR_SLOT_ITEM_COUNT;
 		}
 
@@ -803,6 +805,9 @@ public class Node {
             return blockParameter == null || !blockParameterProvidesPlacementCoordinates(blockParameter);
         }
         if (type == NodeType.PLACE_HAND) {
+            return false;
+        }
+        if (type == NodeType.EVENT_FUNCTION) {
             return false;
         }
         return slotIndex == 0;
@@ -1302,7 +1307,7 @@ public class Node {
             case SENSOR_TARGETED_ENTITY -> NodeType.PARAM_ENTITY;
             case SENSOR_LOOK_DIRECTION -> isSensorLookSingleAxisMode() ? NodeType.PARAM_AMOUNT : NodeType.PARAM_ROTATION;
             case SENSOR_CURRENT_HAND -> NodeType.PARAM_INVENTORY_SLOT;
-            case SENSOR_SLOT_ITEM_COUNT, LIST_LENGTH -> NodeType.PARAM_AMOUNT;
+            case SENSOR_SLOT_ITEM_COUNT, SENSOR_FIND_TRADE, LIST_LENGTH -> NodeType.PARAM_AMOUNT;
             case CHANGE_VARIABLE -> NodeType.PARAM_AMOUNT;
             default -> type;
         };
@@ -2866,6 +2871,18 @@ public class Node {
                 values.put(normalizeParameterKey("Count"), countValue);
                 values.put("Value", countValue);
                 values.put(normalizeParameterKey("Value"), countValue);
+            }
+            case SENSOR_FIND_TRADE -> {
+                int tradeNumber = villagerTradeSensorEvaluator().findTradeNumber();
+                String tradeValue = Integer.toString(Math.max(0, tradeNumber));
+                values.put("Amount", tradeValue);
+                values.put(normalizeParameterKey("Amount"), tradeValue);
+                values.put("Count", tradeValue);
+                values.put(normalizeParameterKey("Count"), tradeValue);
+                values.put("Value", tradeValue);
+                values.put(normalizeParameterKey("Value"), tradeValue);
+                values.put("Number", tradeValue);
+                values.put(normalizeParameterKey("Number"), tradeValue);
             }
         }
 
@@ -6892,6 +6909,7 @@ public class Node {
             case SENSOR_KEY_PRESSED -> basicSensorEvaluator().evaluateKeyPressed();
             case SENSOR_IS_RENDERED -> visibilitySensorEvaluator().evaluateRendered();
             case SENSOR_IS_VISIBLE -> visibilitySensorEvaluator().evaluateVisible();
+            case SENSOR_FIND_TRADE -> villagerTradeSensorEvaluator().evaluateFindTrade();
             case SENSOR_VILLAGER_TRADE -> villagerTradeSensorEvaluator().evaluateVillagerTrade();
             case SENSOR_IN_STOCK -> villagerTradeSensorEvaluator().evaluateInStock();
             case SENSOR_CHAT_MESSAGE -> eventSensorEvaluator().evaluateChatMessage();

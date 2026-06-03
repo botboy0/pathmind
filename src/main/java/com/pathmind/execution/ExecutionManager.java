@@ -405,7 +405,8 @@ public class ExecutionManager {
         this.cancelRequested = false;
         List<Node> rootNodes = new ArrayList<>();
         for (EventHandlerLaunchData handler : handlers) {
-            if (handler == null || handler.rootNode == null) {
+            if (handler == null || handler.rootNode == null
+                || !matchesEventFunctionFilter(handler.rootNode, normalizedEventName, runtimeVariables)) {
                 continue;
             }
             mergeActiveGraph(handler.branchNodes, handler.branchConnections);
@@ -424,7 +425,8 @@ public class ExecutionManager {
         }
 
         for (EventHandlerLaunchData handler : handlers) {
-            if (handler == null || handler.rootNode == null) {
+            if (handler == null || handler.rootNode == null
+                || !matchesEventFunctionFilter(handler.rootNode, normalizedEventName, runtimeVariables)) {
                 continue;
             }
 
@@ -443,6 +445,35 @@ public class ExecutionManager {
         }
 
         return true;
+    }
+
+    private boolean matchesEventFunctionFilter(Node rootNode, String eventName, Map<String, RuntimeVariable> runtimeVariables) {
+        if (rootNode == null || eventName == null || eventName.isEmpty()) {
+            return false;
+        }
+        if (!CHAT_MESSAGE_EVENT_NAME.equals(eventName)) {
+            return true;
+        }
+
+        Node userFilter = rootNode.getAttachedParameter(0);
+        if (userFilter == null) {
+            return true;
+        }
+        if (userFilter.getType() != NodeType.PARAM_PLAYER) {
+            return true;
+        }
+
+        RuntimeVariable senderVariable = runtimeVariables != null ? runtimeVariables.get(CHAT_SENDER_VARIABLE_NAME) : null;
+        String senderName = senderVariable != null ? getRuntimeValue(senderVariable, "Player") : "";
+        if (senderName.isEmpty()) {
+            return false;
+        }
+
+        String expectedPlayer = getNodeParameterValue(userFilter, "Player");
+        if (expectedPlayer.isEmpty() || "any".equalsIgnoreCase(expectedPlayer)) {
+            return true;
+        }
+        return expectedPlayer.equalsIgnoreCase(senderName);
     }
 
     public boolean setRuntimeList(Node startNode, String name, RuntimeList list) {
@@ -1458,6 +1489,52 @@ public class ExecutionManager {
             }
             setRuntimeVariable(startNode, entry.getKey(), entry.getValue());
         }
+    }
+
+    private String getNodeParameterValue(Node node, String key) {
+        if (node == null || key == null || key.isEmpty()) {
+            return "";
+        }
+        NodeParameter parameter = node.getParameter(key);
+        String value = parameter != null ? parameter.getStringValue() : null;
+        if ((value == null || value.isBlank())) {
+            Map<String, String> exported = node.exportParameterValues();
+            if (exported != null) {
+                value = exported.get(key);
+                if (value == null) {
+                    value = exported.get(normalizeRuntimeValueKey(key));
+                }
+            }
+        }
+        return value == null ? "" : value.trim();
+    }
+
+    private String getRuntimeValue(RuntimeVariable variable, String key) {
+        if (variable == null || key == null || key.isEmpty()) {
+            return "";
+        }
+        Map<String, String> values = variable.getValues();
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        String direct = values.get(key);
+        if (direct != null && !direct.isBlank()) {
+            return direct.trim();
+        }
+        String normalized = normalizeRuntimeValueKey(key);
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (entry == null || entry.getKey() == null) {
+                continue;
+            }
+            if (!normalizeRuntimeValueKey(entry.getKey()).equals(normalized)) {
+                continue;
+            }
+            String candidate = entry.getValue();
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate.trim();
+            }
+        }
+        return "";
     }
 
     private boolean storeRuntimeList(ChainController controller, String name, RuntimeList list, boolean preferExistingScope) {
