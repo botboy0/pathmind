@@ -183,7 +183,7 @@ public class Node {
     static final int PARAMETER_SLOT_MIN_CONTENT_WIDTH = 88;
     static final int PARAMETER_SLOT_MIN_CONTENT_HEIGHT = 32;
     static final int PARAMETER_SLOT_LABEL_HEIGHT = 12;
-    static final int OPERATOR_SLOT_GAP = 14;
+    static final int OPERATOR_SLOT_GAP = 24;
     static final int MINIMAL_NODE_TAB_WIDTH = 6;
     static final int PARAMETER_FIELD_PADDING = 12;
     static final int PLAYER_ARMOR_SLOT_COUNT = 4;
