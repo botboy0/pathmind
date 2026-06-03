@@ -5,6 +5,7 @@ import static com.pathmind.util.PathmindI18n.tr;
 import com.pathmind.util.EntityCompatibilityBridge;
 import com.pathmind.util.InputCompatibilityBridge;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.EntityPose;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
@@ -238,7 +239,24 @@ final class NodeMovementCommandExecutor {
         }
 
         InputUtil.Key inputKey = InputUtil.Type.KEYSYM.createFromCode(keyCode);
-        KeyBinding.onKeyPressed(inputKey);
+        boolean[] handledByScreen = {false};
+        try {
+            owner.runOnClientThread(client, () -> {
+                if (client.currentScreen != null) {
+                    handledByScreen[0] = client.currentScreen.keyPressed(new KeyInput(keyCode, 0, 0));
+                }
+                KeyBinding.onKeyPressed(inputKey);
+            });
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            future.completeExceptionally(e);
+            return;
+        }
+
+        if (handledByScreen[0]) {
+            future.complete(null);
+            return;
+        }
 
         boolean keyAlreadyDown = InputCompatibilityBridge.isKeyPressed(client, keyCode);
         if (keyAlreadyDown) {
