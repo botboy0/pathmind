@@ -29,6 +29,10 @@ final class GuiTextureRenderer {
         drawTexture(context, List.of(texture), x, y, size, size, color);
     }
 
+    static boolean tryDrawIcon(DrawContext context, Identifier texture, int x, int y, int size, int color) {
+        return tryDrawTexture(context, List.of(texture), x, y, size, size, color);
+    }
+
     static void drawIcon(DrawContext context, List<Identifier> textures, int x, int y, int size, int color) {
         drawTexture(context, textures, x, y, size, size, color);
     }
@@ -38,12 +42,16 @@ final class GuiTextureRenderer {
     }
 
     static void drawTexture(DrawContext context, List<Identifier> textures, int x, int y, int width, int height, int color) {
+        tryDrawTexture(context, textures, x, y, width, height, color);
+    }
+
+    static boolean tryDrawTexture(DrawContext context, List<Identifier> textures, int x, int y, int width, int height, int color) {
         try {
             RuntimeException lastException = null;
             for (Identifier texture : textures) {
                 try {
                     BACKEND.draw(context, texture, x, y, width, height, color);
-                    return;
+                    return BACKEND != RendererBackend.NO_OP;
                 } catch (RuntimeException exception) {
                     lastException = exception;
                 }
@@ -56,6 +64,7 @@ final class GuiTextureRenderer {
                 PathmindMod.LOGGER.error("Failed to render Pathmind icon. Rendering will be skipped.", exception);
             }
         }
+        return false;
     }
 
     private static RendererBackend detectBackend() {
