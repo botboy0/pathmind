@@ -538,6 +538,16 @@ public class Node {
         return id;
     }
 
+    public String getRuntimeSourceNodeId() {
+        return runtimeState.runtimeSourceNodeId != null && !runtimeState.runtimeSourceNodeId.isBlank()
+            ? runtimeState.runtimeSourceNodeId
+            : id;
+    }
+
+    public void setRuntimeSourceNodeId(String sourceNodeId) {
+        runtimeState.runtimeSourceNodeId = sourceNodeId;
+    }
+
     public NodeType getType() {
         return type;
     }
@@ -944,6 +954,22 @@ public class Node {
 
     public void setStartNodeNumber(int startNodeNumber) {
         runtimeState.startNodeNumber = startNodeNumber;
+    }
+
+    public StartLaunchMode getStartLaunchMode() {
+        return runtimeState.startLaunchMode == null ? StartLaunchMode.MANUAL : runtimeState.startLaunchMode;
+    }
+
+    public void setStartLaunchMode(StartLaunchMode startLaunchMode) {
+        runtimeState.startLaunchMode = startLaunchMode == null ? StartLaunchMode.MANUAL : startLaunchMode;
+    }
+
+    public StartScreenTarget getStartScreenTarget() {
+        return runtimeState.startScreenTarget == null ? StartScreenTarget.ANY : runtimeState.startScreenTarget;
+    }
+
+    public void setStartScreenTarget(StartScreenTarget startScreenTarget) {
+        runtimeState.startScreenTarget = startScreenTarget == null ? StartScreenTarget.ANY : startScreenTarget;
     }
 
     public boolean isGotoAllowBreakWhileExecuting() {
@@ -3674,6 +3700,12 @@ public class Node {
             return future;
         }
 
+        if (requiresInGameRuntime() && (client == null || client.player == null || client.world == null)) {
+            NodeExecutionCompletion.fail(this, client, future,
+                type.getDisplayName() + " requires an in-game world before it can run.");
+            return future;
+        }
+
         if (!requiresClientThreadExecution()) {
             try {
                 ExecutionManager.getInstance().runWithExecutionContext(executionId,
@@ -3700,6 +3732,38 @@ public class Node {
         }
 
         return future;
+    }
+
+    private boolean requiresInGameRuntime() {
+        if (type == null) {
+            return false;
+        }
+        if (type.requiresBaritone()) {
+            return true;
+        }
+        NodeCategory category = type.getCategory();
+        if (category == NodeCategory.WORLD || category == NodeCategory.PLAYER) {
+            return true;
+        }
+        if (category == NodeCategory.SENSORS) {
+            return type != NodeType.SENSOR_CHAT_MESSAGE
+                && type != NodeType.SENSOR_JOINED_SERVER
+                && type != NodeType.SENSOR_FABRIC_EVENT
+                && type != NodeType.SENSOR_KEY_PRESSED;
+        }
+        if (category == NodeCategory.INTERFACE) {
+            return type != NodeType.MESSAGE && type != NodeType.STICKY_NOTE;
+        }
+        if (category == NodeCategory.PARAMETERS) {
+            return type == NodeType.PARAM_PLAYER
+                || type == NodeType.PARAM_ENTITY
+                || type == NodeType.PARAM_GUI
+                || type == NodeType.PARAM_INVENTORY_SLOT
+                || type == NodeType.PARAM_HAND
+                || type == NodeType.PARAM_PLACE_TARGET
+                || type == NodeType.PARAM_CLOSEST;
+        }
+        return false;
     }
 
     private boolean requiresClientThreadExecution() {
@@ -7006,7 +7070,7 @@ public class Node {
             case SENSOR_VILLAGER_TRADE -> villagerTradeSensorEvaluator().evaluateVillagerTrade();
             case SENSOR_IN_STOCK -> villagerTradeSensorEvaluator().evaluateInStock();
             case SENSOR_CHAT_MESSAGE -> eventSensorEvaluator().evaluateChatMessage();
-            case SENSOR_JOINED_SERVER -> eventSensorEvaluator().evaluateJoinedServer();
+            case SENSOR_JOINED_SERVER -> evaluateJoinedServerEdge();
             case SENSOR_FABRIC_EVENT -> eventSensorEvaluator().evaluateFabricEvent();
             case SENSOR_ATTRIBUTE_DETECTION -> evaluateAttributeDetectionSensor();
             default -> false;
@@ -7014,6 +7078,13 @@ public class Node {
         result = adjustBooleanToggleResult(result);
         this.runtimeState.lastSensorResult = result;
         return result;
+    }
+
+    private boolean evaluateJoinedServerEdge() {
+        boolean rawResult = eventSensorEvaluator().evaluateJoinedServer();
+        boolean edge = rawResult && !this.runtimeState.lastJoinedServerRawResult;
+        this.runtimeState.lastJoinedServerRawResult = rawResult;
+        return edge;
     }
 
     private boolean ensureRequiredSensorParameterAttached() {

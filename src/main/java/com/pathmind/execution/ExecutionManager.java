@@ -2877,6 +2877,9 @@ public class ExecutionManager {
                 if (node == null) {
                     continue;
                 }
+                if (node.getRuntimeSourceNodeId() == null || node.getRuntimeSourceNodeId().isBlank()) {
+                    node.setRuntimeSourceNodeId(node.getId());
+                }
                 // Runtime clones must not reuse persisted IDs or nested preset executions with
                 // forever loops can collide in active-node/connection tracking.
                 idField.set(node, UUID.randomUUID().toString());
@@ -2955,6 +2958,9 @@ public class ExecutionManager {
             nodeData.setParentControlId(node.getParentControlId());
             nodeData.setAttachedActionId(node.getAttachedActionId());
             nodeData.setParentActionControlId(node.getParentActionControlId());
+            nodeData.setStartNodeNumber(node.getStartNodeNumber());
+            nodeData.setStartLaunchMode(node.getStartLaunchMode());
+            nodeData.setStartScreenTarget(node.getStartScreenTarget());
             List<NodeGraphData.ParameterAttachmentData> attachmentData = new ArrayList<>();
             Map<Integer, Node> attachedParameters = node.getAttachedParameters();
             if (attachedParameters != null && !attachedParameters.isEmpty()) {

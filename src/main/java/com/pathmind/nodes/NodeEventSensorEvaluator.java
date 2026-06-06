@@ -66,7 +66,12 @@ final class NodeEventSensorEvaluator {
         if (!anyPlayer && Node.isSelfPlayerValue(playerName) && client != null && client.player != null) {
             playerName = GameProfileCompatibilityBridge.getName(client.player.getGameProfile());
         }
-        return ServerJoinTracker.hasRecentJoin(playerName, ServerJoinTracker.getRetentionSeconds(), anyPlayer);
+        return ServerJoinTracker.consumeRecentJoin(
+            playerName,
+            ServerJoinTracker.getRetentionSeconds(),
+            anyPlayer,
+            owner.getRuntimeSourceNodeId()
+        );
     }
 
     boolean evaluateFabricEvent() {

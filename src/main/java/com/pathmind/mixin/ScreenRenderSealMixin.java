@@ -1,7 +1,9 @@
 package com.pathmind.mixin;
 
+import com.pathmind.PathmindClientMod;
 import com.pathmind.screen.PathmindScreens;
 import com.pathmind.util.OverlayProtection;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -61,10 +63,8 @@ public class ScreenRenderSealMixin {
 
         Screen self = (Screen) (Object) this;
         if (!PathmindScreens.isVisualEditorScreen(self)) {
-            return;
-        }
-        if (net.minecraft.client.MinecraftClient.getInstance().player == null
-            || net.minecraft.client.MinecraftClient.getInstance().world == null) {
+            PathmindClientMod.renderHudNotifications(context, MinecraftClient.getInstance());
+            PathmindClientMod.renderScreenActiveNodeOverlay(context, MinecraftClient.getInstance());
             return;
         }
 
@@ -76,5 +76,6 @@ public class ScreenRenderSealMixin {
             OverlayProtection.setPathmindRendering(false);
             pathmind$finalRenderPass.set(false);
         }
+        PathmindClientMod.renderScreenActiveNodeOverlay(context, MinecraftClient.getInstance());
     }
 }

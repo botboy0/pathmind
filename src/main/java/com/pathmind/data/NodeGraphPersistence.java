@@ -328,6 +328,8 @@ public class NodeGraphPersistence {
             if (startNodeNumber != null) {
                 node.setStartNodeNumber(startNodeNumber);
             }
+            node.setStartLaunchMode(nodeData.getStartLaunchMode());
+            node.setStartScreenTarget(nodeData.getStartScreenTarget());
             node.recalculateDimensions();
 
             nodes.add(node);
@@ -856,6 +858,8 @@ public class NodeGraphPersistence {
                 nodeData.setBooleanToggleValue(null);
             }
             nodeData.setStartNodeNumber(node.getStartNodeNumber());
+            nodeData.setStartLaunchMode(node.getStartLaunchMode());
+            nodeData.setStartScreenTarget(node.getStartScreenTarget());
             if (node.hasMessageInputFields()) {
                 nodeData.setMessageLines(new ArrayList<>(node.getMessageLines()));
                 nodeData.setMessageClientSide(node.hasMessageScopeToggle() ? node.isMessageClientSide() : null);

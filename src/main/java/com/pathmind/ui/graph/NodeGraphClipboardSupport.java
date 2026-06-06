@@ -240,6 +240,8 @@ final class NodeGraphClipboardSupport {
             nodeData.setX(node.getX());
             nodeData.setY(node.getY());
             nodeData.setStartNodeNumber(node.getStartNodeNumber());
+            nodeData.setStartLaunchMode(node.getStartLaunchMode());
+            nodeData.setStartScreenTarget(node.getStartScreenTarget());
             if (node.hasMessageInputFields()) {
                 nodeData.setMessageLines(new ArrayList<>(node.getMessageLines()));
                 nodeData.setMessageClientSide(node.isMessageClientSide());

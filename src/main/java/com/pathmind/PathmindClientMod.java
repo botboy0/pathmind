@@ -3,10 +3,12 @@ package com.pathmind;
 import com.pathmind.data.PresetManager;
 import com.pathmind.data.SettingsManager;
 import com.pathmind.execution.ExecutionManager;
+import com.pathmind.execution.BackgroundStartRunner;
 import com.pathmind.execution.PathmindNavigator;
 import com.pathmind.marketplace.MarketplaceAuthManager;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeType;
+import com.pathmind.nodes.StartLaunchMode;
 import com.pathmind.screen.PathmindMainMenuIntegration;
 import com.pathmind.screen.PathmindScreens;
 import com.pathmind.ui.overlay.ActiveNodeOverlay;
@@ -45,7 +47,10 @@ import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.GameMenuScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
@@ -86,6 +91,9 @@ public class PathmindClientMod implements ClientModInitializer {
     private int recipeCacheWarmupCooldownTicks;
     private boolean playGraphsKeyDown;
     private boolean stopGraphsKeyDown;
+    private boolean pendingClientLaunch;
+    private boolean pendingWorldJoinLaunch;
+    private Screen lastObservedScreen;
 
     private static final String EVT_CLIENT_BLOCK_ENTITY_LOAD = "fabric.client.lifecycle.block_entity_load";
     private static final String EVT_CLIENT_BLOCK_ENTITY_UNLOAD = "fabric.client.lifecycle.block_entity_unload";
@@ -160,6 +168,8 @@ public class PathmindClientMod implements ClientModInitializer {
         PathmindMainMenuIntegration.register();
 
         registerFabricEventForwarders();
+        ClientLifecycleEvents.CLIENT_STARTED.register(client ->
+            pendingClientLaunch = true);
 
         // Register client tick events for keybind handling and event forwarding
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -167,7 +177,10 @@ public class PathmindClientMod implements ClientModInitializer {
             handleRecipeCacheWarmup(client);
             NavigatorChatSuggestions.getInstance().tick(client);
             PathmindNavigator.getInstance().tick(client);
+            handlePendingClientLaunch(client);
+            handlePendingWorldJoinLaunch(client);
             ServerJoinTracker.tick(client);
+            handleScreenLaunchTriggers(client);
             fireFabricEvent(EVT_CLIENT_TICK_END);
         });
 
@@ -175,7 +188,7 @@ public class PathmindClientMod implements ClientModInitializer {
             worldShutdownHandled = false;
             ChatMessageTracker.clear();
             FabricEventTracker.clear();
-            ServerJoinTracker.recordClientJoin(client);
+            pendingWorldJoinLaunch = true;
             if (nodeErrorNotificationOverlay != null) {
                 nodeErrorNotificationOverlay.clear();
             }
@@ -186,6 +199,7 @@ public class PathmindClientMod implements ClientModInitializer {
         });
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            pendingWorldJoinLaunch = false;
             handleClientShutdown("play disconnect", false);
             PathmindNavigator.getInstance().reset();
             ChatMessageTracker.clear();
@@ -199,6 +213,8 @@ public class PathmindClientMod implements ClientModInitializer {
         });
 
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            pendingClientLaunch = false;
+            pendingWorldJoinLaunch = false;
             handleClientShutdown("client stopping", true);
             PathmindNavigator.getInstance().reset();
             ChatMessageTracker.clear();
@@ -268,7 +284,7 @@ public class PathmindClientMod implements ClientModInitializer {
     }
 
     public static void renderHudNotifications(DrawContext drawContext, MinecraftClient client) {
-        if (client == null || client.player == null || client.textRenderer == null || nodeErrorNotificationOverlay == null) {
+        if (client == null || client.textRenderer == null || nodeErrorNotificationOverlay == null) {
             return;
         }
 
@@ -286,6 +302,30 @@ public class PathmindClientMod implements ClientModInitializer {
         MatrixStackBridge.translateZ(matrices, 500.0f);
         try {
             nodeErrorNotificationOverlay.render(drawContext, client.textRenderer, scaledWidth, scaledHeight);
+        } finally {
+            MatrixStackBridge.pop(matrices);
+        }
+    }
+
+    public static void renderScreenActiveNodeOverlay(DrawContext drawContext, MinecraftClient client) {
+        if (client == null || client.player != null || client.textRenderer == null || activeNodeOverlay == null) {
+            return;
+        }
+
+        boolean showHudOverlays = SettingsManager.getCurrent().showHudOverlays == null
+            || SettingsManager.getCurrent().showHudOverlays;
+        if (!showHudOverlays) {
+            return;
+        }
+
+        int scaledWidth = client.getWindow().getScaledWidth();
+        int scaledHeight = client.getWindow().getScaledHeight();
+        DrawContextBridge.startNewRootLayer(drawContext);
+        Object matrices = drawContext.getMatrices();
+        MatrixStackBridge.push(matrices);
+        MatrixStackBridge.translateZ(matrices, 500.0f);
+        try {
+            activeNodeOverlay.renderCompact(drawContext, client.textRenderer, scaledWidth, scaledHeight);
         } finally {
             MatrixStackBridge.pop(matrices);
         }
@@ -384,6 +424,72 @@ public class PathmindClientMod implements ClientModInitializer {
             return ActionResult.PASS;
         });
         UseItemCallbackCompat.register(this::fireFabricEvent, EVT_PLAYER_USE_ITEM);
+    }
+
+    private void handlePendingClientLaunch(MinecraftClient client) {
+        if (!pendingClientLaunch) {
+            return;
+        }
+        if (client == null || client.getWindow() == null) {
+            return;
+        }
+
+        pendingClientLaunch = false;
+        BackgroundStartRunner.getInstance().launch(StartLaunchMode.CLIENT_LAUNCH);
+    }
+
+    private void handlePendingWorldJoinLaunch(MinecraftClient client) {
+        if (!pendingWorldJoinLaunch) {
+            return;
+        }
+        if (client == null || client.player == null || client.world == null || client.getNetworkHandler() == null) {
+            return;
+        }
+
+        pendingWorldJoinLaunch = false;
+        ServerJoinTracker.recordClientJoin(client);
+        BackgroundStartRunner.getInstance().launch(StartLaunchMode.WORLD_JOIN);
+    }
+
+    private void handleScreenLaunchTriggers(MinecraftClient client) {
+        if (client == null) {
+            lastObservedScreen = null;
+            return;
+        }
+        Screen currentScreen = client.currentScreen;
+        if (currentScreen == lastObservedScreen) {
+            return;
+        }
+        lastObservedScreen = currentScreen;
+        if (currentScreen == null) {
+            return;
+        }
+        BackgroundStartRunner.getInstance().launch(StartLaunchMode.SCREEN_OPENED, getScreenTargetKey(currentScreen));
+        if (currentScreen instanceof TitleScreen) {
+            BackgroundStartRunner.getInstance().launch(StartLaunchMode.MAIN_MENU_OPEN);
+        }
+    }
+
+    private String getScreenTargetKey(Screen screen) {
+        if (screen instanceof TitleScreen) {
+            return "main_menu";
+        }
+        if (screen instanceof GameMenuScreen) {
+            return "pause_menu";
+        }
+        if (screen instanceof ChatScreen) {
+            return "chat";
+        }
+        if (screen instanceof InventoryScreen) {
+            return "inventory";
+        }
+        if (screen instanceof MerchantScreen) {
+            return "merchant";
+        }
+        if (PathmindScreens.isVisualEditorScreen(screen)) {
+            return "visual_editor";
+        }
+        return screen == null ? "" : screen.getClass().getSimpleName().toLowerCase(Locale.ROOT);
     }
 
     private void fireFabricEvent(String eventName) {

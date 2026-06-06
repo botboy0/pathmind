@@ -13,6 +13,8 @@ import com.pathmind.nodes.NodeParameter;
 import com.pathmind.nodes.NodeType;
 import com.pathmind.nodes.ParameterType;
 import com.pathmind.nodes.RelativeInputSupport;
+import com.pathmind.nodes.StartLaunchMode;
+import com.pathmind.nodes.StartScreenTarget;
 import com.pathmind.ui.menu.ContextMenuSelection;
 import com.pathmind.ui.menu.ContextMenuRenderer;
 import com.pathmind.ui.animation.AnimatedValue;
@@ -172,6 +174,9 @@ public class NodeGraph {
     private boolean hoveringStartButton = false;
     private Node hoveredStartNode = null;
     private boolean lastStartButtonTriggeredExecution = false;
+    private Node startModeDropdownNode = null;
+    private int startModeDropdownWorldX = 0;
+    private int startModeDropdownWorldY = 0;
 
     private Node sensorDropTarget = null;
     private Node actionDropTarget = null;
@@ -1253,6 +1258,7 @@ public class NodeGraph {
         hoveredSocketIsInput = false;
         hoveringStartButton = false;
         hoveredStartNode = null;
+        startModeDropdownNode = null;
         isDraggingConnection = false;
         connectionSourceNode = null;
         disconnectedConnection = null;
@@ -2480,6 +2486,10 @@ public class NodeGraph {
         return nodeContextMenu != null && nodeContextMenu.isOpen();
     }
 
+    public boolean isStartModeDropdownOpen() {
+        return startModeDropdownNode != null;
+    }
+
     /**
      * Updates the context menu hover state.
      */
@@ -2501,6 +2511,46 @@ public class NodeGraph {
             nodeContextMenu.setScale(getZoomScale());
             nodeContextMenu.updateHover(mouseX, mouseY);
         }
+    }
+
+    public boolean handleStartModeDropdownClick(int mouseX, int mouseY) {
+        if (startModeDropdownNode != null) {
+            StartScreenTarget selectedTarget = getStartScreenTargetDropdownOptionAt(mouseX, mouseY);
+            if (selectedTarget != null) {
+                startModeDropdownNode.setStartLaunchMode(StartLaunchMode.SCREEN_OPENED);
+                startModeDropdownNode.setStartScreenTarget(selectedTarget);
+                markWorkspaceDirty();
+                closeStartModeDropdown();
+                return true;
+            }
+            StartLaunchMode selectedMode = getStartModeDropdownOptionAt(mouseX, mouseY);
+            if (selectedMode != null) {
+                startModeDropdownNode.setStartLaunchMode(selectedMode);
+                markWorkspaceDirty();
+                if (selectedMode == StartLaunchMode.SCREEN_OPENED) {
+                    return true;
+                }
+                closeStartModeDropdown();
+                return true;
+            }
+            closeStartModeDropdown();
+            return true;
+        }
+
+        Node node = findStartModeButtonAt(mouseX, mouseY);
+        if (node == null) {
+            return false;
+        }
+        startModeDropdownNode = node;
+        startModeDropdownWorldX = getStartModeButtonWorldX(node) + 10;
+        startModeDropdownWorldY = getStartModeButtonWorldY(node) + 8;
+        closeContextMenu();
+        closeNodeContextMenu();
+        return true;
+    }
+
+    public void closeStartModeDropdown() {
+        startModeDropdownNode = null;
     }
 
     /**
@@ -2574,6 +2624,74 @@ public class NodeGraph {
             nodeContextMenu.setScale(getZoomScale());
             nodeContextMenu.render(context, textRenderer);
         }
+    }
+
+    public void renderStartModeDropdown(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY) {
+        if (startModeDropdownNode == null) {
+            return;
+        }
+        int x = worldToScreenX(startModeDropdownWorldX);
+        int y = worldToScreenY(startModeDropdownWorldY);
+        int width = 124;
+        int rowHeight = 18;
+        int height = StartLaunchMode.values().length * rowHeight + 4;
+        ContextMenuRenderer.renderMenuBackground(context, x, y, width, height);
+        StartLaunchMode currentMode = startModeDropdownNode.getStartLaunchMode();
+        StartLaunchMode[] modes = StartLaunchMode.values();
+        for (int i = 0; i < modes.length; i++) {
+            StartLaunchMode mode = modes[i];
+            int rowY = y + 2 + i * rowHeight;
+            boolean hovered = mouseX >= x + 2 && mouseX <= x + width - 2
+                && mouseY >= rowY && mouseY <= rowY + rowHeight;
+            if (hovered) {
+                context.fill(x + 2, rowY, x + width - 2, rowY + rowHeight, UITheme.CONTEXT_MENU_ITEM_HOVER);
+            }
+            int textColor = mode == currentMode ? getSelectedNodeAccentColor() : UITheme.TEXT_PRIMARY;
+            if (mode == currentMode) {
+                renderStartModeSubmenuArrow(context, x + 8, rowY + 6, textColor);
+            }
+            context.drawTextWithShadow(textRenderer, Text.literal(mode.getDisplayName()), x + 20, rowY + 5, textColor);
+            if (mode == StartLaunchMode.SCREEN_OPENED) {
+                renderStartModeSubmenuArrow(context, x + width - 12, rowY + 6, UITheme.CONTEXT_MENU_TEXT);
+            }
+        }
+        if (shouldRenderStartScreenTargetSubmenu(mouseX, mouseY)) {
+            renderStartScreenTargetSubmenu(context, textRenderer, mouseX, mouseY);
+        }
+    }
+
+    private void renderStartScreenTargetSubmenu(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY) {
+        int x = getStartScreenTargetSubmenuX();
+        int y = getStartScreenTargetSubmenuY();
+        int width = 124;
+        int rowHeight = 18;
+        int height = StartScreenTarget.values().length * rowHeight + 4;
+        ContextMenuRenderer.renderMenuBackground(context, x, y, width, height);
+        StartScreenTarget currentTarget = startModeDropdownNode.getStartScreenTarget();
+        StartScreenTarget[] targets = StartScreenTarget.values();
+        for (int i = 0; i < targets.length; i++) {
+            StartScreenTarget target = targets[i];
+            int rowY = y + 2 + i * rowHeight;
+            boolean hovered = mouseX >= x + 2 && mouseX <= x + width - 2
+                && mouseY >= rowY && mouseY <= rowY + rowHeight;
+            if (hovered) {
+                context.fill(x + 2, rowY, x + width - 2, rowY + rowHeight, UITheme.CONTEXT_MENU_ITEM_HOVER);
+            }
+            int textColor = target == currentTarget ? getSelectedNodeAccentColor() : UITheme.TEXT_PRIMARY;
+            if (target == currentTarget) {
+                context.drawHorizontalLine(x + 8, x + 11, rowY + 9, textColor);
+                context.drawHorizontalLine(x + 11, x + 15, rowY + 8, textColor);
+            }
+            context.drawTextWithShadow(textRenderer, Text.literal(target.getDisplayName()), x + 20, rowY + 5, textColor);
+        }
+    }
+
+    private void renderStartModeSubmenuArrow(DrawContext context, int x, int y, int color) {
+        context.fill(x, y + 1, x + 3, y + 2, color);
+        context.fill(x, y + 2, x + 5, y + 3, color);
+        context.fill(x, y + 3, x + 7, y + 4, color);
+        context.fill(x, y + 4, x + 5, y + 5, color);
+        context.fill(x, y + 5, x + 3, y + 6, color);
     }
 
     /**
@@ -3594,7 +3712,7 @@ public class NodeGraph {
                 : (isOverSidebar ? toGrayscale(UITheme.NODE_START_BG, 0.7f) : UITheme.NODE_START_BG);
             context.fill(x + 1, y + 1, x + width - 1, y + height - 1, greenColor);
             
-            // Draw play button (triangle pointing right) - with hover effect
+            // Draw launch-mode icon - with hover effect
             int playColor;
             if (hoveringStartButton) {
                 playColor = isOverSidebar ? UITheme.TEXT_LABEL : UITheme.TEXT_PRIMARY; // Darker when hovered
@@ -3603,23 +3721,11 @@ public class NodeGraph {
             }
             int centerX = x + width / 2;
             int centerY = y + height / 2;
-            
-            // Play triangle (pointing right) - bigger and cleaner
-            int triangleSize = 10; // Bigger triangle
-            int offset = 1; // Slight right offset for centering
-            
-            // Draw triangle using a cleaner algorithm
-            for (int i = 0; i < triangleSize; i++) {
-                int lineWidth = i + 1; // Each line gets progressively wider
-                int startX = centerX - triangleSize/2 + offset;
-                int lineY = centerY - triangleSize/2 + i;
-                
-                if (lineY >= y + 2 && lineY <= y + height - 3) {
-                    context.drawHorizontalLine(startX, startX + lineWidth, lineY, playColor);
-                }
-            }
+
+            renderStartLaunchIcon(context, node.getStartLaunchMode(), centerX, centerY, playColor, y, height);
 
             renderStartNodeNumber(context, textRenderer, node, x, y, isOverSidebar);
+            renderStartModeButton(context, node, x, y, isOverSidebar, mouseX, mouseY);
             
         } else if (node.getType() == NodeType.EVENT_FUNCTION) {
             int baseColor = lowDetail
@@ -5039,6 +5145,60 @@ public class NodeGraph {
         String label = String.valueOf(number);
         int textColor = isOverSidebar ? UITheme.TEXT_LABEL : UITheme.TEXT_PRIMARY;
         drawNodeText(context, textRenderer, label, x + 4, y + 4, textColor);
+    }
+
+    private void renderStartLaunchIcon(DrawContext context, StartLaunchMode mode, int centerX, int centerY,
+                                       int color, int nodeY, int nodeHeight) {
+        StartLaunchMode effectiveMode = mode == null ? StartLaunchMode.MANUAL : mode;
+        if (effectiveMode == StartLaunchMode.CLIENT_LAUNCH) {
+            context.fill(centerX - 2, centerY - 8, centerX + 3, centerY + 5, color);
+            context.fill(centerX - 6, centerY + 2, centerX + 7, centerY + 6, color);
+            context.fill(centerX - 4, centerY - 5, centerX + 5, centerY - 1, color);
+            return;
+        }
+        if (effectiveMode == StartLaunchMode.WORLD_JOIN) {
+            context.fill(centerX - 7, centerY - 5, centerX + 8, centerY + 6, color);
+            context.fill(centerX - 4, centerY - 8, centerX + 5, centerY + 9, color);
+            context.fill(centerX - 9, centerY - 2, centerX + 10, centerY + 3, color);
+            return;
+        }
+        if (effectiveMode == StartLaunchMode.MAIN_MENU_OPEN) {
+            context.fill(centerX - 8, centerY - 7, centerX + 9, centerY - 3, color);
+            context.fill(centerX - 8, centerY - 1, centerX + 9, centerY + 3, color);
+            context.fill(centerX - 8, centerY + 5, centerX + 9, centerY + 9, color);
+            return;
+        }
+        if (effectiveMode == StartLaunchMode.SCREEN_OPENED) {
+            context.fill(centerX - 9, centerY - 7, centerX + 10, centerY + 8, color);
+            context.fill(centerX - 5, centerY - 3, centerX + 6, centerY + 4, UITheme.NODE_START_BG);
+            context.fill(centerX - 4, centerY + 10, centerX + 5, centerY + 13, color);
+            return;
+        }
+
+        int triangleSize = 13;
+        for (int i = 0; i < triangleSize; i++) {
+            int lineWidth = Math.max(3, i + 2);
+            int startX = centerX - 5;
+            int lineY = centerY - triangleSize / 2 + i;
+            if (lineY >= nodeY + 2 && lineY <= nodeY + nodeHeight - 3) {
+                context.fill(startX, lineY, startX + lineWidth, lineY + 2, color);
+            }
+        }
+    }
+
+    private void renderStartModeButton(DrawContext context, Node node, int x, int y, boolean isOverSidebar,
+                                       int mouseX, int mouseY) {
+        int buttonX = getStartModeButtonWorldX(node) - cameraX;
+        int buttonY = getStartModeButtonWorldY(node) - cameraY;
+        int color = isOverSidebar ? UITheme.TEXT_TERTIARY : UITheme.TEXT_PRIMARY;
+        boolean hovered = isPointInsideStartModeButton(node, mouseX, mouseY);
+        if (hovered && !isOverSidebar) {
+            context.fill(buttonX - 1, buttonY - 1, buttonX + 10, buttonY + 7, 0x33000000);
+        }
+        for (int i = 0; i < 3; i++) {
+            int dotX = buttonX + 2 + (i * 3);
+            context.fill(dotX, buttonY + 2, dotX + 1, buttonY + 3, color);
+        }
     }
 
     private void renderBooleanToggleButton(DrawContext context, TextRenderer textRenderer, Node node, boolean isOverSidebar, int mouseX, int mouseY) {
@@ -14833,19 +14993,125 @@ public class NodeGraph {
     }
     
     private boolean isMouseOverStartButton(Node startNode, int mouseX, int mouseY) {
+        if (isPointInsideStartModeButton(startNode, mouseX, mouseY)) {
+            return false;
+        }
         int centerX = startNode.getX() + startNode.getWidth() / 2;
         int centerY = startNode.getY() + startNode.getHeight() / 2;
         int worldMouseX = screenToWorldX(mouseX);
         int worldMouseY = screenToWorldY(mouseY);
         
-        // Check if mouse is within the triangle area
-        int triangleSize = 10;
-        int offset = 1;
-        int startX = centerX - triangleSize/2 + offset;
-        
-        // Simple bounding box check for the triangle
-        return worldMouseX >= startX && worldMouseX <= startX + triangleSize &&
-               worldMouseY >= centerY - triangleSize/2 && worldMouseY <= centerY + triangleSize/2;
+        return worldMouseX >= centerX - 11 && worldMouseX <= centerX + 11
+            && worldMouseY >= centerY - 11 && worldMouseY <= centerY + 11;
+    }
+
+    private int getStartModeButtonWorldX(Node startNode) {
+        return startNode.getX() + startNode.getWidth() - 12;
+    }
+
+    private int getStartModeButtonWorldY(Node startNode) {
+        return startNode.getY() + 4;
+    }
+
+    private boolean isPointInsideStartModeButton(Node startNode, int mouseX, int mouseY) {
+        if (startNode == null || startNode.getType() != NodeType.START) {
+            return false;
+        }
+        int worldMouseX = screenToWorldX(mouseX);
+        int worldMouseY = screenToWorldY(mouseY);
+        int buttonX = getStartModeButtonWorldX(startNode) - 1;
+        int buttonY = getStartModeButtonWorldY(startNode) - 1;
+        return worldMouseX >= buttonX && worldMouseX <= buttonX + 12
+            && worldMouseY >= buttonY && worldMouseY <= buttonY + 9;
+    }
+
+    private Node findStartModeButtonAt(int mouseX, int mouseY) {
+        rebuildHierarchyCacheIfNeeded();
+        for (Node node : nodes) {
+            if (!intersectsViewport(node)) {
+                continue;
+            }
+            if (node.getType() == NodeType.START && isPointInsideStartModeButton(node, mouseX, mouseY)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private StartLaunchMode getStartModeDropdownOptionAt(int mouseX, int mouseY) {
+        int x = worldToScreenX(startModeDropdownWorldX);
+        int y = worldToScreenY(startModeDropdownWorldY);
+        int width = 124;
+        int rowHeight = 18;
+        int localX = mouseX - x;
+        int localY = mouseY - y - 2;
+        if (localX < 2 || localX > width - 2 || localY < 0) {
+            return null;
+        }
+        int index = localY / rowHeight;
+        StartLaunchMode[] modes = StartLaunchMode.values();
+        if (index < 0 || index >= modes.length) {
+            return null;
+        }
+        return modes[index];
+    }
+
+    private StartScreenTarget getStartScreenTargetDropdownOptionAt(int mouseX, int mouseY) {
+        if (startModeDropdownNode == null
+            || !shouldRenderStartScreenTargetSubmenu(mouseX, mouseY)) {
+            return null;
+        }
+        int x = getStartScreenTargetSubmenuX();
+        int y = getStartScreenTargetSubmenuY();
+        int width = 124;
+        int rowHeight = 18;
+        int localX = mouseX - x;
+        int localY = mouseY - y - 2;
+        if (localX < 2 || localX > width - 2 || localY < 0) {
+            return null;
+        }
+        int index = localY / rowHeight;
+        StartScreenTarget[] targets = StartScreenTarget.values();
+        if (index < 0 || index >= targets.length) {
+            return null;
+        }
+        return targets[index];
+    }
+
+    private boolean shouldRenderStartScreenTargetSubmenu(int mouseX, int mouseY) {
+        return startModeDropdownNode != null
+            && (startModeDropdownNode.getStartLaunchMode() == StartLaunchMode.SCREEN_OPENED
+                || isMouseOverStartScreenOpenedModeRow(mouseX, mouseY)
+                || isMouseOverStartScreenTargetSubmenu(mouseX, mouseY));
+    }
+
+    private boolean isMouseOverStartScreenOpenedModeRow(int mouseX, int mouseY) {
+        int x = worldToScreenX(startModeDropdownWorldX);
+        int y = worldToScreenY(startModeDropdownWorldY);
+        int width = 124;
+        int rowHeight = 18;
+        int rowIndex = StartLaunchMode.SCREEN_OPENED.ordinal();
+        int rowY = y + 2 + rowIndex * rowHeight;
+        return mouseX >= x && mouseX <= x + width
+            && mouseY >= rowY && mouseY <= rowY + rowHeight;
+    }
+
+    private boolean isMouseOverStartScreenTargetSubmenu(int mouseX, int mouseY) {
+        int x = getStartScreenTargetSubmenuX();
+        int y = getStartScreenTargetSubmenuY();
+        int width = 124;
+        int height = StartScreenTarget.values().length * 18 + 4;
+        return mouseX >= x && mouseX <= x + width
+            && mouseY >= y && mouseY <= y + height;
+    }
+
+    private int getStartScreenTargetSubmenuX() {
+        return worldToScreenX(startModeDropdownWorldX) + 123;
+    }
+
+    private int getStartScreenTargetSubmenuY() {
+        int baseY = worldToScreenY(startModeDropdownWorldY);
+        return baseY + 2 + StartLaunchMode.SCREEN_OPENED.ordinal() * 18;
     }
     
     public boolean isHoveringStartButton() {
@@ -14860,7 +15126,8 @@ public class NodeGraph {
         int worldX = screenToWorldX(mouseX);
         int worldY = screenToWorldY(mouseY);
 
-        if (node.getType() == NodeType.START && isMouseOverStartButton(node, mouseX, mouseY)) {
+        if (node.getType() == NodeType.START
+            && (isMouseOverStartButton(node, mouseX, mouseY) || isPointInsideStartModeButton(node, mouseX, mouseY))) {
             return true;
         }
         if (node.getType() == NodeType.TEMPLATE && isPointInsideTemplateEditButton(node, mouseX, mouseY)) {
@@ -14929,9 +15196,6 @@ public class NodeGraph {
 
     public boolean handleStartButtonClick(int mouseX, int mouseY) {
         lastStartButtonTriggeredExecution = false;
-        if (!executionEnabled) {
-            return false;
-        }
         Node startNode = findStartNodeAt(mouseX, mouseY);
         if (startNode == null) {
             return false;
@@ -15273,6 +15537,8 @@ public class NodeGraph {
             if (startNodeNumber != null) {
                 node.setStartNodeNumber(startNodeNumber);
             }
+            node.setStartLaunchMode(nodeData.getStartLaunchMode());
+            node.setStartScreenTarget(nodeData.getStartScreenTarget());
             if (node.getType() == NodeType.SENSOR_KEY_PRESSED) {
                 Boolean storedValue = nodeData.getKeyPressedActivatesInGuis();
                 node.setKeyPressedActivatesInGuis(storedValue == null || storedValue);

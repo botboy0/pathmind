@@ -51,6 +51,9 @@ public final class SettingsManager {
         public Boolean createListUseCustomRadius = false;
         public Integer createListRadius = 64;
         public Map<String, Map<String, String>> presetInputValues = new LinkedHashMap<>();
+        public Map<String, String> presetGroupColors = new LinkedHashMap<>();
+        public Map<String, Boolean> presetGroupsExpanded = new LinkedHashMap<>();
+        public java.util.List<String> presetGroupOrder = new java.util.ArrayList<>();
 
         public Settings() {
         }
@@ -260,6 +263,15 @@ public final class SettingsManager {
         }
         if (settings.presetInputValues == null) {
             settings.presetInputValues = new LinkedHashMap<>();
+        }
+        if (settings.presetGroupColors == null) {
+            settings.presetGroupColors = new LinkedHashMap<>();
+        }
+        if (settings.presetGroupsExpanded == null) {
+            settings.presetGroupsExpanded = new LinkedHashMap<>();
+        }
+        if (settings.presetGroupOrder == null) {
+            settings.presetGroupOrder = new java.util.ArrayList<>();
         }
         return settings;
     }

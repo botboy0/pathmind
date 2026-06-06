@@ -14,10 +14,14 @@ final class NodeRuntimeState {
     boolean repeatActive;
     boolean repeatExecuteAttachedAction;
     boolean lastSensorResult;
+    boolean lastJoinedServerRawResult;
     RuntimeParameterData runtimeParameterData;
     Node owningStartNode;
     Node activeRepeatUntilGuard;
     int startNodeNumber;
+    StartLaunchMode startLaunchMode = StartLaunchMode.MANUAL;
+    StartScreenTarget startScreenTarget = StartScreenTarget.ANY;
+    String runtimeSourceNodeId;
     Random randomGenerator;
     String randomSeedCache;
 
@@ -26,6 +30,7 @@ final class NodeRuntimeState {
         repeatActive = false;
         repeatExecuteAttachedAction = false;
         lastSensorResult = false;
+        lastJoinedServerRawResult = false;
         nextOutputSocket = 0;
     }
 }
