@@ -46,12 +46,14 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
 import net.minecraft.client.gui.screen.TitleScreen;
@@ -71,6 +73,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * The client-side mod class for Pathmind.
@@ -200,7 +203,6 @@ public class PathmindClientMod implements ClientModInitializer {
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             pendingWorldJoinLaunch = false;
-            handleClientShutdown("play disconnect", false);
             PathmindNavigator.getInstance().reset();
             ChatMessageTracker.clear();
             FabricEventTracker.clear();
@@ -552,31 +554,30 @@ public class PathmindClientMod implements ClientModInitializer {
         // but freeze Pathmind when the vanilla pause menu is open in multiplayer too.
         manager.setSingleplayerPaused((client.isInSingleplayer() && editorOpen) || isPauseMenuOpen(client));
 
-        if (client.world == null) {
-            if (!PathmindScreens.isVisualEditorScreen(client.currentScreen)) {
-                handleClientShutdown("world unavailable", false);
-            }
-            return;
-        }
+        boolean typing = shouldIgnoreKeybinds(client);
 
-        // Don't handle k/j keybinds when chat or Pathmind GUI is open
-        boolean chatOrGuiOpen = shouldIgnoreKeybinds(client);
-
-        boolean stopDown = PathmindKeybinds.STOP_GRAPHS.isPressed();
-        if (!chatOrGuiOpen && stopDown && !stopGraphsKeyDown) {
+        boolean stopDown = isPathmindKeyDown(client, PathmindKeybinds.STOP_GRAPHS, GLFW.GLFW_KEY_J);
+        if (!typing && stopDown && !stopGraphsKeyDown) {
             ExecutionManager.getInstance().requestStopAll();
         }
         stopGraphsKeyDown = stopDown;
 
-        if (client.player == null) {
-            return;
-        }
-
-        boolean playDown = PathmindKeybinds.PLAY_GRAPHS.isPressed();
-        if (!chatOrGuiOpen && playDown && !playGraphsKeyDown) {
+        boolean playDown = isPathmindKeyDown(client, PathmindKeybinds.PLAY_GRAPHS, GLFW.GLFW_KEY_K);
+        if (!typing && playDown && !playGraphsKeyDown) {
             ExecutionManager.getInstance().playAllGraphs();
         }
         playGraphsKeyDown = playDown;
+    }
+
+    private boolean isPathmindKeyDown(MinecraftClient client, net.minecraft.client.option.KeyBinding keyBinding, int fallbackKeyCode) {
+        if (keyBinding != null && keyBinding.isPressed()) {
+            return true;
+        }
+        if (client == null || client.getWindow() == null) {
+            return false;
+        }
+        long handle = client.getWindow().getHandle();
+        return handle != 0L && GLFW.glfwGetKey(handle, fallbackKeyCode) == GLFW.GLFW_PRESS;
     }
 
     private boolean isPauseMenuOpen(MinecraftClient client) {
@@ -587,15 +588,31 @@ public class PathmindClientMod implements ClientModInitializer {
         if (client == null || client.currentScreen == null) {
             return false;
         }
-        // Check if chat screen is open
         if (client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
             return true;
         }
-        // Check if Pathmind visual editor is open
-        if (PathmindScreens.isVisualEditorScreen(client.currentScreen)) {
-            return true;
+        return isTextInputFocused(client.currentScreen);
+    }
+
+    private boolean isTextInputFocused(Screen screen) {
+        Element focused = getFocusedElement(screen);
+        if (focused instanceof TextFieldWidget textField) {
+            return textField.isFocused();
         }
         return false;
+    }
+
+    private Element getFocusedElement(Screen screen) {
+        if (screen == null) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Method method = Screen.class.getMethod("getFocused");
+            Object focused = method.invoke(screen);
+            return focused instanceof Element element ? element : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     private void handleRecipeCacheWarmup(MinecraftClient client) {

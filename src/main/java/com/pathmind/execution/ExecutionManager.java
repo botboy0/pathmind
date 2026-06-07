@@ -2961,6 +2961,7 @@ public class ExecutionManager {
             nodeData.setStartNodeNumber(node.getStartNodeNumber());
             nodeData.setStartLaunchMode(node.getStartLaunchMode());
             nodeData.setStartScreenTarget(node.getStartScreenTarget());
+            nodeData.setRuntimeSourceNodeId(node.getRuntimeSourceNodeId());
             List<NodeGraphData.ParameterAttachmentData> attachmentData = new ArrayList<>();
             Map<Integer, Node> attachedParameters = node.getAttachedParameters();
             if (attachedParameters != null && !attachedParameters.isEmpty()) {

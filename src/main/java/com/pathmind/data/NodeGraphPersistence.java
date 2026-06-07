@@ -330,6 +330,7 @@ public class NodeGraphPersistence {
             }
             node.setStartLaunchMode(nodeData.getStartLaunchMode());
             node.setStartScreenTarget(nodeData.getStartScreenTarget());
+            node.setRuntimeSourceNodeId(nodeData.getRuntimeSourceNodeId());
             node.recalculateDimensions();
 
             nodes.add(node);

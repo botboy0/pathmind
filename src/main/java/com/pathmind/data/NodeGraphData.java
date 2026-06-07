@@ -126,6 +126,7 @@ public class NodeGraphData {
         private Integer startNodeNumber;
         private StartLaunchMode startLaunchMode;
         private StartScreenTarget startScreenTarget;
+        private String runtimeSourceNodeId;
         private List<String> messageLines;
         private Boolean messageClientSide;
         private String bookText;
@@ -231,6 +232,14 @@ public class NodeGraphData {
 
         public void setStartScreenTarget(StartScreenTarget startScreenTarget) {
             this.startScreenTarget = startScreenTarget;
+        }
+
+        public String getRuntimeSourceNodeId() {
+            return runtimeSourceNodeId;
+        }
+
+        public void setRuntimeSourceNodeId(String runtimeSourceNodeId) {
+            this.runtimeSourceNodeId = runtimeSourceNodeId;
         }
 
         public List<String> getMessageLines() {
