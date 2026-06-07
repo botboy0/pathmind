@@ -3151,7 +3151,11 @@ public class Node {
         if (!hasMessageInputFields()) {
             return;
         }
-        messageLines.add(value == null ? "" : value);
+        String lineValue = value == null ? "" : value;
+        if (type == NodeType.CHANGE_VARIABLE && lineValue.isBlank()) {
+            lineValue = getDefaultCalculationLineValue(messageLines.size());
+        }
+        messageLines.add(lineValue);
         layoutState.clearMessageFieldContentWidthOverride();
         recalculateDimensions();
     }
@@ -3207,13 +3211,28 @@ public class Node {
 
     public String getMessageFieldLabelText(int index) {
         if (type == NodeType.CHANGE_VARIABLE) {
-            return getMessageFieldCount() > 1 ? "Expr " + (index + 1) : "Expression";
+            return "Output " + getCalculationVariableLabel(index);
         }
         return getMessageFieldCount() > 1 ? "Message " + (index + 1) : "Message";
     }
 
     private String getDefaultMessageLineValue() {
-        return type == NodeType.CHANGE_VARIABLE ? "0" : "Hello World";
+        return type == NodeType.CHANGE_VARIABLE ? getDefaultCalculationLineValue(messageLines.size()) : "Hello World";
+    }
+
+    private String getDefaultCalculationLineValue(int index) {
+        return getCalculationVariableLabel(index) + " = 0";
+    }
+
+    private String getCalculationVariableLabel(int index) {
+        int value = Math.max(0, index);
+        StringBuilder builder = new StringBuilder();
+        do {
+            int remainder = value % 26;
+            builder.insert(0, (char) ('A' + remainder));
+            value = value / 26 - 1;
+        } while (value >= 0);
+        return builder.toString();
     }
 
     public int getMessageFieldDisplayHeight() {

@@ -6313,26 +6313,40 @@ public class NodeGraph {
             if (rawValue == null) {
                 rawValue = "";
             }
+            int textX = fieldLeft + 3;
+            int textY = fieldTop + (fieldHeight - textRenderer.fontHeight) / 2 + 1;
+            String fixedPrefix = "";
+            int expressionTextX = textX;
+            if (node.getType() == NodeType.CHANGE_VARIABLE) {
+                String variableName = getCalculateOutputName(node, i);
+                fixedPrefix = variableName + " = ";
+                expressionTextX = textX + textRenderer.getWidth(fixedPrefix);
+                if (!editingThis) {
+                    rawValue = getCalculateExpressionText(rawValue, variableName);
+                }
+            }
+            int expressionFieldWidth = Math.max(1, fieldWidth - 6 - textRenderer.getWidth(fixedPrefix));
             String display = editingThis
                 ? rawValue
-                : trimTextToWidth(rawValue, textRenderer, fieldWidth - 6);
+                : trimTextToWidth(rawValue, textRenderer, expressionFieldWidth);
             InlineVariableRender renderData = null;
             if (shouldBuildInlineExpressionRender(rawValue, runtimeVariableNames)) {
                 InlineVariableRender candidate = buildInlineVariableRender(rawValue, runtimeVariableNames, valueColor, variableHighlightColor);
                 if (editingThis) {
                     renderData = candidate;
                     display = renderData.displayText;
-                } else if (textRenderer.getWidth(candidate.displayText) <= fieldWidth - 6) {
+                } else if (textRenderer.getWidth(candidate.displayText) <= expressionFieldWidth) {
                     renderData = candidate;
                     display = renderData.displayText;
                 } else if (isSingleKnownInlineVariableReference(rawValue, runtimeVariableNames)) {
-                    display = trimTextToWidth(candidate.displayText, textRenderer, fieldWidth - 6);
+                    display = trimTextToWidth(candidate.displayText, textRenderer, expressionFieldWidth);
                     valueColor = variableHighlightColor;
                 }
             }
 
-            int textX = fieldLeft + 3;
-            int textY = fieldTop + (fieldHeight - textRenderer.fontHeight) / 2 + 1;
+            if (!fixedPrefix.isEmpty()) {
+                drawNodeText(context, textRenderer, Text.literal(fixedPrefix), textX, textY, UITheme.TEXT_TERTIARY);
+            }
             if (editingThis && hasMessageSelection()) {
                 int start = messageSelectionStart;
                 int end = messageSelectionEnd;
@@ -6341,17 +6355,17 @@ public class NodeGraph {
                     end = renderData.toDisplayIndex(end);
                 }
                 if (start >= 0 && end >= 0 && start <= display.length() && end <= display.length()) {
-                    int selectionStartX = textX + textRenderer.getWidth(display.substring(0, start));
-                    int selectionEndX = textX + textRenderer.getWidth(display.substring(0, end));
+                    int selectionStartX = expressionTextX + textRenderer.getWidth(display.substring(0, start));
+                    int selectionEndX = expressionTextX + textRenderer.getWidth(display.substring(0, end));
                     context.fill(selectionStartX, fieldTop + 2, selectionEndX, fieldBottom - 2, UITheme.TEXT_SELECTION_BG);
                 }
             }
             if (renderData != null) {
                 if (shouldRenderNodeText()) {
-                    renderData.draw(context, textRenderer, textX, textY);
+                    renderData.draw(context, textRenderer, expressionTextX, textY);
                 }
             } else {
-                drawNodeText(context, textRenderer, Text.literal(display), textX, textY, valueColor);
+                drawNodeText(context, textRenderer, Text.literal(display), expressionTextX, textY, valueColor);
             }
 
             if (editingThis && messageCaretVisible) {
@@ -6360,7 +6374,7 @@ public class NodeGraph {
                     caretIndex = renderData.toDisplayIndex(caretIndex);
                 }
                 caretIndex = MathHelper.clamp(caretIndex, 0, display.length());
-                int caretX = textX + textRenderer.getWidth(display.substring(0, caretIndex));
+                int caretX = expressionTextX + textRenderer.getWidth(display.substring(0, caretIndex));
                 caretX = Math.min(caretX, fieldLeft + fieldWidth - 2);
                 int caretBaseline = Math.min(textY + textRenderer.fontHeight - 1, fieldBottom - 2);
                 UIStyleHelper.drawTextCaretAtBaseline(context, textRenderer, caretX, caretBaseline, fieldLeft + fieldWidth - 2, UITheme.CARET_COLOR);
@@ -6639,25 +6653,42 @@ public class NodeGraph {
         }
         Set<String> names = new HashSet<>();
         for (Node graphNode : nodes) {
-            if (graphNode == null || graphNode.getType() != NodeType.VARIABLE) {
+            if (graphNode == null) {
                 continue;
             }
-            NodeParameter parameter = graphNode.getParameter("Variable");
-            if (parameter == null) {
-                continue;
-            }
-            String value = parameter.getStringValue();
-            if (value == null) {
-                continue;
-            }
-            String trimmed = value.trim();
-            if (!trimmed.isEmpty()) {
-                names.add(trimmed);
+            if (graphNode.getType() == NodeType.VARIABLE) {
+                NodeParameter parameter = graphNode.getParameter("Variable");
+                if (parameter == null) {
+                    continue;
+                }
+                String value = parameter.getStringValue();
+                if (value == null) {
+                    continue;
+                }
+                String trimmed = value.trim();
+                if (!trimmed.isEmpty()) {
+                    names.add(trimmed);
+                }
+            } else if (graphNode.getType() == NodeType.CHANGE_VARIABLE) {
+                collectCalculateOutputNames(graphNode, names);
             }
         }
         collectActivePresetInputNames(names);
         cachedBaseRuntimeVariableNames = names;
         return cachedBaseRuntimeVariableNames;
+    }
+
+    private void collectCalculateOutputNames(Node node, Set<String> names) {
+        if (node == null || node.getType() != NodeType.CHANGE_VARIABLE || names == null) {
+            return;
+        }
+        int lineCount = node.getMessageFieldCount();
+        for (int i = 0; i < lineCount; i++) {
+            String outputName = getCalculateOutputName(node, i);
+            if (outputName != null && !outputName.isBlank()) {
+                names.add(outputName.trim());
+            }
+        }
     }
 
     private void collectActivePresetInputNames(Set<String> names) {
@@ -9709,8 +9740,10 @@ public class NodeGraph {
 
         messageEditingNode = node;
         messageEditingIndex = index;
-        messageEditBuffer = node.getMessageLine(index);
-        messageEditOriginalValue = messageEditBuffer;
+        messageEditOriginalValue = node.getMessageLine(index);
+        messageEditBuffer = node.getType() == NodeType.CHANGE_VARIABLE
+            ? getCalculateExpressionText(messageEditOriginalValue, getCalculateOutputName(node, index))
+            : messageEditOriginalValue;
         resetMessageCaretBlink();
         messageCaretPosition = messageEditBuffer.length();
         messageSelectionAnchor = -1;
@@ -9948,6 +9981,9 @@ public class NodeGraph {
             return false;
         }
         String value = messageEditBuffer == null ? "" : messageEditBuffer;
+        if (messageEditingNode.getType() == NodeType.CHANGE_VARIABLE) {
+            value = getCalculateOutputName(messageEditingNode, messageEditingIndex) + " = " + value;
+        }
         String previous = messageEditingNode.getMessageLine(messageEditingIndex);
         messageEditingNode.setMessageLine(messageEditingIndex, value);
         messageEditingNode.recalculateDimensions();
@@ -9960,6 +9996,67 @@ public class NodeGraph {
         }
         messageEditingNode.setMessageLine(messageEditingIndex, messageEditOriginalValue);
         messageEditingNode.recalculateDimensions();
+    }
+
+    private String getCalculateOutputName(Node node, int index) {
+        if (node != null && node.getType() == NodeType.CHANGE_VARIABLE) {
+            String raw = node.getMessageLine(index);
+            int equalsIndex = raw == null ? -1 : raw.indexOf('=');
+            if (equalsIndex > 0) {
+                String candidate = raw.substring(0, equalsIndex).trim();
+                if (candidate.startsWith("$")) {
+                    candidate = candidate.substring(1).trim();
+                }
+                if (isValidCalculateOutputName(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+        return defaultCalculateOutputName(index);
+    }
+
+    private String getCalculateExpressionText(String raw, String outputName) {
+        String value = raw == null ? "" : raw.trim();
+        int equalsIndex = value.indexOf('=');
+        if (equalsIndex > 0) {
+            String candidate = value.substring(0, equalsIndex).trim();
+            if (candidate.startsWith("$")) {
+                candidate = candidate.substring(1).trim();
+            }
+            if (isValidCalculateOutputName(candidate)
+                && (outputName == null || outputName.isBlank() || candidate.equals(outputName))) {
+                return value.substring(equalsIndex + 1).trim();
+            }
+        }
+        return value;
+    }
+
+    private boolean isValidCalculateOutputName(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        String trimmed = name.trim();
+        if (!Character.isLetter(trimmed.charAt(0)) && trimmed.charAt(0) != '_') {
+            return false;
+        }
+        for (int i = 1; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String defaultCalculateOutputName(int index) {
+        int value = Math.max(0, index);
+        StringBuilder builder = new StringBuilder();
+        do {
+            int remainder = value % 26;
+            builder.insert(0, (char) ('A' + remainder));
+            value = value / 26 - 1;
+        } while (value >= 0);
+        return builder.toString();
     }
 
     public boolean isEditingParameterField() {

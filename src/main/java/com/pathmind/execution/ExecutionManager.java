@@ -2987,9 +2987,9 @@ public class ExecutionManager {
             if (node.getType() == NodeType.START) {
                 nodeData.setStartNodeNumber(node.getStartNodeNumber());
             }
-            if (node.getType() == NodeType.MESSAGE) {
-                nodeData.setMessageLines(node.getMessageLines());
-                nodeData.setMessageClientSide(node.isMessageClientSide());
+            if (node.hasMessageInputFields()) {
+                nodeData.setMessageLines(new ArrayList<>(node.getMessageLines()));
+                nodeData.setMessageClientSide(node.hasMessageScopeToggle() ? node.isMessageClientSide() : null);
             }
             if (node.hasBookTextInput()) {
                 nodeData.setBookText(node.getBookText());
