@@ -15,7 +15,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.ActionResult;
@@ -176,9 +175,6 @@ final class NodeEntityActionCommandExecutor {
 
         if (swingOnSuccess && result != null && (result.isAccepted() || result == ActionResult.PASS)) {
             client.player.swingHand(hand);
-            if (client.player.networkHandler != null) {
-                client.player.networkHandler.sendPacket(new HandSwingC2SPacket(hand));
-            }
         }
 
         restoreSneakState.run();
@@ -901,9 +897,6 @@ final class NodeEntityActionCommandExecutor {
                         while (!swung || System.currentTimeMillis() < deadline) {
                             owner.runOnClientThread(client, () -> {
                                 client.player.swingHand(hand);
-                                if (client.player.networkHandler != null) {
-                                    client.player.networkHandler.sendPacket(new HandSwingC2SPacket(hand));
-                                }
                             });
                             swung = true;
                             if (owner.shouldAbortForRepeatUntilGuard()) {
@@ -924,9 +917,6 @@ final class NodeEntityActionCommandExecutor {
                                 performMainHandAttack(client);
                             } else {
                                 client.player.swingHand(hand);
-                                if (client.player.networkHandler != null) {
-                                    client.player.networkHandler.sendPacket(new HandSwingC2SPacket(hand));
-                                }
                             }
                         });
 
@@ -989,9 +979,6 @@ final class NodeEntityActionCommandExecutor {
             }
         }
         client.player.swingHand(Hand.MAIN_HAND);
-        if (client.player.networkHandler != null) {
-            client.player.networkHandler.sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
-        }
     }
     void executeEquipArmorCommand(CompletableFuture<Void> future) {
         if (owner.preprocessAttachedParameter(EnumSet.noneOf(Node.ParameterUsage.class), future) == Node.ParameterHandlingResult.COMPLETE) {

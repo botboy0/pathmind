@@ -87,8 +87,16 @@ final class NodeInventoryCommandExecutor {
             slot = MathHelper.clamp(resolvedSlot, 0, PlayerInventory.getHotbarSize() - 1);
         }
 
-        HotbarSlotSynchronizer.selectHotbarSlot(client, slot);
-        future.complete(null);
+        final int targetSlot = slot;
+        try {
+            runOnClientThread(client, () -> HotbarSlotSynchronizer.selectHotbarSlot(client, targetSlot));
+            future.complete(null);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            future.completeExceptionally(e);
+        } catch (RuntimeException e) {
+            future.completeExceptionally(e);
+        }
     }
     
     void executeDropItemCommand(CompletableFuture<Void> future) {
