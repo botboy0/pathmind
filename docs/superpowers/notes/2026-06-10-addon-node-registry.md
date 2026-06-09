@@ -17,12 +17,13 @@ Start the public addon-node API by giving Pathmind and addon mods an ID-backed r
 - Added addon-ID sidebar availability coverage for dependency flags and hidden helper nodes, plus addon-ID compatibility coverage for registered parameter-slot and provided-trait metadata.
 - Added an ID-backed sidebar category entry view so visible addon definitions can appear in sidebar category metadata without adding `NodeType` enum constants, including render-ready translation key, description key, and color metadata.
 - Added a metadata-backed sidebar search bridge so visible built-in and addon definitions can be discovered by ID, translation key, description key, or category metadata without adding `NodeType` enum constants.
+- Bridged modern, mid, and legacy compat editor context search to consume the sidebar search metadata through `NodeSearchMapper`, while preserving built-in `NodeType` instantiation and keeping addon-only results non-instantiating.
 
 ## Design
 
 The public addon path follows the Fabric/REI pattern of named entrypoint contracts rather than requiring addons to mix into Pathmind internals. Internal mixins remain available to Pathmind or addons for their own implementation details, but the semantic extension point is `PathmindNodePlugin`.
 
-This slice does not update compat editor screen loops, live graph creation, or execution dispatch. It starts at call sites that can consume registered metadata without changing node creation semantics: `Sidebar.isNodeAvailable(Identifier)`, `Sidebar.getEntriesForCategory(NodeCategory)`, `Sidebar.searchEntries(String)`, and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
+The compat editor search loop now consumes registered metadata through `Sidebar.searchEntries(String)`, but live graph creation and execution dispatch remain built-in-only. Addon-only editor search results deliberately return without adding graph nodes until the graph structure can represent external node IDs. Current metadata consumers are `Sidebar.isNodeAvailable(Identifier)`, `Sidebar.getEntriesForCategory(NodeCategory)`, `Sidebar.searchEntries(String)`, compat editor search mapping, and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
 
 ## Verification
 
@@ -46,10 +47,17 @@ This slice does not update compat editor screen loops, live graph creation, or e
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar search metadata because `Sidebar.SidebarSearchResult` and `Sidebar.searchEntries(String)` did not exist.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding metadata-backed sidebar search.
 - `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before compat editor search mapping because `NodeSearchEntry` and `NodeSearchMapper` did not exist.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding `NodeSearchMapper` and wiring compat editor search to sidebar metadata.
+- `.\gradlew.bat assemble "-Pmc_version=1.21"` passed for the legacy compat source set.
+- `.\gradlew.bat assemble "-Pmc_version=1.21.11"` passed for the modern compat source set.
+- `.\gradlew.bat assemble "-Pmc_version=1.21.10"` compiled the mid compat source set but failed later in `remapJar` because `libraries.minecraft.net` DNS resolution failed while downloading `jtracy-1.0.36-natives-windows.jar`.
+- `.\gradlew.bat compileJava "-Pmc_version=1.21.10"` passed for the mid compat source set.
 
 ## Review Risks
 
-- The registry currently captures metadata only; addon node creation, full editor listing, execution routing, and many runtime call-site lookups are still enum-backed in later call sites.
+- The registry currently captures metadata only; addon node creation, execution routing, and many runtime call-site lookups are still enum-backed in later call sites.
+- Compat editor search can show addon metadata, but selecting an addon-only result is intentionally a no-op until graph node structure supports external IDs.
 - `Sidebar` can now answer availability for addon IDs and expose addon IDs plus render/search metadata, but dragging/instantiating sidebar rows into the live graph still depends on built-in `NodeType`.
 - `NodeCompatibility` can now compare registered resolved IDs by trait metadata, but live graph attachment still depends on `Node` instances backed by `NodeType`.
 - Built-in required-slot metadata is bridged from `NodeTraitRegistry.isParameterSlotAlwaysRequired`; dynamic runtime rules such as placement target requirements remain in `Node`.

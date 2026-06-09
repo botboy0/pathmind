@@ -1,6 +1,8 @@
 package com.pathmind.nodes;
 
 import com.pathmind.ui.sidebar.Sidebar;
+import com.pathmind.ui.search.NodeSearchEntry;
+import com.pathmind.ui.search.NodeSearchMapper;
 import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
@@ -145,6 +147,33 @@ class NodeTypeSearchLabelTest {
             .anyMatch(result -> result.entry().builtInType()
                 .filter(NodeType.START::equals)
                 .isPresent()));
+    }
+
+    @Test
+    void editorSearchMappingKeepsAddonResultsNonInstantiating() {
+        Identifier addonNode = Identifier.of("sidebartest", "editor_search_sensor");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.editor_search_sensor")
+            .descriptionKey("sidebartest.node.editor_search_sensor.desc")
+            .color(0xFF226699));
+
+        Sidebar sidebar = new Sidebar(true, true);
+
+        NodeSearchEntry addonEntry = NodeSearchMapper.map(sidebar.searchEntries("editor_search_sensor")).stream()
+            .filter(result -> addonNode.equals(result.entry().id()))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(Optional.empty(), addonEntry.builtInType());
+        assertEquals("sidebartest:editor_search_sensor", addonEntry.label());
+        assertEquals("SENSORS", addonEntry.categoryLabel());
+
+        NodeSearchEntry builtInEntry = NodeSearchMapper.map(sidebar.searchEntries("pathmind.node.type.start")).stream()
+            .filter(result -> result.builtInType().filter(NodeType.START::equals).isPresent())
+            .findFirst()
+            .orElseThrow();
+        assertEquals(NodeType.START.getDisplayName(), builtInEntry.label());
+        assertTrue(builtInEntry.builtInType().isPresent());
     }
 
     private static String getSearchLabel(NodeType nodeType, Map<String, String> translations) throws Exception {

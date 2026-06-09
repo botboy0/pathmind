@@ -28,6 +28,8 @@ import com.pathmind.ui.menu.ContextMenuSelection;
 import com.pathmind.ui.overlay.BookTextEditorOverlay;
 import com.pathmind.ui.overlay.NodeErrorNotificationOverlay;
 import com.pathmind.ui.overlay.NodeParameterOverlay;
+import com.pathmind.ui.search.NodeSearchEntry;
+import com.pathmind.ui.search.NodeSearchMapper;
 import com.pathmind.ui.sidebar.Sidebar;
 import com.pathmind.ui.tooltip.TooltipRenderer;
 import com.pathmind.ui.theme.UIStyleHelper;
@@ -242,7 +244,7 @@ public class PathmindVisualEditorScreen extends Screen {
     private int nodeSearchWorldX = 0;
     private int nodeSearchWorldY = 0;
     private float nodeSearchScale = 1.0f;
-    private final List<NodeSearchResult> nodeSearchResults = new ArrayList<>();
+    private final List<NodeSearchEntry> nodeSearchResults = new ArrayList<>();
     private int nodeSearchHoverIndex = -1;
 
     // Workspace dialogs
@@ -381,20 +383,6 @@ public class PathmindVisualEditorScreen extends Screen {
             this.graphData = graphData;
             this.parentTabIndex = parentTabIndex;
             this.hostTemplateNodeId = hostTemplateNodeId;
-        }
-    }
-
-    private static final class NodeSearchResult {
-        private final NodeType nodeType;
-        private final String label;
-        private final String categoryLabel;
-        private final int score;
-
-        private NodeSearchResult(NodeType nodeType, String label, String categoryLabel, int score) {
-            this.nodeType = nodeType;
-            this.label = label;
-            this.categoryLabel = categoryLabel;
-            this.score = score;
         }
     }
 
@@ -2300,7 +2288,7 @@ public class PathmindVisualEditorScreen extends Screen {
                 return true;
             }
             if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
-                NodeSearchResult selected = getSelectedNodeSearchResult();
+                NodeSearchEntry selected = getSelectedNodeSearchResult();
                 if (selected != null) {
                     selectNodeSearchResult(selected);
                 } else {
@@ -5951,85 +5939,13 @@ public class PathmindVisualEditorScreen extends Screen {
             return;
         }
 
-        for (NodeType nodeType : NodeType.values()) {
-            if (!sidebar.isNodeAvailable(nodeType)) {
-                continue;
-            }
-            int score = scoreNodeSearchCandidate(nodeType, normalizedQuery);
-            if (score <= 0) {
-                continue;
-            }
-            nodeSearchResults.add(new NodeSearchResult(
-                nodeType,
-                nodeType.getDisplayName(),
-                nodeType.getCategory().name().replace('_', ' '),
-                score
-            ));
-        }
-
-        nodeSearchResults.sort((left, right) -> {
-            int scoreCompare = Integer.compare(right.score, left.score);
-            if (scoreCompare != 0) {
-                return scoreCompare;
-            }
-            return left.label.compareToIgnoreCase(right.label);
-        });
+        nodeSearchResults.addAll(NodeSearchMapper.map(sidebar.searchEntries(normalizedQuery)));
         if (nodeSearchResults.size() > NODE_SEARCH_MAX_RESULTS) {
             nodeSearchResults.subList(NODE_SEARCH_MAX_RESULTS, nodeSearchResults.size()).clear();
         }
         if (!nodeSearchResults.isEmpty()) {
             nodeSearchHoverIndex = 0;
         }
-    }
-
-    private int scoreNodeSearchCandidate(NodeType nodeType, String query) {
-        int bestScore = 0;
-        bestScore = Math.max(bestScore, scoreSearchCandidate(nodeType.getDisplayName(), query));
-        bestScore = Math.max(bestScore, scoreSearchCandidate(nodeType.getDescription(), query) - 40);
-        bestScore = Math.max(bestScore, scoreSearchCandidate(nodeType.getCategory().name().replace('_', ' '), query) - 80);
-        bestScore = Math.max(bestScore, scoreSearchCandidate(nodeType.name(), query) - 100);
-        return bestScore;
-    }
-
-    private int scoreSearchCandidate(String candidate, String query) {
-        if (candidate == null || query == null) {
-            return 0;
-        }
-        String normalizedCandidate = candidate.trim().toLowerCase(Locale.ROOT);
-        if (normalizedCandidate.isEmpty() || query.isEmpty()) {
-            return 0;
-        }
-        if (normalizedCandidate.equals(query)) {
-            return 1000;
-        }
-        if (normalizedCandidate.startsWith(query)) {
-            return 800 - Math.max(0, normalizedCandidate.length() - query.length());
-        }
-        int containsIndex = normalizedCandidate.indexOf(query);
-        if (containsIndex >= 0) {
-            return 650 - containsIndex * 6;
-        }
-        int fuzzyScore = fuzzySearchScore(normalizedCandidate, query);
-        return fuzzyScore > 0 ? 300 + fuzzyScore : 0;
-    }
-
-    private int fuzzySearchScore(String candidate, String query) {
-        int score = 0;
-        int streak = 0;
-        int queryIndex = 0;
-        for (int i = 0; i < candidate.length() && queryIndex < query.length(); i++) {
-            if (candidate.charAt(i) == query.charAt(queryIndex)) {
-                score += 8 + streak * 4;
-                streak++;
-                queryIndex++;
-            } else {
-                streak = 0;
-            }
-        }
-        if (queryIndex != query.length()) {
-            return 0;
-        }
-        return Math.max(1, score - Math.max(0, candidate.length() - query.length()));
     }
 
     private void renderNodeSearchDropdown(DrawContext context, int mouseX, int mouseY) {
@@ -6049,7 +5965,7 @@ public class PathmindVisualEditorScreen extends Screen {
         }
 
         for (int i = 0; i < nodeSearchResults.size(); i++) {
-            NodeSearchResult result = nodeSearchResults.get(i);
+            NodeSearchEntry result = nodeSearchResults.get(i);
             int rowTop = listY + i * NODE_SEARCH_RESULT_HEIGHT;
             boolean selected = i == nodeSearchHoverIndex;
             UIStyleHelper.DropdownRowPalette rowPalette = UIStyleHelper.getDropdownRowPalette(getAccentColor(), selected ? 1f : 0f, selected, false);
@@ -6057,9 +5973,9 @@ public class PathmindVisualEditorScreen extends Screen {
                 UIStyleHelper.drawDropdownRow(context, listX + 1, rowTop, listWidth - 2, NODE_SEARCH_RESULT_HEIGHT, rowPalette);
             }
             int textY = rowTop + Math.max(0, (NODE_SEARCH_RESULT_HEIGHT - this.textRenderer.fontHeight) / 2);
-            String label = trimToWidth(result.label, listWidth - (NODE_SEARCH_RESULT_TEXT_PADDING * 2) - 42);
+            String label = trimToWidth(result.label(), listWidth - (NODE_SEARCH_RESULT_TEXT_PADDING * 2) - 42);
             context.drawTextWithShadow(this.textRenderer, Text.literal(label), listX + NODE_SEARCH_RESULT_TEXT_PADDING, textY, selected ? rowPalette.textColor() : UITheme.TEXT_PRIMARY);
-            String category = trimToWidth(result.categoryLabel, 36);
+            String category = trimToWidth(result.categoryLabel(), 36);
             int categoryWidth = this.textRenderer.getWidth(category);
             context.drawTextWithShadow(this.textRenderer, Text.literal(category),
                 listX + listWidth - NODE_SEARCH_RESULT_TEXT_PADDING - categoryWidth, textY, UITheme.TEXT_TERTIARY);
@@ -6135,7 +6051,7 @@ public class PathmindVisualEditorScreen extends Screen {
         return Math.round(nodeSearchFieldY + (mouseY - nodeSearchFieldY) / nodeSearchScale);
     }
 
-    private NodeSearchResult getSelectedNodeSearchResult() {
+    private NodeSearchEntry getSelectedNodeSearchResult() {
         if (nodeSearchResults.isEmpty()) {
             return null;
         }
@@ -6157,14 +6073,15 @@ public class PathmindVisualEditorScreen extends Screen {
         nodeSearchHoverIndex = MathHelper.clamp(nodeSearchHoverIndex + direction, 0, nodeSearchResults.size() - 1);
     }
 
-    private void selectNodeSearchResult(NodeSearchResult result) {
-        if (result == null || result.nodeType == null) {
+    private void selectNodeSearchResult(NodeSearchEntry result) {
+        NodeType nodeType = result == null ? null : result.builtInType().orElse(null);
+        if (nodeType == null) {
             return;
         }
-        if (shouldBlockBaritoneNode(result.nodeType) || shouldBlockUiUtilsNode(result.nodeType)) {
+        if (shouldBlockBaritoneNode(nodeType) || shouldBlockUiUtilsNode(nodeType)) {
             return;
         }
-        nodeGraph.addNodeFromContextMenu(result.nodeType);
+        nodeGraph.addNodeFromContextMenu(nodeType);
         closeNodeSearch();
     }
 
