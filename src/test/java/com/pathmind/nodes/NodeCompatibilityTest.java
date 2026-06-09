@@ -3,6 +3,7 @@ package com.pathmind.nodes;
 import com.pathmind.data.NodeGraphData;
 import com.pathmind.execution.ExecutionManager;
 import com.pathmind.util.RecipeCompatibilityBridge;
+import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -237,6 +238,27 @@ class NodeCompatibilityTest {
 
         assertTrue(or.canAcceptParameterNode(coordinate, 0));
         assertTrue(or.attachParameter(coordinate, 0));
+    }
+
+    @Test
+    void registeredAddonMetadataControlsResolvedCompatibility() {
+        Identifier hostId = Identifier.of("compataddon", "distance_check");
+        Identifier candidateId = Identifier.of("compataddon", "scan_range");
+        PathmindNodes.register(hostId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("compataddon.node.distance_check")
+            .descriptionKey("compataddon.node.distance_check.desc")
+            .color(0xFF224466)
+            .parameterSlot("Range", true, NodeValueTrait.RANGE));
+        PathmindNodes.register(candidateId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("compataddon.node.scan_range")
+            .descriptionKey("compataddon.node.scan_range.desc")
+            .color(0xFF446622)
+            .providesTraits(NodeValueTrait.RANGE));
+
+        assertTrue(NodeCompatibility.canAttachResolvedNode(hostId, candidateId, 0));
+        assertFalse(NodeCompatibility.canAttachResolvedNode(hostId, candidateId, 1));
     }
 
     @Test

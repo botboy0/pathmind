@@ -1,6 +1,9 @@
 package com.pathmind.nodes;
 
+import net.minecraft.util.Identifier;
+
 import java.util.EnumSet;
+import java.util.Set;
 
 public final class NodeCompatibility {
     private NodeCompatibility() {
@@ -108,6 +111,11 @@ public final class NodeCompatibility {
         if (hostType == null || candidateType == null) {
             return false;
         }
+        PathmindNodeDefinition hostDefinition = PathmindNodes.get(Identifier.of(hostType.getPersistenceId())).orElse(null);
+        PathmindNodeDefinition candidateDefinition = PathmindNodes.get(Identifier.of(candidateType.getPersistenceId())).orElse(null);
+        if (hostDefinition != null && candidateDefinition != null) {
+            return canAttachResolvedDefinition(hostDefinition, candidateDefinition, slotIndex);
+        }
         EnumSet<NodeValueTrait> accepted = NodeTraitRegistry.getAcceptedTraits(hostType, slotIndex);
         if (accepted.isEmpty()) {
             return false;
@@ -116,6 +124,45 @@ public final class NodeCompatibility {
             return true;
         }
         EnumSet<NodeValueTrait> provided = NodeTraitRegistry.getProvidedTraits(candidateType);
+        if (provided.isEmpty()) {
+            return false;
+        }
+        for (NodeValueTrait trait : provided) {
+            if (accepted.contains(trait)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean canAttachResolvedNode(Identifier hostId, Identifier candidateId, int slotIndex) {
+        if (hostId == null || candidateId == null) {
+            return false;
+        }
+        PathmindNodeDefinition hostDefinition = PathmindNodes.get(hostId).orElse(null);
+        PathmindNodeDefinition candidateDefinition = PathmindNodes.get(candidateId).orElse(null);
+        if (hostDefinition == null || candidateDefinition == null) {
+            return false;
+        }
+        return canAttachResolvedDefinition(hostDefinition, candidateDefinition, slotIndex);
+    }
+
+    private static boolean canAttachResolvedDefinition(
+        PathmindNodeDefinition hostDefinition,
+        PathmindNodeDefinition candidateDefinition,
+        int slotIndex
+    ) {
+        if (slotIndex < 0 || slotIndex >= hostDefinition.parameterSlots().size()) {
+            return false;
+        }
+        Set<NodeValueTrait> accepted = hostDefinition.parameterSlots().get(slotIndex).acceptedTraits();
+        if (accepted.isEmpty()) {
+            return false;
+        }
+        if (accepted.contains(NodeValueTrait.ANY)) {
+            return true;
+        }
+        Set<NodeValueTrait> provided = candidateDefinition.providedTraits();
         if (provided.isEmpty()) {
             return false;
         }

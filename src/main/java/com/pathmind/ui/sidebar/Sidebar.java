@@ -5,6 +5,8 @@ import com.pathmind.data.NodeGraphPersistence;
 import com.pathmind.data.PresetManager;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeCategory;
+import com.pathmind.nodes.PathmindNodeDefinition;
+import com.pathmind.nodes.PathmindNodes;
 import com.pathmind.nodes.NodeType;
 import com.pathmind.ui.animation.AnimatedValue;
 import com.pathmind.ui.animation.AnimationHelper;
@@ -19,6 +21,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -434,20 +437,45 @@ public class Sidebar {
     }
 
     private boolean shouldIncludeNode(NodeType nodeType) {
-        if (nodeType == null || !nodeType.isDraggableFromSidebar()) {
+        if (nodeType == null) {
             return false;
         }
-        if (!uiUtilsAvailable && nodeType.requiresUiUtils()) {
+        return PathmindNodes.get(Identifier.of(nodeType.getPersistenceId()))
+            .map(this::shouldIncludeDefinition)
+            .orElseGet(() -> shouldIncludeLegacyNode(nodeType));
+    }
+
+    private boolean shouldIncludeDefinition(PathmindNodeDefinition definition) {
+        if (definition == null || !definition.draggableFromSidebar()) {
+            return false;
+        }
+        if (!uiUtilsAvailable && definition.requiresUiUtils()) {
             return false;
         }
         if (baritoneAvailable) {
             return true;
         }
-        return !nodeType.requiresBaritone();
+        return !definition.requiresBaritone();
+    }
+
+    private boolean shouldIncludeLegacyNode(NodeType nodeType) {
+        if (!nodeType.isDraggableFromSidebar()) {
+            return false;
+        }
+        if (!uiUtilsAvailable && nodeType.requiresUiUtils()) {
+            return false;
+        }
+        return baritoneAvailable || !nodeType.requiresBaritone();
     }
 
     public boolean isNodeAvailable(NodeType nodeType) {
         return shouldIncludeNode(nodeType);
+    }
+
+    public boolean isNodeAvailable(Identifier nodeId) {
+        return PathmindNodes.get(nodeId)
+            .map(this::shouldIncludeDefinition)
+            .orElse(false);
     }
 
     private boolean hasGroupedContent(NodeCategory category) {

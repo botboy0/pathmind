@@ -1,6 +1,7 @@
 package com.pathmind.nodes;
 
 import com.pathmind.ui.sidebar.Sidebar;
+import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -14,7 +15,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NodeTypeSearchLabelTest {
 
@@ -58,6 +61,33 @@ class NodeTypeSearchLabelTest {
                 );
             }
         }
+    }
+
+    @Test
+    void addonDependencyMetadataControlsSidebarAvailabilityByRegistryId() {
+        Identifier addonNode = Identifier.of("sidebartest", "baritone_scan");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.baritone_scan")
+            .descriptionKey("sidebartest.node.baritone_scan.desc")
+            .color(0xFF335577)
+            .requiresBaritone(true));
+
+        assertFalse(new Sidebar(false, true).isNodeAvailable(addonNode));
+        assertTrue(new Sidebar(true, true).isNodeAvailable(addonNode));
+    }
+
+    @Test
+    void addonSidebarVisibilityMetadataControlsAvailabilityByRegistryId() {
+        Identifier addonNode = Identifier.of("sidebartest", "hidden_helper");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.hidden_helper")
+            .descriptionKey("sidebartest.node.hidden_helper.desc")
+            .color(0xFF775533)
+            .draggableFromSidebar(false));
+
+        assertFalse(new Sidebar(true, true).isNodeAvailable(addonNode));
     }
 
     private static String getSearchLabel(NodeType nodeType, Map<String, String> translations) throws Exception {

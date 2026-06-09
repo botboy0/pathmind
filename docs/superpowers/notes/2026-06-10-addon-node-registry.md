@@ -13,12 +13,14 @@ Start the public addon-node API by giving Pathmind and addon mods an ID-backed r
 - Wired `PathmindMod` to load Fabric entrypoints declared under `pathmind_nodes`.
 - Exposed exact built-in translation and description keys from `NodeType` for registry bootstrap.
 - Added focused tests for built-in lookup, direct addon registration, entrypoint-style addon registration, built-in metadata lookup, and addon trait/slot registration without enum constants.
+- Started moving metadata consumers onto the registry by routing sidebar availability checks and resolved compatibility checks through `PathmindNodeDefinition`.
+- Added addon-ID sidebar availability coverage for dependency flags and hidden helper nodes, plus addon-ID compatibility coverage for registered parameter-slot and provided-trait metadata.
 
 ## Design
 
 The public addon path follows the Fabric/REI pattern of named entrypoint contracts rather than requiring addons to mix into Pathmind internals. Internal mixins remain available to Pathmind or addons for their own implementation details, but the semantic extension point is `PathmindNodePlugin`.
 
-This slice intentionally does not update editor/sidebar enumeration or execution dispatch. Those will move to the registry in later slices after this API foundation and metadata bridge are in place.
+This slice does not update full editor/sidebar enumeration or execution dispatch. It starts at call sites that can consume registered metadata without changing node creation semantics: `Sidebar.isNodeAvailable(Identifier)` and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
 
 ## Verification
 
@@ -29,9 +31,17 @@ This slice intentionally does not update editor/sidebar enumeration or execution
 - `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest` failed before the metadata bridge because `PathmindNodeDefinition` did not expose `draggableFromSidebar`, dependency flags, provided traits, or parameter slots.
 - `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest` passed after adding definition-level metadata.
 - `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest --tests com.pathmind.nodes.NodeTypeDefinitionTest --tests com.pathmind.nodes.NodeSlotLayoutTest --tests com.pathmind.nodes.NodeCompatibilityTest --tests com.pathmind.data.NodeGraphPersistenceTest --tests com.pathmind.validation.GraphValidatorTest` passed.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar registry bridging because `Sidebar.isNodeAvailable` only accepted `NodeType`.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding registry-ID availability lookup.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeCompatibilityTest` failed before compatibility registry bridging because `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)` did not exist.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeCompatibilityTest` passed after adding registry-backed resolved compatibility.
+- `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest --tests com.pathmind.nodes.NodeTypeDefinitionTest --tests com.pathmind.nodes.NodeSlotLayoutTest --tests com.pathmind.nodes.NodeCompatibilityTest --tests com.pathmind.nodes.NodeTypeSearchLabelTest --tests com.pathmind.data.NodeGraphPersistenceTest --tests com.pathmind.validation.GraphValidatorTest` passed.
+- `.\gradlew.bat test` passed.
 
 ## Review Risks
 
-- The registry currently captures metadata only; addon node creation, editor listing, execution routing, and most call-site lookups are still enum-backed in later call sites.
+- The registry currently captures metadata only; addon node creation, full editor listing, execution routing, and many runtime call-site lookups are still enum-backed in later call sites.
+- `Sidebar` can now answer availability for addon IDs, but the visible grouped sidebar still enumerates built-in `NodeType` lists.
+- `NodeCompatibility` can now compare registered resolved IDs by trait metadata, but live graph attachment still depends on `Node` instances backed by `NodeType`.
 - Built-in required-slot metadata is bridged from `NodeTraitRegistry.isParameterSlotAlwaysRequired`; dynamic runtime rules such as placement target requirements remain in `Node`.
 - Duplicate registration throws immediately, which is intentional for now but may need richer diagnostics once third-party addons are loaded in the wild.
