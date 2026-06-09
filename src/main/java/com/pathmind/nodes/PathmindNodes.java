@@ -64,15 +64,31 @@ public final class PathmindNodes {
     private static void registerBuiltIns() {
         for (NodeType type : NodeType.values()) {
             Identifier id = Identifier.of(type.getPersistenceId());
-            PathmindNodeDefinition definition = PathmindNodeDefinition.builder(id)
+            PathmindNodeDefinition.Builder builder = PathmindNodeDefinition.builder(id)
                 .builtInType(type)
                 .category(type.getCategory())
                 .translationKey(type.getTranslationKey())
                 .descriptionKey(type.getDescriptionKey())
                 .color(type.getColor())
                 .hasParameters(type.hasParameters())
-                .build();
-            register(definition);
+                .draggableFromSidebar(type.isDraggableFromSidebar())
+                .requiresBaritone(type.requiresBaritone())
+                .requiresUiUtils(type.requiresUiUtils());
+            addBuiltInTraitMetadata(builder, type);
+            register(builder.build());
+        }
+    }
+
+    private static void addBuiltInTraitMetadata(PathmindNodeDefinition.Builder builder, NodeType type) {
+        for (NodeValueTrait trait : NodeTraitRegistry.getProvidedTraits(type)) {
+            builder.providesTraits(trait);
+        }
+        int slotCount = NodeTraitRegistry.getParameterSlotCount(type);
+        for (int slotIndex = 0; slotIndex < slotCount; slotIndex++) {
+            builder.parameterSlot(
+                NodeTraitRegistry.getParameterSlotLabel(type, slotIndex),
+                NodeTraitRegistry.isParameterSlotAlwaysRequired(type, slotIndex),
+                NodeTraitRegistry.getAcceptedTraits(type, slotIndex).toArray(NodeValueTrait[]::new));
         }
     }
 
