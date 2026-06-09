@@ -129,6 +129,14 @@ public class PathmindVisualEditorScreen extends Screen {
     private static final int CREATE_PRESET_POPUP_HEIGHT = 170;
     private static final int PUBLISH_PRESET_POPUP_WIDTH = 380;
     private static final int PUBLISH_PRESET_POPUP_HEIGHT = 272;
+    private static final int MARKETPLACE_POPUP_BG = 0xFF101316;
+    private static final int MARKETPLACE_POPUP_PANEL = 0xFF171B20;
+    private static final int MARKETPLACE_POPUP_PANEL_DARK = 0xFF0E1114;
+    private static final int MARKETPLACE_POPUP_CARD = 0xFF1E2429;
+    private static final int MARKETPLACE_POPUP_CARD_HOVER = 0xFF2A3138;
+    private static final int MARKETPLACE_POPUP_ACCENT = 0xFFE1B54A;
+    private static final int MARKETPLACE_POPUP_ACCENT_BLUE = 0xFF5D8EAA;
+    private static final int MARKETPLACE_POPUP_BORDER = 0xFF303840;
     private static final int PLAY_BUTTON_SIZE = 18;
     private static final int PLAY_BUTTON_MARGIN = 6;
     private static final int STOP_BUTTON_SIZE = 18;
@@ -4218,11 +4226,95 @@ public class PathmindVisualEditorScreen extends Screen {
         );
     }
 
+    private void drawMarketplacePublishPopupContainer(DrawContext context, int x, int y, int width, int height,
+                                                      PopupAnimationHandler animation) {
+        UIStyleHelper.drawBeveledPanel(
+            context,
+            x,
+            y,
+            width,
+            height,
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_BG),
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_BORDER),
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_PANEL)
+        );
+        context.fill(x + 2, y + 2, x + width - 2, y + 30,
+            getPopupAnimatedColor(animation, 0xCC171B20));
+        context.drawHorizontalLine(x + 3, x + width - 4, y + 2,
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_ACCENT_BLUE));
+        context.drawHorizontalLine(x + 2, x + width - 3, y + 30,
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_BORDER));
+    }
+
+    private void drawMarketplacePublishSection(DrawContext context, int x, int y, int width, int height,
+                                               PopupAnimationHandler animation) {
+        UIStyleHelper.drawBeveledPanel(
+            context,
+            x,
+            y,
+            width,
+            height,
+            getPopupAnimatedColor(animation, 0xAA171B20),
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_BORDER),
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_PANEL_DARK)
+        );
+        context.drawHorizontalLine(x + 3, x + width - 4, y + 2,
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_ACCENT_BLUE));
+    }
+
+    private void drawMarketplacePublishButton(DrawContext context, int x, int y, int width, int height,
+                                              boolean hovered, Text label, boolean primary,
+                                              PopupAnimationHandler animation) {
+        float hoverProgress = getHoverProgress("marketplace-publish-button:" + label.getString() + ":" + x + ":" + y + ":" + width + ":" + height, hovered);
+        float easedHover = AnimationHelper.easeOutQuad(Math.max(0f, Math.min(1f, hoverProgress)));
+        int background = primary
+            ? AnimationHelper.lerpColor(MARKETPLACE_POPUP_ACCENT_BLUE, MARKETPLACE_POPUP_CARD_HOVER, 0.35f)
+            : MARKETPLACE_POPUP_PANEL;
+        int hoveredBackground = primary ? MARKETPLACE_POPUP_ACCENT_BLUE : MARKETPLACE_POPUP_CARD_HOVER;
+        int border = primary ? MARKETPLACE_POPUP_ACCENT_BLUE : MARKETPLACE_POPUP_BORDER;
+        int hoveredBorder = primary ? UITheme.TEXT_HEADER : MARKETPLACE_POPUP_ACCENT_BLUE;
+        int textColor = primary
+            ? AnimationHelper.lerpColor(UITheme.TEXT_PRIMARY, UITheme.TEXT_HEADER, easedHover)
+            : AnimationHelper.lerpColor(UITheme.TEXT_PRIMARY, MARKETPLACE_POPUP_ACCENT, easedHover);
+        UIStyleHelper.drawToolbarButtonFrame(
+            context,
+            x,
+            y,
+            width,
+            height,
+            getPopupAnimatedColor(animation, AnimationHelper.lerpColor(background, hoveredBackground, easedHover)),
+            getPopupAnimatedColor(animation, AnimationHelper.lerpColor(border, hoveredBorder, easedHover)),
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_PANEL_DARK)
+        );
+        context.drawCenteredTextWithShadow(
+            this.textRenderer,
+            label,
+            x + width / 2,
+            y + (height - this.textRenderer.fontHeight) / 2 + 1,
+            getPopupAnimatedColor(animation, textColor)
+        );
+    }
+
     private void drawPopupInputFrame(DrawContext context, int x, int y, int width, int height, int borderColor, PopupAnimationHandler animation) {
         UIStyleHelper.drawFieldFrame(context, x, y, width, height, new UIStyleHelper.FieldPalette(
             getPopupAnimatedColor(animation, UITheme.RENAME_INPUT_BG),
             getPopupAnimatedColor(animation, borderColor),
             getPopupAnimatedColor(animation, UITheme.PANEL_INNER_BORDER),
+            getPopupAnimatedColor(animation, UITheme.TEXT_PRIMARY),
+            getPopupAnimatedColor(animation, UITheme.TEXT_TERTIARY)
+        ));
+    }
+
+    private void drawMarketplacePublishInputFrame(DrawContext context, int x, int y, int width, int height,
+                                                  boolean hovered, boolean focused, PopupAnimationHandler animation) {
+        float hoverProgress = getHoverProgress("marketplace-publish-input:" + x + ":" + y + ":" + width + ":" + height, hovered);
+        float emphasis = focused ? 1f : AnimationHelper.easeOutQuad(Math.max(0f, Math.min(1f, hoverProgress)));
+        int border = AnimationHelper.lerpColor(MARKETPLACE_POPUP_BORDER, MARKETPLACE_POPUP_ACCENT_BLUE, emphasis);
+        int innerBorder = AnimationHelper.lerpColor(MARKETPLACE_POPUP_PANEL, MARKETPLACE_POPUP_CARD_HOVER, emphasis * 0.5f);
+        UIStyleHelper.drawFieldFrame(context, x, y, width, height, new UIStyleHelper.FieldPalette(
+            getPopupAnimatedColor(animation, MARKETPLACE_POPUP_PANEL_DARK),
+            getPopupAnimatedColor(animation, border),
+            getPopupAnimatedColor(animation, innerBorder),
             getPopupAnimatedColor(animation, UITheme.TEXT_PRIMARY),
             getPopupAnimatedColor(animation, UITheme.TEXT_TERTIARY)
         ));
@@ -5778,15 +5870,15 @@ public class PathmindVisualEditorScreen extends Screen {
         int contentY = getBoundedPopupContentY(popupY, publishPresetPopupAnimation, PUBLISH_PRESET_POPUP_HEIGHT);
         setOverlayCutout(popupX, popupY, scaledWidth, scaledHeight);
 
-        drawPopupContainer(context, popupX, popupY, scaledWidth, scaledHeight, publishPresetPopupAnimation);
+        drawMarketplacePublishPopupContainer(context, popupX, popupY, scaledWidth, scaledHeight, publishPresetPopupAnimation);
         boolean popupScissor = enablePopupScissor(context, popupX, popupY, scaledWidth, scaledHeight);
 
         context.drawCenteredTextWithShadow(
             this.textRenderer,
             Text.literal(publishPresetEditingPreset == null ? "Publish Preset" : "Update Uploaded Preset"),
             popupX + scaledWidth / 2,
-            contentY + 14,
-            getPopupAnimatedColor(publishPresetPopupAnimation, UITheme.TEXT_PRIMARY)
+            contentY + 11,
+            getPopupAnimatedColor(publishPresetPopupAnimation, UITheme.TEXT_HEADER)
         );
 
         int fieldX = popupX + 20;
@@ -5795,6 +5887,8 @@ public class PathmindVisualEditorScreen extends Screen {
         int nameY = contentY + 44;
         int descriptionY = contentY + 82;
         int tagsY = contentY + 120;
+
+        drawMarketplacePublishSection(context, fieldX - 8, nameY - 20, fieldWidth + 16, 168, publishPresetPopupAnimation);
 
         drawPopupTextWithEllipsis(context, "Name", fieldX, nameY - 10, fieldWidth,
             getPopupAnimatedColor(publishPresetPopupAnimation, UITheme.TEXT_SECONDARY));
@@ -5839,18 +5933,18 @@ public class PathmindVisualEditorScreen extends Screen {
         boolean signInHovered = publishPresetSession == null
             && isPointInRect(mouseX, mouseY, popupX + (scaledWidth - buttonWidth) / 2, buttonY, buttonWidth, buttonHeight);
 
-        drawPopupButton(context, cancelX, buttonY, buttonWidth, buttonHeight, cancelHovered,
-            Text.translatable("pathmind.button.cancel"), PopupButtonStyle.DEFAULT, publishPresetPopupAnimation);
+        drawMarketplacePublishButton(context, cancelX, buttonY, buttonWidth, buttonHeight, cancelHovered,
+            Text.translatable("pathmind.button.cancel"), false, publishPresetPopupAnimation);
         if (publishPresetSession == null) {
             int signInX = popupX + (scaledWidth - buttonWidth) / 2;
-            drawPopupButton(context, signInX, buttonY, buttonWidth, buttonHeight, signInHovered,
-                Text.literal(accountLabel), PopupButtonStyle.DEFAULT, publishPresetPopupAnimation);
+            drawMarketplacePublishButton(context, signInX, buttonY, buttonWidth, buttonHeight, signInHovered,
+                Text.literal(accountLabel), false, publishPresetPopupAnimation);
         } else {
             context.drawTextWithShadow(this.textRenderer, Text.literal(accountLabel), accountTextX, accountTextY,
                 getPopupAnimatedColor(publishPresetPopupAnimation, UITheme.TEXT_SECONDARY));
         }
-        drawPopupButton(context, publishX, buttonY, buttonWidth, buttonHeight, publishHovered,
-            Text.literal(publishPresetBusy ? "Working..." : (publishPresetEditingPreset == null ? "Publish" : "Update")), PopupButtonStyle.PRIMARY, publishPresetPopupAnimation);
+        drawMarketplacePublishButton(context, publishX, buttonY, buttonWidth, buttonHeight, publishHovered,
+            Text.literal(publishPresetBusy ? "Working..." : (publishPresetEditingPreset == null ? "Publish" : "Update")), true, publishPresetPopupAnimation);
         disablePopupScissor(context, popupScissor);
         RenderStateBridge.setShaderColor(1f, 1f, 1f, 1f);
     }
@@ -5859,8 +5953,7 @@ public class PathmindVisualEditorScreen extends Screen {
                                           int fieldX, int fieldY, int fieldWidth, int fieldHeight) {
         boolean fieldHovered = isPointInRect(mouseX, mouseY, fieldX, fieldY, fieldWidth, fieldHeight);
         boolean focused = field != null && field.isFocused();
-        int borderColor = focused ? getAccentColor() : fieldHovered ? UITheme.BORDER_HIGHLIGHT : UITheme.RENAME_INPUT_BORDER;
-        drawPopupInputFrame(context, fieldX, fieldY, fieldWidth, fieldHeight, borderColor, publishPresetPopupAnimation);
+        drawMarketplacePublishInputFrame(context, fieldX, fieldY, fieldWidth, fieldHeight, fieldHovered, focused, publishPresetPopupAnimation);
         if (field != null) {
             field.setVisible(true);
             field.setEditable(true);
@@ -5880,13 +5973,13 @@ public class PathmindVisualEditorScreen extends Screen {
         publishPresetVisibilityToggle.setPosition(toggleX, fieldY);
         publishPresetVisibilityToggle.render(context, mouseX, mouseY, publishPresetPopupAnimation.getPopupAlpha());
         String label = publishPresetPublic ? "Public" : "Private";
-        int labelColor = publishPresetPublic ? getAccentColor() : UITheme.STATE_WARNING;
+        int labelColor = publishPresetPublic ? MARKETPLACE_POPUP_ACCENT_BLUE : MARKETPLACE_POPUP_ACCENT;
         drawPopupTextWithEllipsis(context, label, fieldX, fieldY + 4, fieldWidth - publishPresetVisibilityToggle.getWidth() - 8,
             getPopupAnimatedColor(publishPresetPopupAnimation, labelColor));
     }
 
     private void syncPublishPresetVisibilityToggleColors() {
-        publishPresetVisibilityToggle.setIndicatorColors(UITheme.MARKETPLACE_PRIVATE_VISIBILITY, getAccentColor());
+        publishPresetVisibilityToggle.setIndicatorColors(MARKETPLACE_POPUP_ACCENT, MARKETPLACE_POPUP_ACCENT_BLUE);
     }
 
     private int getPublishPresetFieldY(int popupY, int fieldIndex) {
