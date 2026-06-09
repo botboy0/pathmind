@@ -506,6 +506,15 @@ public class Sidebar {
         for (NodeGroup group : getGroupsForCategory(category)) {
             entries.addAll(group.getEntries());
         }
+        entries.addAll(getAddonEntriesForCategory(category));
+        return List.copyOf(entries);
+    }
+
+    private List<SidebarNodeEntry> getAddonEntriesForCategory(NodeCategory category) {
+        if (category == null || category == NodeCategory.CUSTOM) {
+            return java.util.Collections.emptyList();
+        }
+        List<SidebarNodeEntry> entries = new ArrayList<>();
         for (PathmindNodeDefinition definition : PathmindNodes.all()) {
             if (definition.category() == category
                 && definition.builtInType().isEmpty()
@@ -689,7 +698,13 @@ public class Sidebar {
                 }
                 List<String> lines = wrapText(group.getTitle(), textRenderer, maxContentWidth);
                 int height = Math.max(GROUP_HEADER_HEIGHT, lines.size() * groupLineHeight);
-                groupHeaders.add(new GroupHeaderInfo(group, lines, height, buildNodeRows(group.getNodes(), textRenderer, nodeTextWidth, nodeLineHeight)));
+                groupHeaders.add(new GroupHeaderInfo(group, lines, height, buildNodeRows(group.getEntries(), textRenderer, nodeTextWidth, nodeLineHeight)));
+            }
+            List<SidebarNodeEntry> addonEntries = getAddonEntriesForCategory(selectedCategory);
+            if (!addonEntries.isEmpty()) {
+                List<String> lines = wrapText("Add-ons", textRenderer, maxContentWidth);
+                int height = Math.max(GROUP_HEADER_HEIGHT, lines.size() * groupLineHeight);
+                groupHeaders.add(new GroupHeaderInfo(null, lines, height, buildNodeRows(addonEntries, textRenderer, nodeTextWidth, nodeLineHeight)));
             }
         } else if (selectedCategory == NodeCategory.CUSTOM) {
             customNodeRows = buildCustomNodeRows(textRenderer, nodeTextWidth, nodeLineHeight);
@@ -884,7 +899,7 @@ public class Sidebar {
                                 indicatorY,
                                 indicatorSize,
                                 indicatorSize,
-                                getSidebarNodeIndicatorColor(selectedCategory, nodeType, nodeIndex),
+                                getSidebarNodeIndicatorColor(selectedCategory, row, nodeIndex),
                                 UITheme.BORDER_SUBTLE,
                                 UITheme.PANEL_INNER_BORDER
                             );
@@ -932,7 +947,7 @@ public class Sidebar {
                             indicatorY,
                             indicatorSize,
                             indicatorSize,
-                            getSidebarNodeIndicatorColor(selectedCategory, nodeType, nodeIndex),
+                            getSidebarNodeIndicatorColor(selectedCategory, row, nodeIndex),
                             UITheme.BORDER_SUBTLE,
                             UITheme.PANEL_INNER_BORDER
                         );
@@ -1188,12 +1203,16 @@ public class Sidebar {
         return AnimationHelper.lerpColor(UITheme.TEXT_TERTIARY, getSidebarCategoryAccent(category), 0.55f);
     }
 
-    private int getSidebarNodeIndicatorColor(NodeCategory category, NodeType nodeType, int indexInGroup) {
-        if (nodeType == null) {
+    private int getSidebarNodeIndicatorColor(NodeCategory category, NodeRowInfo row, int indexInGroup) {
+        if (row == null || row.rowFacts() == null) {
             return getSidebarCategoryAccent(category);
         }
+        NodeType nodeType = row.nodeType();
         if (indexInGroup == 0) {
-            return nodeType.getColor();
+            return row.rowFacts().color();
+        }
+        if (nodeType == null) {
+            return row.rowFacts().color();
         }
         return getSidebarCategoryAccent(category);
     }
@@ -1281,11 +1300,10 @@ public class Sidebar {
     }
 
     private List<NodeRowInfo> buildNodeRowsForCategory(NodeCategory category, TextRenderer textRenderer, int maxWidth, int lineHeight) {
-        List<NodeType> nodes = categoryNodes.get(category);
-        if (nodes == null || textRenderer == null) {
+        if (category == null || textRenderer == null) {
             return java.util.Collections.emptyList();
         }
-        return buildNodeRows(nodes, textRenderer, maxWidth, lineHeight);
+        return buildNodeRows(getEntriesForCategory(category), textRenderer, maxWidth, lineHeight);
     }
 
     private List<NodeRowInfo> buildCustomNodeRows(TextRenderer textRenderer, int maxWidth, int lineHeight) {
@@ -1300,11 +1318,15 @@ public class Sidebar {
         return rows;
     }
 
-    private List<NodeRowInfo> buildNodeRows(List<NodeType> nodes, TextRenderer textRenderer, int maxWidth, int lineHeight) {
+    private List<NodeRowInfo> buildNodeRows(List<SidebarNodeEntry> entries, TextRenderer textRenderer, int maxWidth, int lineHeight) {
+        if (entries == null || textRenderer == null) {
+            return java.util.Collections.emptyList();
+        }
         List<NodeRowInfo> rows = new ArrayList<>();
-        for (NodeType nodeType : nodes) {
-            List<String> lines = wrapText(nodeType.getDisplayName(), textRenderer, maxWidth);
-            rows.add(new NodeRowInfo(nodeType, null, lines, getWrappedNodeRowHeight(lines.size(), lineHeight)));
+        for (SidebarNodeEntry entry : entries) {
+            SidebarRowFacts facts = toRowFacts(entry);
+            List<String> lines = wrapText(facts.label(), textRenderer, maxWidth);
+            rows.add(new NodeRowInfo(facts, null, lines, getWrappedNodeRowHeight(lines.size(), lineHeight)));
         }
         return rows;
     }
@@ -1368,7 +1390,11 @@ public class Sidebar {
         }
     }
 
-    private record NodeRowInfo(NodeType nodeType, CustomNodeEntry customNode, List<String> lines, int height) {}
+    private record NodeRowInfo(SidebarRowFacts rowFacts, CustomNodeEntry customNode, List<String> lines, int height) {
+        private NodeType nodeType() {
+            return rowFacts != null ? rowFacts.builtInType().orElse(null) : null;
+        }
+    }
 
     public static class NodeGroup {
         private final String titleKey;
@@ -1432,6 +1458,32 @@ public class Sidebar {
             );
         }
     }
+
+    public static SidebarRowFacts toRowFacts(SidebarNodeEntry entry) {
+        if (entry == null) {
+            throw new IllegalArgumentException("Sidebar node entry cannot be null");
+        }
+        String label = entry.builtInType()
+            .map(NodeType::getDisplayName)
+            .orElseGet(() -> entry.id().toString());
+        return new SidebarRowFacts(
+            entry.id(),
+            entry.builtInType(),
+            label,
+            entry.descriptionKey(),
+            entry.color(),
+            entry.builtInType().isPresent()
+        );
+    }
+
+    public record SidebarRowFacts(
+        Identifier id,
+        Optional<NodeType> builtInType,
+        String label,
+        String descriptionKey,
+        int color,
+        boolean instantiating
+    ) {}
 
     public record SidebarSearchResult(SidebarNodeEntry entry, NodeCategory category, int score) {}
 }

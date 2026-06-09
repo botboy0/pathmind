@@ -126,6 +126,38 @@ class NodeTypeSearchLabelTest {
     }
 
     @Test
+    void sidebarRowFactsKeepAddonEntriesVisibleButNonInstantiating() {
+        Identifier addonNode = Identifier.of("sidebartest", "row_fact_sensor");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.row_fact_sensor")
+            .descriptionKey("sidebartest.node.row_fact_sensor.desc")
+            .color(0xFF663399));
+
+        Sidebar.SidebarNodeEntry addonEntry = new Sidebar(true, true).getEntriesForCategory(NodeCategory.SENSORS).stream()
+            .filter(candidate -> addonNode.equals(candidate.id()))
+            .findFirst()
+            .orElseThrow();
+
+        Sidebar.SidebarRowFacts addonFacts = Sidebar.toRowFacts(addonEntry);
+        assertEquals(addonNode, addonFacts.id());
+        assertEquals(Optional.empty(), addonFacts.builtInType());
+        assertEquals("sidebartest:row_fact_sensor", addonFacts.label());
+        assertEquals("sidebartest.node.row_fact_sensor.desc", addonFacts.descriptionKey());
+        assertEquals(0xFF663399, addonFacts.color());
+        assertFalse(addonFacts.instantiating());
+
+        Sidebar.SidebarRowFacts builtInFacts = Sidebar.toRowFacts(
+            new Sidebar(true, true).getEntriesForCategory(NodeCategory.FLOW).stream()
+                .filter(entry -> entry.builtInType().filter(NodeType.START::equals).isPresent())
+                .findFirst()
+                .orElseThrow()
+        );
+        assertEquals(NodeType.START.getDisplayName(), builtInFacts.label());
+        assertTrue(builtInFacts.instantiating());
+    }
+
+    @Test
     void sidebarSearchFindsBuiltInAndAddonEntriesFromMetadata() {
         Identifier addonNode = Identifier.of("sidebartest", "searchable_sensor");
         PathmindNodes.register(addonNode, builder -> builder
