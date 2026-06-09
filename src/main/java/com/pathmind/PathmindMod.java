@@ -1,5 +1,7 @@
 package com.pathmind;
 
+import com.pathmind.nodes.PathmindNodePlugin;
+import com.pathmind.nodes.PathmindNodes;
 import com.pathmind.util.VersionSupport;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
@@ -30,6 +32,11 @@ public class PathmindMod implements ModInitializer {
         if (!VersionSupport.isSupported(minecraftVersion)) {
             LOGGER.warn("Pathmind targets Minecraft {} but detected {}", VersionSupport.SUPPORTED_RANGE, minecraftVersion);
         }
+
+        int addonEntrypoints = PathmindNodes.loadEntrypoints(
+            FabricLoader.getInstance().getEntrypoints(PathmindNodes.ENTRYPOINT_KEY, PathmindNodePlugin.class)
+        );
+        LOGGER.info("Loaded {} Pathmind node addon entrypoints", addonEntrypoints);
 
         LOGGER.info("Pathmind mod initialized successfully");
     }

@@ -231,6 +231,13 @@ public enum NodeType {
         return Text.translatable(translationKey).getString();
     }
 
+    public String getTranslationKey() {
+        if (this == DROP_SLOT) {
+            return "pathmind.node.type.dropItem";
+        }
+        return translationKey;
+    }
+
     public int getColor() {
         // Special nodes keep their original colors
         if (this == START || this == START_CHAIN) {
@@ -250,6 +257,13 @@ public enum NodeType {
             return Text.translatable("pathmind.node.type.dropItem.desc").getString();
         }
         return Text.translatable(descriptionKey).getString();
+    }
+
+    public String getDescriptionKey() {
+        if (this == DROP_SLOT) {
+            return "pathmind.node.type.dropItem.desc";
+        }
+        return descriptionKey;
     }
 
     public boolean isInputNode() {

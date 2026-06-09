@@ -1,0 +1,90 @@
+package com.pathmind.nodes;
+
+import net.minecraft.util.Identifier;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
+
+/**
+ * Public registry facade for node types supplied by Pathmind or addon mods.
+ */
+public final class PathmindNodes {
+    public static final String ENTRYPOINT_KEY = "pathmind_nodes";
+    private static final ConcurrentMap<Identifier, PathmindNodeDefinition> DEFINITIONS = new ConcurrentHashMap<>();
+
+    static {
+        registerBuiltIns();
+    }
+
+    private PathmindNodes() {
+    }
+
+    public static PathmindNodeDefinition register(Identifier id, Consumer<PathmindNodeDefinition.Builder> configurer) {
+        Objects.requireNonNull(configurer, "configurer");
+        PathmindNodeDefinition.Builder builder = PathmindNodeDefinition.builder(normalize(id));
+        configurer.accept(builder);
+        return register(builder.build());
+    }
+
+    public static int loadEntrypoints(Collection<? extends PathmindNodePlugin> plugins) {
+        if (plugins == null || plugins.isEmpty()) {
+            return 0;
+        }
+        PathmindNodeRegistrar registrar = PathmindNodes::register;
+        int loaded = 0;
+        for (PathmindNodePlugin plugin : plugins) {
+            if (plugin == null) {
+                continue;
+            }
+            plugin.registerNodes(registrar);
+            loaded++;
+        }
+        return loaded;
+    }
+
+    public static Optional<PathmindNodeDefinition> get(Identifier id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(DEFINITIONS.get(id));
+    }
+
+    public static Collection<PathmindNodeDefinition> all() {
+        List<PathmindNodeDefinition> definitions = new ArrayList<>(DEFINITIONS.values());
+        definitions.sort((left, right) -> left.id().compareTo(right.id()));
+        return List.copyOf(definitions);
+    }
+
+    private static void registerBuiltIns() {
+        for (NodeType type : NodeType.values()) {
+            Identifier id = Identifier.of(type.getPersistenceId());
+            PathmindNodeDefinition definition = PathmindNodeDefinition.builder(id)
+                .builtInType(type)
+                .category(type.getCategory())
+                .translationKey(type.getTranslationKey())
+                .descriptionKey(type.getDescriptionKey())
+                .color(type.getColor())
+                .hasParameters(type.hasParameters())
+                .build();
+            register(definition);
+        }
+    }
+
+    private static PathmindNodeDefinition register(PathmindNodeDefinition definition) {
+        PathmindNodeDefinition previous = DEFINITIONS.putIfAbsent(definition.id(), definition);
+        if (previous != null) {
+            throw new IllegalArgumentException("Node type is already registered: " + definition.id());
+        }
+        return definition;
+    }
+
+    private static Identifier normalize(Identifier id) {
+        return Objects.requireNonNull(id, "id");
+    }
+}
