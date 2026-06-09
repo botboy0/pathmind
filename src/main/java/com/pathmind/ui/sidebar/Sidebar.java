@@ -24,6 +24,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -513,6 +514,60 @@ public class Sidebar {
             }
         }
         return List.copyOf(entries);
+    }
+
+    public List<SidebarSearchResult> searchEntries(String query) {
+        String normalizedQuery = normalizeSearchText(query);
+        if (normalizedQuery.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        List<SidebarSearchResult> results = new ArrayList<>();
+        for (NodeCategory category : NodeCategory.values()) {
+            if (category == NodeCategory.CUSTOM) {
+                continue;
+            }
+            for (SidebarNodeEntry entry : getEntriesForCategory(category)) {
+                int score = scoreSearchEntry(entry, category, normalizedQuery);
+                if (score > 0) {
+                    results.add(new SidebarSearchResult(entry, category, score));
+                }
+            }
+        }
+        results.sort(Comparator
+            .comparingInt(SidebarSearchResult::score)
+            .reversed()
+            .thenComparing(result -> result.entry().id().toString()));
+        return List.copyOf(results);
+    }
+
+    private static int scoreSearchEntry(SidebarNodeEntry entry, NodeCategory category, String normalizedQuery) {
+        int score = 0;
+        score = Math.max(score, scoreSearchText(entry.id().toString(), normalizedQuery));
+        score = Math.max(score, scoreSearchText(entry.id().getNamespace(), normalizedQuery));
+        score = Math.max(score, scoreSearchText(entry.id().getPath(), normalizedQuery));
+        score = Math.max(score, scoreSearchText(entry.translationKey(), normalizedQuery));
+        score = Math.max(score, scoreSearchText(entry.descriptionKey(), normalizedQuery));
+        score = Math.max(score, scoreSearchText(category.name(), normalizedQuery));
+        return score;
+    }
+
+    private static int scoreSearchText(String candidate, String normalizedQuery) {
+        String normalizedCandidate = normalizeSearchText(candidate);
+        if (normalizedCandidate.isEmpty()) {
+            return 0;
+        }
+        if (normalizedCandidate.equals(normalizedQuery)) {
+            return 100;
+        }
+        if (normalizedCandidate.startsWith(normalizedQuery)) {
+            return 80;
+        }
+        return normalizedCandidate.contains(normalizedQuery) ? 50 : 0;
+    }
+
+    private static String normalizeSearchText(String text) {
+        return text == null ? "" : text.trim().toLowerCase(java.util.Locale.ROOT);
     }
     
     private void calculateMaxScroll(int sidebarHeight) {
@@ -1377,4 +1432,6 @@ public class Sidebar {
             );
         }
     }
+
+    public record SidebarSearchResult(SidebarNodeEntry entry, NodeCategory category, int score) {}
 }

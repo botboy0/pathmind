@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -120,6 +121,30 @@ class NodeTypeSearchLabelTest {
         assertEquals("sidebartest.node.renderable_sensor", entry.translationKey());
         assertEquals("sidebartest.node.renderable_sensor.desc", entry.descriptionKey());
         assertEquals(0xFF225588, entry.color());
+    }
+
+    @Test
+    void sidebarSearchFindsBuiltInAndAddonEntriesFromMetadata() {
+        Identifier addonNode = Identifier.of("sidebartest", "searchable_sensor");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.searchable_sensor")
+            .descriptionKey("sidebartest.node.searchable_sensor.desc")
+            .color(0xFF114477));
+
+        Sidebar sidebar = new Sidebar(true, true);
+
+        Sidebar.SidebarSearchResult addonResult = sidebar.searchEntries("searchable_sensor").stream()
+            .filter(result -> addonNode.equals(result.entry().id()))
+            .findFirst()
+            .orElseThrow();
+        assertEquals(NodeCategory.SENSORS, addonResult.category());
+        assertEquals(Optional.empty(), addonResult.entry().builtInType());
+
+        assertTrue(sidebar.searchEntries("pathmind.node.type.start").stream()
+            .anyMatch(result -> result.entry().builtInType()
+                .filter(NodeType.START::equals)
+                .isPresent()));
     }
 
     private static String getSearchLabel(NodeType nodeType, Map<String, String> translations) throws Exception {

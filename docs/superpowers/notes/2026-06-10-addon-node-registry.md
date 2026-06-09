@@ -16,12 +16,13 @@ Start the public addon-node API by giving Pathmind and addon mods an ID-backed r
 - Started moving metadata consumers onto the registry by routing sidebar availability checks and resolved compatibility checks through `PathmindNodeDefinition`.
 - Added addon-ID sidebar availability coverage for dependency flags and hidden helper nodes, plus addon-ID compatibility coverage for registered parameter-slot and provided-trait metadata.
 - Added an ID-backed sidebar category entry view so visible addon definitions can appear in sidebar category metadata without adding `NodeType` enum constants, including render-ready translation key, description key, and color metadata.
+- Added a metadata-backed sidebar search bridge so visible built-in and addon definitions can be discovered by ID, translation key, description key, or category metadata without adding `NodeType` enum constants.
 
 ## Design
 
 The public addon path follows the Fabric/REI pattern of named entrypoint contracts rather than requiring addons to mix into Pathmind internals. Internal mixins remain available to Pathmind or addons for their own implementation details, but the semantic extension point is `PathmindNodePlugin`.
 
-This slice does not update editor search, live graph creation, or execution dispatch. It starts at call sites that can consume registered metadata without changing node creation semantics: `Sidebar.isNodeAvailable(Identifier)`, `Sidebar.getEntriesForCategory(NodeCategory)`, and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
+This slice does not update compat editor screen loops, live graph creation, or execution dispatch. It starts at call sites that can consume registered metadata without changing node creation semantics: `Sidebar.isNodeAvailable(Identifier)`, `Sidebar.getEntriesForCategory(NodeCategory)`, `Sidebar.searchEntries(String)`, and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
 
 ## Verification
 
@@ -42,11 +43,14 @@ This slice does not update editor search, live graph creation, or execution disp
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding the ID-backed sidebar entry view.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar entry render metadata because `SidebarNodeEntry` did not expose `translationKey`, `descriptionKey`, or `color`.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding render metadata to sidebar entries.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar search metadata because `Sidebar.SidebarSearchResult` and `Sidebar.searchEntries(String)` did not exist.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding metadata-backed sidebar search.
+- `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed.
 
 ## Review Risks
 
 - The registry currently captures metadata only; addon node creation, full editor listing, execution routing, and many runtime call-site lookups are still enum-backed in later call sites.
-- `Sidebar` can now answer availability for addon IDs and expose addon IDs plus render metadata in category entry metadata, but dragging/instantiating sidebar rows into the live graph still depends on built-in `NodeType`.
+- `Sidebar` can now answer availability for addon IDs and expose addon IDs plus render/search metadata, but dragging/instantiating sidebar rows into the live graph still depends on built-in `NodeType`.
 - `NodeCompatibility` can now compare registered resolved IDs by trait metadata, but live graph attachment still depends on `Node` instances backed by `NodeType`.
 - Built-in required-slot metadata is bridged from `NodeTraitRegistry.isParameterSlotAlwaysRequired`; dynamic runtime rules such as placement target requirements remain in `Node`.
 - Duplicate registration throws immediately, which is intentional for now but may need richer diagnostics once third-party addons are loaded in the wild.
