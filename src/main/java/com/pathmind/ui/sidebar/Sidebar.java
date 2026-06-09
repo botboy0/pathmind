@@ -1350,13 +1350,31 @@ public class Sidebar {
         }
     }
 
-    public record SidebarNodeEntry(Identifier id, Optional<NodeType> builtInType) {
+    public record SidebarNodeEntry(
+        Identifier id,
+        Optional<NodeType> builtInType,
+        String translationKey,
+        String descriptionKey,
+        int color
+    ) {
         static SidebarNodeEntry builtIn(NodeType nodeType) {
-            return new SidebarNodeEntry(Identifier.of(nodeType.getPersistenceId()), Optional.of(nodeType));
+            return new SidebarNodeEntry(
+                Identifier.of(nodeType.getPersistenceId()),
+                Optional.of(nodeType),
+                nodeType.getTranslationKey(),
+                nodeType.getDescriptionKey(),
+                nodeType.getColor()
+            );
         }
 
         static SidebarNodeEntry addon(PathmindNodeDefinition definition) {
-            return new SidebarNodeEntry(definition.id(), Optional.empty());
+            return new SidebarNodeEntry(
+                definition.id(),
+                Optional.empty(),
+                definition.translationKey(),
+                definition.descriptionKey(),
+                definition.color()
+            );
         }
     }
 }

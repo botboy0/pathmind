@@ -15,7 +15,7 @@ Start the public addon-node API by giving Pathmind and addon mods an ID-backed r
 - Added focused tests for built-in lookup, direct addon registration, entrypoint-style addon registration, built-in metadata lookup, and addon trait/slot registration without enum constants.
 - Started moving metadata consumers onto the registry by routing sidebar availability checks and resolved compatibility checks through `PathmindNodeDefinition`.
 - Added addon-ID sidebar availability coverage for dependency flags and hidden helper nodes, plus addon-ID compatibility coverage for registered parameter-slot and provided-trait metadata.
-- Added an ID-backed sidebar category entry view so visible addon definitions can appear in sidebar category metadata without adding `NodeType` enum constants.
+- Added an ID-backed sidebar category entry view so visible addon definitions can appear in sidebar category metadata without adding `NodeType` enum constants, including render-ready translation key, description key, and color metadata.
 
 ## Design
 
@@ -40,11 +40,13 @@ This slice does not update editor search, live graph creation, or execution disp
 - `.\gradlew.bat test` passed.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar category entry metadata because `Sidebar.getEntriesForCategory(NodeCategory)` did not exist.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding the ID-backed sidebar entry view.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar entry render metadata because `SidebarNodeEntry` did not expose `translationKey`, `descriptionKey`, or `color`.
+- `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding render metadata to sidebar entries.
 
 ## Review Risks
 
 - The registry currently captures metadata only; addon node creation, full editor listing, execution routing, and many runtime call-site lookups are still enum-backed in later call sites.
-- `Sidebar` can now answer availability for addon IDs and expose addon IDs in category entry metadata, but dragging/instantiating sidebar rows into the live graph still depends on built-in `NodeType`.
+- `Sidebar` can now answer availability for addon IDs and expose addon IDs plus render metadata in category entry metadata, but dragging/instantiating sidebar rows into the live graph still depends on built-in `NodeType`.
 - `NodeCompatibility` can now compare registered resolved IDs by trait metadata, but live graph attachment still depends on `Node` instances backed by `NodeType`.
 - Built-in required-slot metadata is bridged from `NodeTraitRegistry.isParameterSlotAlwaysRequired`; dynamic runtime rules such as placement target requirements remain in `Node`.
 - Duplicate registration throws immediately, which is intentional for now but may need richer diagnostics once third-party addons are loaded in the wild.
