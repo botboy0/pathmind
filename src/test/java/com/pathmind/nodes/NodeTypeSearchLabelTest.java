@@ -90,6 +90,19 @@ class NodeTypeSearchLabelTest {
         assertFalse(new Sidebar(true, true).isNodeAvailable(addonNode));
     }
 
+    @Test
+    void addonNodeDefinitionsAppearInSidebarGroupsByRegistryId() {
+        Identifier addonNode = Identifier.of("sidebartest", "visible_sensor");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.visible_sensor")
+            .descriptionKey("sidebartest.node.visible_sensor.desc")
+            .color(0xFF337755));
+
+        assertTrue(new Sidebar(true, true).getEntriesForCategory(NodeCategory.SENSORS).stream()
+            .anyMatch(entry -> addonNode.equals(entry.id()) && entry.builtInType().isEmpty()));
+    }
+
     private static String getSearchLabel(NodeType nodeType, Map<String, String> translations) throws Exception {
         if (nodeType == NodeType.DROP_SLOT) {
             return requireTranslation(translations, "pathmind.node.type.dropItem");

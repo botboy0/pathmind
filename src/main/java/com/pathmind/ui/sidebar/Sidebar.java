@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Manages the sidebar with categorized draggable nodes.
@@ -494,6 +495,24 @@ public class Sidebar {
     private List<NodeGroup> getGroupsForCategory(NodeCategory category) {
         List<NodeGroup> groups = groupedCategoryNodes.get(category);
         return groups != null ? groups : java.util.Collections.emptyList();
+    }
+
+    public List<SidebarNodeEntry> getEntriesForCategory(NodeCategory category) {
+        if (category == null || category == NodeCategory.CUSTOM) {
+            return java.util.Collections.emptyList();
+        }
+        List<SidebarNodeEntry> entries = new ArrayList<>();
+        for (NodeGroup group : getGroupsForCategory(category)) {
+            entries.addAll(group.getEntries());
+        }
+        for (PathmindNodeDefinition definition : PathmindNodes.all()) {
+            if (definition.category() == category
+                && definition.builtInType().isEmpty()
+                && shouldIncludeDefinition(definition)) {
+                entries.add(SidebarNodeEntry.addon(definition));
+            }
+        }
+        return List.copyOf(entries);
     }
     
     private void calculateMaxScroll(int sidebarHeight) {
@@ -1298,13 +1317,15 @@ public class Sidebar {
 
     public static class NodeGroup {
         private final String titleKey;
-        private final List<NodeType> nodes;
+        private final List<SidebarNodeEntry> entries;
 
         NodeGroup(String titleKey, List<NodeType> nodeTypes) {
             this.titleKey = titleKey;
-            this.nodes = new ArrayList<>();
+            this.entries = new ArrayList<>();
             if (nodeTypes != null) {
-                this.nodes.addAll(nodeTypes);
+                for (NodeType nodeType : nodeTypes) {
+                    this.entries.add(SidebarNodeEntry.builtIn(nodeType));
+                }
             }
         }
 
@@ -1313,11 +1334,29 @@ public class Sidebar {
         }
 
         public List<NodeType> getNodes() {
+            List<NodeType> nodes = new ArrayList<>();
+            for (SidebarNodeEntry entry : entries) {
+                entry.builtInType().ifPresent(nodes::add);
+            }
             return nodes;
         }
 
+        public List<SidebarNodeEntry> getEntries() {
+            return List.copyOf(entries);
+        }
+
         public boolean isEmpty() {
-            return nodes.isEmpty();
+            return entries.isEmpty();
+        }
+    }
+
+    public record SidebarNodeEntry(Identifier id, Optional<NodeType> builtInType) {
+        static SidebarNodeEntry builtIn(NodeType nodeType) {
+            return new SidebarNodeEntry(Identifier.of(nodeType.getPersistenceId()), Optional.of(nodeType));
+        }
+
+        static SidebarNodeEntry addon(PathmindNodeDefinition definition) {
+            return new SidebarNodeEntry(definition.id(), Optional.empty());
         }
     }
 }
