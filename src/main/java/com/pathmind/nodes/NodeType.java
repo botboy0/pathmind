@@ -2,6 +2,10 @@ package com.pathmind.nodes;
 
 import net.minecraft.text.Text;
 
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
 /**
  * Enum representing different types of nodes in the Pathmind visual editor.
  * Similar to Blender's shader nodes, each type has specific properties and behaviors.
@@ -182,11 +186,42 @@ public enum NodeType {
     private final String translationKey;
     private final int baseColor;
     private final String descriptionKey;
+    private static final String PATHMIND_NAMESPACE = "pathmind:";
+    private static final Map<String, NodeType> BY_PERSISTENCE_ID = new HashMap<>();
 
     NodeType(String translationKey, int color, String descriptionKey) {
         this.translationKey = translationKey;
         this.baseColor = color;
         this.descriptionKey = descriptionKey;
+    }
+
+    static {
+        for (NodeType type : values()) {
+            BY_PERSISTENCE_ID.put(type.getPersistenceId(), type);
+            BY_PERSISTENCE_ID.put(type.name(), type);
+        }
+        BY_PERSISTENCE_ID.put("MINE", COLLECT);
+        BY_PERSISTENCE_ID.put("CLOSE_INVENTORY", CLOSE_GUI);
+    }
+
+    public String getPersistenceId() {
+        return PATHMIND_NAMESPACE + name().toLowerCase(Locale.ROOT);
+    }
+
+    public static NodeType fromPersistenceId(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        return BY_PERSISTENCE_ID.get(id.trim());
+    }
+
+    public static String normalizePersistenceId(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        String trimmed = id.trim();
+        NodeType type = fromPersistenceId(trimmed);
+        return type == null ? trimmed : type.getPersistenceId();
     }
 
     public String getDisplayName() {

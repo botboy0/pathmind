@@ -175,6 +175,75 @@ class NodeGraphPersistenceTest {
     }
 
     @Test
+    void saveNodeGraphPersistsBuiltInNodeTypesAsNamespacedIds() throws Exception {
+        Node start = new Node(NodeType.START, 10, 20);
+
+        Path savePath = tempDir.resolve("builtin-id-graph.json");
+        assertTrue(NodeGraphPersistence.saveNodeGraphToPath(List.of(start), List.of(), savePath));
+
+        String json = Files.readString(savePath);
+        assertTrue(json.contains("\"type\": \"pathmind:start\""));
+
+        NodeGraphData loaded = NodeGraphPersistence.loadNodeGraphFromPath(savePath);
+        assertNotNull(loaded);
+        assertEquals("pathmind:start", loaded.getNodes().getFirst().getTypeId());
+        assertEquals(NodeType.START, loaded.getNodes().getFirst().getType());
+    }
+
+    @Test
+    void loadNodeGraphReadsLegacyEnumNodeTypesAsBuiltInIds() throws Exception {
+        Path savePath = tempDir.resolve("legacy-id-graph.json");
+        Files.writeString(savePath, """
+            {
+              "nodes": [
+                {
+                  "id": "start",
+                  "type": "START",
+                  "x": 0,
+                  "y": 0,
+                  "parameters": [],
+                  "parameterAttachments": []
+                }
+              ],
+              "connections": []
+            }
+            """);
+
+        NodeGraphData loaded = NodeGraphPersistence.loadNodeGraphFromPath(savePath);
+
+        assertNotNull(loaded);
+        assertEquals("pathmind:start", loaded.getNodes().getFirst().getTypeId());
+        assertEquals(NodeType.START, loaded.getNodes().getFirst().getType());
+    }
+
+    @Test
+    void loadNodeGraphPreservesUnknownNamespacedAddonNodeTypeIds() throws Exception {
+        Path savePath = tempDir.resolve("addon-id-graph.json");
+        Files.writeString(savePath, """
+            {
+              "nodes": [
+                {
+                  "id": "addon",
+                  "type": "myaddon:scan_area",
+                  "x": 0,
+                  "y": 0,
+                  "parameters": [],
+                  "parameterAttachments": []
+                }
+              ],
+              "connections": []
+            }
+            """);
+
+        NodeGraphData loaded = NodeGraphPersistence.loadNodeGraphFromPath(savePath);
+
+        assertNotNull(loaded);
+        assertEquals("myaddon:scan_area", loaded.getNodes().getFirst().getTypeId());
+        assertNull(loaded.getNodes().getFirst().getType());
+        assertTrue(NodeGraphPersistence.toPrettyJson(loaded).contains("\"type\": \"myaddon:scan_area\""));
+    }
+
+    @Test
     void convertToConnectionsKeepsOnlyOneIncomingConnectionPerInputSocket() {
         NodeGraphData data = new NodeGraphData(
             List.of(
@@ -551,7 +620,7 @@ class NodeGraphPersistenceTest {
     }
 
     @Test
-    void normalizeNodeGraphToPathPreservesKnownNodesFromMixedVersionPreset() throws Exception {
+    void normalizeNodeGraphToPathPreservesUnknownAddonNodesFromMixedVersionPreset() throws Exception {
         Path sourcePath = tempDir.resolve("mixed-version.json");
         Files.writeString(sourcePath, """
             {
@@ -567,7 +636,7 @@ class NodeGraphPersistenceTest {
                 },
                 {
                   "id": "future",
-                  "type": "FUTURE_NODE_TYPE",
+                  "type": "myaddon:scan_area",
                   "x": 40,
                   "y": 0,
                   "parameters": [],
@@ -606,9 +675,11 @@ class NodeGraphPersistenceTest {
 
         NodeGraphData normalized = NodeGraphPersistence.loadNodeGraphFromPath(normalizedPath);
         assertNotNull(normalized);
-        assertEquals(2, normalized.getNodes().size());
-        assertFalse(normalized.getNodes().stream().anyMatch(node -> node.getType() == null));
-        assertEquals(0, normalized.getConnections().size());
+        assertEquals(3, normalized.getNodes().size());
+        assertTrue(normalized.getNodes().stream().anyMatch(node ->
+            "myaddon:scan_area".equals(node.getTypeId()) && node.getType() == null));
+        assertEquals(1, normalized.getConnections().size());
+        assertEquals("future", normalized.getConnections().getFirst().getInputNodeId());
 
         List<Node> restoredNodes = NodeGraphPersistence.convertToNodes(normalized);
         Map<String, Node> byId = restoredNodes.stream().collect(Collectors.toMap(Node::getId, Function.identity()));

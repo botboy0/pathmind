@@ -111,7 +111,7 @@ public class NodeGraphData {
      */
     public static class NodeData {
         private String id;
-        private NodeType type;
+        private String type;
         private NodeMode mode;
         private int x, y;
         private List<ParameterData> parameters;
@@ -148,7 +148,7 @@ public class NodeGraphData {
 
         public NodeData(String id, NodeType type, NodeMode mode, int x, int y, List<ParameterData> parameters) {
             this.id = id;
-            this.type = type;
+            setType(type);
             this.mode = mode;
             this.x = x;
             this.y = y;
@@ -166,8 +166,13 @@ public class NodeGraphData {
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
         
-        public NodeType getType() { return type; }
-        public void setType(NodeType type) { this.type = type; }
+        public NodeType getType() { return NodeType.fromPersistenceId(type); }
+        public void setType(NodeType type) {
+            this.type = type == null ? null : type.getPersistenceId();
+        }
+
+        public String getTypeId() { return NodeType.normalizePersistenceId(type); }
+        public void setTypeId(String typeId) { this.type = NodeType.normalizePersistenceId(typeId); }
         
         public NodeMode getMode() { return mode; }
         public void setMode(NodeMode mode) { this.mode = mode; }

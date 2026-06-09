@@ -85,7 +85,7 @@ public class NodeGraphPersistence {
         if (json == null || json.isBlank()) {
             return null;
         }
-        return GSON.fromJson(json, NodeGraphData.class);
+        return readNodeGraphDataFromJson(json);
     }
 
     /**
@@ -108,7 +108,7 @@ public class NodeGraphPersistence {
             String cached = IN_MEMORY_JSON_CACHE.get(key);
             if (cached != null) {
                 try {
-                    return GSON.fromJson(cached, NodeGraphData.class);
+                    return readNodeGraphDataFromJson(cached);
                 } catch (Exception e) {
                     System.err.println("Failed to deserialize cached node graph: " + e.getMessage());
                 }
@@ -125,7 +125,7 @@ public class NodeGraphPersistence {
             }
 
             try (Reader reader = Files.newBufferedReader(savePath)) {
-                return GSON.fromJson(reader, NodeGraphData.class);
+                return normalizeLoadedNodeGraphData(GSON.fromJson(reader, NodeGraphData.class));
             }
 
         } catch (Exception e) {
@@ -151,8 +151,34 @@ public class NodeGraphPersistence {
         }
         List<NodeConnection> connections = convertToConnections(data, nodeMap);
         NodeGraphData normalized = buildNodeGraphData(null, nodes, connections, data);
+        preserveUnsupportedNodeData(data, normalized);
         preserveStickyNoteFields(data, normalized);
         return writeNodeGraphDataToPath(normalized, targetPath);
+    }
+
+    private static NodeGraphData readNodeGraphDataFromJson(String json) {
+        return normalizeLoadedNodeGraphData(GSON.fromJson(json, NodeGraphData.class));
+    }
+
+    private static NodeGraphData normalizeLoadedNodeGraphData(NodeGraphData data) {
+        if (data == null) {
+            return null;
+        }
+        normalizeLoadedNodeTypeIds(data);
+        return data;
+    }
+
+    private static void normalizeLoadedNodeTypeIds(NodeGraphData data) {
+        if (data == null || data.getNodes() == null) {
+            return;
+        }
+        for (NodeGraphData.NodeData nodeData : data.getNodes()) {
+            if (nodeData == null) {
+                continue;
+            }
+            nodeData.setTypeId(nodeData.getTypeId());
+            normalizeLoadedNodeTypeIds(nodeData.getTemplateGraph());
+        }
     }
 
     public static ParameterType parseParameterType(String rawType) {
@@ -956,6 +982,67 @@ public class NodeGraphPersistence {
         }
     }
 
+    private static void preserveUnsupportedNodeData(NodeGraphData source, NodeGraphData target) {
+        if (source == null || target == null || source.getNodes() == null || target.getNodes() == null) {
+            return;
+        }
+        Map<String, NodeGraphData.NodeData> targetById = new HashMap<>();
+        for (NodeGraphData.NodeData nodeData : target.getNodes()) {
+            if (nodeData != null && nodeData.getId() != null) {
+                targetById.put(nodeData.getId(), nodeData);
+            }
+        }
+        for (NodeGraphData.NodeData sourceNode : source.getNodes()) {
+            if (sourceNode == null || sourceNode.getId() == null || sourceNode.getType() != null
+                || targetById.containsKey(sourceNode.getId())) {
+                continue;
+            }
+            NodeGraphData.NodeData copy = copyNodeData(sourceNode);
+            target.getNodes().add(copy);
+            targetById.put(copy.getId(), copy);
+        }
+
+        if (source.getConnections() == null || source.getConnections().isEmpty()) {
+            return;
+        }
+        java.util.Set<String> existingConnections = new java.util.HashSet<>();
+        for (NodeGraphData.ConnectionData connection : target.getConnections()) {
+            existingConnections.add(connectionKey(connection));
+        }
+        for (NodeGraphData.ConnectionData sourceConnection : source.getConnections()) {
+            if (sourceConnection == null
+                || !targetById.containsKey(sourceConnection.getOutputNodeId())
+                || !targetById.containsKey(sourceConnection.getInputNodeId())) {
+                continue;
+            }
+            String key = connectionKey(sourceConnection);
+            if (existingConnections.add(key)) {
+                target.getConnections().add(copyConnectionData(sourceConnection));
+            }
+        }
+    }
+
+    private static NodeGraphData.NodeData copyNodeData(NodeGraphData.NodeData source) {
+        return GSON.fromJson(GSON.toJson(source), NodeGraphData.NodeData.class);
+    }
+
+    private static NodeGraphData.ConnectionData copyConnectionData(NodeGraphData.ConnectionData source) {
+        return new NodeGraphData.ConnectionData(
+            source.getOutputNodeId(),
+            source.getInputNodeId(),
+            source.getOutputSocket(),
+            source.getInputSocket()
+        );
+    }
+
+    private static String connectionKey(NodeGraphData.ConnectionData connection) {
+        if (connection == null) {
+            return "";
+        }
+        return connection.getOutputNodeId() + "->" + connection.getInputNodeId()
+            + ":" + connection.getOutputSocket() + ":" + connection.getInputSocket();
+    }
+
     public static NodeGraphData.CustomNodeDefinition resolveCustomNodeDefinition(String presetName, NodeGraphData data) {
         if (data != null && data.getCustomNodeDefinition() != null) {
             NodeGraphData.CustomNodeDefinition stored = data.getCustomNodeDefinition();
@@ -1353,10 +1440,10 @@ public class NodeGraphPersistence {
         StringBuilder raw = new StringBuilder();
         List<NodeGraphData.NodeData> nodeList = data.getNodes() == null ? List.of() : new ArrayList<>(data.getNodes());
         nodeList.sort(Comparator
-            .comparing((NodeGraphData.NodeData node) -> node.getType() == null ? "" : node.getType().name())
+            .comparing((NodeGraphData.NodeData node) -> node.getTypeId() == null ? "" : node.getTypeId())
             .thenComparing(node -> node.getId() == null ? "" : node.getId()));
         for (NodeGraphData.NodeData node : nodeList) {
-            raw.append(node.getType() == null ? "" : node.getType().name()).append('|');
+            raw.append(node.getTypeId() == null ? "" : node.getTypeId()).append('|');
             List<NodeGraphData.ParameterData> params = node.getParameters() == null ? List.of() : new ArrayList<>(node.getParameters());
             params.sort(Comparator.comparing(NodeGraphData.ParameterData::getName, Comparator.nullsFirst(String::compareToIgnoreCase)));
             for (NodeGraphData.ParameterData param : params) {
@@ -1381,10 +1468,10 @@ public class NodeGraphPersistence {
         StringBuilder raw = new StringBuilder();
         List<Node> nodeList = new ArrayList<>(nodes);
         nodeList.sort(Comparator
-            .comparing((Node node) -> node.getType() == null ? "" : node.getType().name())
+            .comparing((Node node) -> node.getType() == null ? "" : node.getType().getPersistenceId())
             .thenComparing(Node::getId));
         for (Node node : nodeList) {
-            raw.append(node.getType() == null ? "" : node.getType().name()).append('|');
+            raw.append(node.getType() == null ? "" : node.getType().getPersistenceId()).append('|');
             List<NodeParameter> params = new ArrayList<>(node.getParameters());
             params.sort(Comparator.comparing(NodeParameter::getName, Comparator.nullsFirst(String::compareToIgnoreCase)));
             for (NodeParameter param : params) {
@@ -1441,25 +1528,25 @@ public class NodeGraphPersistence {
 class NodeTypeAdapter extends com.google.gson.TypeAdapter<NodeType> {
     @Override
     public void write(com.google.gson.stream.JsonWriter out, NodeType value) throws java.io.IOException {
-        out.value(value.name());
+        if (value == null) {
+            out.nullValue();
+            return;
+        }
+        out.value(value.getPersistenceId());
     }
 
     @Override
     public NodeType read(com.google.gson.stream.JsonReader in) throws java.io.IOException {
-        String name = in.nextString();
-        try {
-            if ("MINE".equals(name)) {
-                return NodeType.COLLECT;
-            }
-            if ("CLOSE_INVENTORY".equals(name)) {
-                return NodeType.CLOSE_GUI;
-            }
-            return NodeType.valueOf(name);
-        } catch (IllegalArgumentException e) {
-            // Handle unknown node types gracefully
-            System.err.println("Unknown node type: " + name + ", skipping...");
+        if (in.peek() == com.google.gson.stream.JsonToken.NULL) {
+            in.nextNull();
             return null;
         }
+        String name = in.nextString();
+        NodeType type = NodeType.fromPersistenceId(name);
+        if (type == null) {
+            System.err.println("Unknown node type: " + name + ", skipping...");
+        }
+        return type;
     }
 }
 

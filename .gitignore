@@ -22,3 +22,7 @@ logs/
 **/logs/
 **/crash-reports/
 *.log
+
+# Local verification / PR trace docs
+docs-trace/
+.codex/skills/
