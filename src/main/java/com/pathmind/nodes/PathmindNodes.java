@@ -5,6 +5,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -75,6 +76,7 @@ public final class PathmindNodes {
                 .requiresBaritone(type.requiresBaritone())
                 .requiresUiUtils(type.requiresUiUtils());
             addBuiltInTraitMetadata(builder, type);
+            addBuiltInModeMetadata(builder, type);
             register(builder.build());
         }
     }
@@ -89,6 +91,16 @@ public final class PathmindNodes {
                 NodeTraitRegistry.getParameterSlotLabel(type, slotIndex),
                 NodeTraitRegistry.isParameterSlotAlwaysRequired(type, slotIndex),
                 NodeTraitRegistry.getAcceptedTraits(type, slotIndex).toArray(NodeValueTrait[]::new));
+        }
+    }
+
+    private static void addBuiltInModeMetadata(PathmindNodeDefinition.Builder builder, NodeType type) {
+        NodeMode defaultMode = NodeMode.getDefaultModeForNodeType(type);
+        for (NodeMode mode : NodeMode.getModesForNodeType(type)) {
+            builder.modeOption(
+                Identifier.of("pathmind", mode.name().toLowerCase(Locale.ROOT)),
+                mode,
+                mode == defaultMode);
         }
     }
 

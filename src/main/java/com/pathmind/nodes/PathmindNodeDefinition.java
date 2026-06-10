@@ -26,6 +26,7 @@ public final class PathmindNodeDefinition {
     private final boolean requiresUiUtils;
     private final Set<NodeValueTrait> providedTraits;
     private final List<ParameterSlot> parameterSlots;
+    private final List<ModeOption> modeOptions;
 
     private PathmindNodeDefinition(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id");
@@ -40,6 +41,7 @@ public final class PathmindNodeDefinition {
         this.requiresUiUtils = builder.requiresUiUtils;
         this.providedTraits = Set.copyOf(builder.providedTraits);
         this.parameterSlots = List.copyOf(builder.parameterSlots);
+        this.modeOptions = List.copyOf(builder.modeOptions);
     }
 
     public Identifier id() {
@@ -90,6 +92,10 @@ public final class PathmindNodeDefinition {
         return parameterSlots;
     }
 
+    public List<ModeOption> modeOptions() {
+        return modeOptions;
+    }
+
     static Builder builder(Identifier id) {
         return new Builder(id);
     }
@@ -118,6 +124,48 @@ public final class PathmindNodeDefinition {
         }
     }
 
+    public static final class ModeOption {
+        private final Identifier id;
+        private final NodeMode builtInMode;
+        private final String translationKey;
+        private final String descriptionKey;
+        private final boolean defaultMode;
+
+        private ModeOption(
+            Identifier id,
+            NodeMode builtInMode,
+            String translationKey,
+            String descriptionKey,
+            boolean defaultMode
+        ) {
+            this.id = Objects.requireNonNull(id, "id");
+            this.builtInMode = builtInMode;
+            this.translationKey = requireText(translationKey, "translationKey");
+            this.descriptionKey = requireText(descriptionKey, "descriptionKey");
+            this.defaultMode = defaultMode;
+        }
+
+        public Identifier id() {
+            return id;
+        }
+
+        public Optional<NodeMode> builtInMode() {
+            return Optional.ofNullable(builtInMode);
+        }
+
+        public String translationKey() {
+            return translationKey;
+        }
+
+        public String descriptionKey() {
+            return descriptionKey;
+        }
+
+        public boolean defaultMode() {
+            return defaultMode;
+        }
+    }
+
     public static final class Builder {
         private final Identifier id;
         private NodeType builtInType;
@@ -131,6 +179,7 @@ public final class PathmindNodeDefinition {
         private boolean requiresUiUtils;
         private final Set<NodeValueTrait> providedTraits = EnumSet.noneOf(NodeValueTrait.class);
         private final List<ParameterSlot> parameterSlots = new ArrayList<>();
+        private final List<ModeOption> modeOptions = new ArrayList<>();
 
         private Builder(Identifier id) {
             this.id = Objects.requireNonNull(id, "id");
@@ -193,6 +242,27 @@ public final class PathmindNodeDefinition {
                 ? EnumSet.noneOf(NodeValueTrait.class)
                 : EnumSet.copyOf(Arrays.asList(acceptedTraits));
             this.parameterSlots.add(new ParameterSlot(label, required, traits));
+            return this;
+        }
+
+        public Builder modeOption(
+            Identifier id,
+            String translationKey,
+            String descriptionKey,
+            boolean defaultMode
+        ) {
+            this.modeOptions.add(new ModeOption(id, null, translationKey, descriptionKey, defaultMode));
+            return this;
+        }
+
+        Builder modeOption(Identifier id, NodeMode mode, boolean defaultMode) {
+            Objects.requireNonNull(mode, "mode");
+            this.modeOptions.add(new ModeOption(
+                id,
+                mode,
+                mode.getTranslationKey(),
+                mode.getDescriptionKey(),
+                defaultMode));
             return this;
         }
 

@@ -75,6 +75,24 @@ class PathmindNodesTest {
     }
 
     @Test
+    void builtInNodeModeMetadataIsAvailableFromRegistryDefinition() {
+        PathmindNodeDefinition definition = PathmindNodes.get(Identifier.of("pathmind", "wait")).orElseThrow();
+
+        List<PathmindNodeDefinition.ModeOption> modeOptions = definition.modeOptions();
+        assertEquals(NodeMode.getModesForNodeType(NodeType.WAIT).length, modeOptions.size());
+
+        PathmindNodeDefinition.ModeOption seconds = modeOptions.stream()
+            .filter(option -> option.id().equals(Identifier.of("pathmind", "wait_seconds")))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(NodeMode.WAIT_SECONDS, seconds.builtInMode().orElseThrow());
+        assertEquals(NodeMode.WAIT_SECONDS.getTranslationKey(), seconds.translationKey());
+        assertEquals(NodeMode.WAIT_SECONDS.getDescriptionKey(), seconds.descriptionKey());
+        assertTrue(seconds.defaultMode());
+    }
+
+    @Test
     void addonNodeCanRegisterTraitsAndParameterSlotsWithoutEnumConstant() {
         Identifier id = Identifier.of("slotaddon", "nearby_signal");
 
@@ -102,5 +120,48 @@ class PathmindNodesTest {
         assertEquals("Range", definition.parameterSlots().get(1).label());
         assertFalse(definition.parameterSlots().get(1).required());
         assertEquals(Set.of(NodeValueTrait.RANGE, NodeValueTrait.NUMBER), definition.parameterSlots().get(1).acceptedTraits());
+    }
+
+    @Test
+    void addonNodeCanRegisterMetadataOnlyModeOptionsWithoutEnumConstants() {
+        Identifier id = Identifier.of("modeaddon", "scan_area");
+
+        PathmindNodes.register(id, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("modeaddon.node.scan_area")
+            .descriptionKey("modeaddon.node.scan_area.desc")
+            .color(0xFF225544)
+            .modeOption(
+                Identifier.of("modeaddon", "nearest"),
+                "modeaddon.node.scan_area.mode.nearest",
+                "modeaddon.node.scan_area.mode.nearest.desc",
+                true)
+            .modeOption(
+                Identifier.of("modeaddon", "all"),
+                "modeaddon.node.scan_area.mode.all",
+                "modeaddon.node.scan_area.mode.all.desc",
+                false));
+
+        PathmindNodeDefinition definition = PathmindNodes.get(id).orElseThrow();
+        List<PathmindNodeDefinition.ModeOption> modeOptions = definition.modeOptions();
+
+        assertEquals(2, modeOptions.size());
+        assertEquals(1, modeOptions.stream().filter(PathmindNodeDefinition.ModeOption::defaultMode).count());
+
+        PathmindNodeDefinition.ModeOption nearest = modeOptions.stream()
+            .filter(option -> option.id().equals(Identifier.of("modeaddon", "nearest")))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("modeaddon.node.scan_area.mode.nearest", nearest.translationKey());
+        assertEquals("modeaddon.node.scan_area.mode.nearest.desc", nearest.descriptionKey());
+        assertTrue(nearest.defaultMode());
+        assertTrue(nearest.builtInMode().isEmpty());
+
+        PathmindNodeDefinition.ModeOption all = modeOptions.stream()
+            .filter(option -> option.id().equals(Identifier.of("modeaddon", "all")))
+            .findFirst()
+            .orElseThrow();
+        assertFalse(all.defaultMode());
+        assertTrue(all.builtInMode().isEmpty());
     }
 }
