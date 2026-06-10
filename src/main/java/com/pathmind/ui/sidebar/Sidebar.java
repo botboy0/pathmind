@@ -1121,7 +1121,10 @@ public class Sidebar {
             return !customNodes.isEmpty();
         }
         List<NodeType> nodes = categoryNodes.get(category);
-        return nodes != null && !nodes.isEmpty();
+        if (nodes != null && !nodes.isEmpty()) {
+            return true;
+        }
+        return !getAddonEntriesForCategory(category).isEmpty();
     }
 
     /**

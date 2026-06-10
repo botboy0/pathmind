@@ -11,6 +11,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -104,6 +105,42 @@ class NodeTypeSearchLabelTest {
 
         assertTrue(new Sidebar(true, true).getEntriesForCategory(NodeCategory.SENSORS).stream()
             .anyMatch(entry -> addonNode.equals(entry.id()) && entry.builtInType().isEmpty()));
+    }
+
+    @Test
+    void visibleAddonOnlyEntryMakesCategoryAvailableWithoutBuiltInEntries() throws Exception {
+        Identifier addonNode = Identifier.of("sidebartest", "visible_world_category_entry");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.WORLD)
+            .translationKey("sidebartest.node.visible_world_category_entry")
+            .descriptionKey("sidebartest.node.visible_world_category_entry.desc")
+            .color(0xFF336688));
+        Sidebar sidebarWithoutBuiltIns = new Sidebar(false, false);
+        removeBuiltInCategoryEntries(sidebarWithoutBuiltIns, NodeCategory.WORLD);
+
+        assertTrue(sidebarWithoutBuiltIns.hasNodesInCategory(NodeCategory.WORLD));
+    }
+
+    @Test
+    void hiddenOrDependencyGatedAddonOnlyEntriesDoNotMakeCategoryAvailableWithoutBuiltInEntries() throws Exception {
+        Identifier hiddenAddonNode = Identifier.of("sidebartest", "hidden_player_category_entry");
+        PathmindNodes.register(hiddenAddonNode, builder -> builder
+            .category(NodeCategory.PLAYER)
+            .translationKey("sidebartest.node.hidden_player_category_entry")
+            .descriptionKey("sidebartest.node.hidden_player_category_entry.desc")
+            .color(0xFF886633)
+            .draggableFromSidebar(false));
+        Identifier gatedAddonNode = Identifier.of("sidebartest", "gated_player_category_entry");
+        PathmindNodes.register(gatedAddonNode, builder -> builder
+            .category(NodeCategory.PLAYER)
+            .translationKey("sidebartest.node.gated_player_category_entry")
+            .descriptionKey("sidebartest.node.gated_player_category_entry.desc")
+            .color(0xFF336688)
+            .requiresBaritone(true));
+        Sidebar sidebarWithoutBuiltIns = new Sidebar(false, false);
+        removeBuiltInCategoryEntries(sidebarWithoutBuiltIns, NodeCategory.PLAYER);
+
+        assertFalse(sidebarWithoutBuiltIns.hasNodesInCategory(NodeCategory.PLAYER));
     }
 
     @Test
@@ -233,5 +270,20 @@ class NodeTypeSearchLabelTest {
             translations.put(matcher.group(1), matcher.group(2));
         }
         return translations;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void removeBuiltInCategoryEntries(Sidebar sidebar, NodeCategory category) throws Exception {
+        Field categoryNodesField = Sidebar.class.getDeclaredField("categoryNodes");
+        categoryNodesField.setAccessible(true);
+        Map<NodeCategory, List<NodeType>> categoryNodes =
+            (Map<NodeCategory, List<NodeType>>) categoryNodesField.get(sidebar);
+        categoryNodes.put(category, List.of());
+
+        Field groupedCategoryNodesField = Sidebar.class.getDeclaredField("groupedCategoryNodes");
+        groupedCategoryNodesField.setAccessible(true);
+        Map<NodeCategory, List<Sidebar.NodeGroup>> groupedCategoryNodes =
+            (Map<NodeCategory, List<Sidebar.NodeGroup>>) groupedCategoryNodesField.get(sidebar);
+        groupedCategoryNodes.put(category, List.of());
     }
 }
