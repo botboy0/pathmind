@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 public final class PathmindNodes {
     public static final String ENTRYPOINT_KEY = "pathmind_nodes";
     private static final ConcurrentMap<Identifier, PathmindNodeDefinition> DEFINITIONS = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Identifier, PathmindNodeExecutor> EXECUTORS = new ConcurrentHashMap<>();
 
     static {
         registerBuiltIns();
@@ -56,6 +57,22 @@ public final class PathmindNodes {
         return Optional.ofNullable(DEFINITIONS.get(id));
     }
 
+    public static void registerExecutor(Identifier id, PathmindNodeExecutor executor) {
+        Identifier normalizedId = normalize(id);
+        Objects.requireNonNull(executor, "executor");
+        PathmindNodeExecutor previous = EXECUTORS.putIfAbsent(normalizedId, executor);
+        if (previous != null) {
+            throw new IllegalArgumentException("Node executor is already registered: " + normalizedId);
+        }
+    }
+
+    static Optional<PathmindNodeExecutor> getExecutor(Identifier id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(EXECUTORS.get(normalize(id)));
+    }
+
     public static Collection<PathmindNodeDefinition> all() {
         List<PathmindNodeDefinition> definitions = new ArrayList<>(DEFINITIONS.values());
         definitions.sort((left, right) -> left.id().compareTo(right.id()));
@@ -78,6 +95,7 @@ public final class PathmindNodes {
             addBuiltInTraitMetadata(builder, type);
             addBuiltInModeMetadata(builder, type);
             register(builder.build());
+            registerExecutor(id, NodeCommandDispatcher::executeBuiltIn);
         }
     }
 

@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import net.minecraft.util.Identifier;
+
 import java.util.concurrent.CompletableFuture;
 
 final class NodeCommandDispatcher {
@@ -7,6 +9,13 @@ final class NodeCommandDispatcher {
     }
 
     static void execute(Node node, CompletableFuture<Void> future) {
+        PathmindNodes.getExecutor(Identifier.of(node.getTypeId()))
+            .ifPresentOrElse(
+                executor -> executor.execute(node, future),
+                () -> future.complete(null));
+    }
+
+    static void executeBuiltIn(Node node, CompletableFuture<Void> future) {
         switch (node.getType()) {
             case SET_VARIABLE -> new NodeVariableListCommandExecutor(node).executeSetVariableCommand(future);
             case CHANGE_VARIABLE -> new NodeVariableListCommandExecutor(node).executeChangeVariableCommand(future);
