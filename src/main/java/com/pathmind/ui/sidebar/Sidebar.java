@@ -62,6 +62,7 @@ public class Sidebar {
     private final boolean baritoneAvailable;
     private final boolean uiUtilsAvailable;
     private NodeType hoveredNodeType = null;
+    private SidebarNodeEntry hoveredNodeEntry = null;
     private CustomNodeEntry hoveredCustomNode = null;
     private NodeCategory hoveredCategory = null;
     private NodeCategory selectedCategory = null;
@@ -726,6 +727,7 @@ public class Sidebar {
         // Render colored tabs
         hoveredCategory = null;
         hoveredCustomNode = null;
+        hoveredNodeEntry = null;
         int tabX = Math.max(0, (currentInnerSidebarWidth - tabSize) / 2);
         int visibleTabIndex = 0;
         for (int i = 0; i < categories.length; i++) {
@@ -814,6 +816,7 @@ public class Sidebar {
             contentY += headerHeight;
             
             hoveredNodeType = null;
+            hoveredNodeEntry = null;
 
             if (selectedCategory == NodeCategory.CUSTOM) {
                 if (customNodeRows != null) {
@@ -886,6 +889,7 @@ public class Sidebar {
                                                 effectiveMouseY >= contentY && effectiveMouseY < contentY + rowHeight;
 
                             if (nodeHovered) {
+                                hoveredNodeEntry = row.entry();
                                 hoveredNodeType = nodeType;
                                 context.fill(nodeBackgroundLeft, contentY, nodeBackgroundRight, contentY + rowHeight, UITheme.BACKGROUND_TERTIARY);
                             }
@@ -934,6 +938,7 @@ public class Sidebar {
                                             effectiveMouseY >= contentY && effectiveMouseY < contentY + rowHeight;
 
                         if (nodeHovered) {
+                            hoveredNodeEntry = row.entry();
                             hoveredNodeType = nodeType;
                             context.fill(nodeBackgroundLeft, contentY, nodeBackgroundRight, contentY + rowHeight, UITheme.BACKGROUND_TERTIARY);
                         }
@@ -1003,11 +1008,22 @@ public class Sidebar {
                 MinecraftClient.getInstance().getWindow().getScaledWidth(),
                 MinecraftClient.getInstance().getWindow().getScaledHeight()
             );
+        } else if (interactionsEnabled && showTooltips && hoveredNodeEntry != null) {
+            TooltipRenderer.render(
+                context,
+                textRenderer,
+                Text.translatable(hoveredNodeEntry.descriptionKey()).getString(),
+                mouseX,
+                mouseY,
+                MinecraftClient.getInstance().getWindow().getScaledWidth(),
+                MinecraftClient.getInstance().getWindow().getScaledHeight()
+            );
         }
         
         // Reset hover states if mouse is not in sidebar
         if (effectiveMouseX < 0 || effectiveMouseX > currentRenderedWidth) {
             hoveredNodeType = null;
+            hoveredNodeEntry = null;
             hoveredCustomNode = null;
             hoveredCategory = null;
         }
@@ -1036,6 +1052,7 @@ public class Sidebar {
                 }
                 // Clear any hovered node when switching or collapsing categories
                 hoveredNodeType = null;
+                hoveredNodeEntry = null;
                 // Reset scroll to top when changing categories
                 scrollOffset = 0;
                 calculateMaxScroll(currentSidebarHeight);
@@ -1043,7 +1060,7 @@ public class Sidebar {
             }
             
             // Check node clicks for dragging
-            if (hoveredNodeType != null || hoveredCustomNode != null) {
+            if (hoveredNodeType != null || hoveredNodeEntry != null || hoveredCustomNode != null) {
                 return true; // Signal that dragging should start
             }
         }
@@ -1080,12 +1097,24 @@ public class Sidebar {
     }
     
     public boolean isHoveringNode() {
-        return hoveredNodeType != null || hoveredCustomNode != null;
+        return hoveredNodeType != null || hoveredNodeEntry != null || hoveredCustomNode != null;
+    }
+
+    public static Node createNodeFromEntry(SidebarNodeEntry entry, int x, int y) {
+        if (entry == null) {
+            throw new IllegalArgumentException("Sidebar node entry cannot be null");
+        }
+        return entry.builtInType()
+            .map(nodeType -> new Node(nodeType, x, y))
+            .orElseGet(() -> Node.createUnsupportedAddonPlaceholder(entry.id(), x, y));
     }
     
     public Node createNodeFromSidebar(int x, int y) {
         if (hoveredCustomNode != null) {
             return hoveredCustomNode.createNode(x, y);
+        }
+        if (hoveredNodeEntry != null) {
+            return createNodeFromEntry(hoveredNodeEntry, x, y);
         }
         if (hoveredNodeType != null) {
             return new Node(hoveredNodeType, x, y);
@@ -1316,7 +1345,7 @@ public class Sidebar {
         List<NodeRowInfo> rows = new ArrayList<>();
         for (CustomNodeEntry customNode : customNodes) {
             List<String> lines = wrapText(customNode.getLabel(), textRenderer, maxWidth);
-            rows.add(new NodeRowInfo(null, customNode, lines, getWrappedNodeRowHeight(lines.size(), lineHeight)));
+            rows.add(new NodeRowInfo(null, null, customNode, lines, getWrappedNodeRowHeight(lines.size(), lineHeight)));
         }
         return rows;
     }
@@ -1329,7 +1358,7 @@ public class Sidebar {
         for (SidebarNodeEntry entry : entries) {
             SidebarRowFacts facts = toRowFacts(entry);
             List<String> lines = wrapText(facts.label(), textRenderer, maxWidth);
-            rows.add(new NodeRowInfo(facts, null, lines, getWrappedNodeRowHeight(lines.size(), lineHeight)));
+            rows.add(new NodeRowInfo(facts, entry, null, lines, getWrappedNodeRowHeight(lines.size(), lineHeight)));
         }
         return rows;
     }
@@ -1393,7 +1422,7 @@ public class Sidebar {
         }
     }
 
-    private record NodeRowInfo(SidebarRowFacts rowFacts, CustomNodeEntry customNode, List<String> lines, int height) {
+    private record NodeRowInfo(SidebarRowFacts rowFacts, SidebarNodeEntry entry, CustomNodeEntry customNode, List<String> lines, int height) {
         private NodeType nodeType() {
             return rowFacts != null ? rowFacts.builtInType().orElse(null) : null;
         }
@@ -1475,7 +1504,7 @@ public class Sidebar {
             label,
             entry.descriptionKey(),
             entry.color(),
-            entry.builtInType().isPresent()
+            true
         );
     }
 

@@ -163,7 +163,7 @@ class NodeTypeSearchLabelTest {
     }
 
     @Test
-    void sidebarRowFactsKeepAddonEntriesVisibleButNonInstantiating() {
+    void sidebarRowFactsKeepAddonEntriesVisibleAndInstantiating() {
         Identifier addonNode = Identifier.of("sidebartest", "row_fact_sensor");
         PathmindNodes.register(addonNode, builder -> builder
             .category(NodeCategory.SENSORS)
@@ -182,7 +182,7 @@ class NodeTypeSearchLabelTest {
         assertEquals("sidebartest:row_fact_sensor", addonFacts.label());
         assertEquals("sidebartest.node.row_fact_sensor.desc", addonFacts.descriptionKey());
         assertEquals(0xFF663399, addonFacts.color());
-        assertFalse(addonFacts.instantiating());
+        assertTrue(addonFacts.instantiating());
 
         Sidebar.SidebarRowFacts builtInFacts = Sidebar.toRowFacts(
             new Sidebar(true, true).getEntriesForCategory(NodeCategory.FLOW).stream()
@@ -192,6 +192,40 @@ class NodeTypeSearchLabelTest {
         );
         assertEquals(NodeType.START.getDisplayName(), builtInFacts.label());
         assertTrue(builtInFacts.instantiating());
+    }
+
+    @Test
+    void sidebarEntryCreationCreatesAddonPlaceholdersAndBuiltInNodes() {
+        Identifier addonNode = Identifier.of("sidebartest", "created_sidebar_sensor");
+        PathmindNodes.register(addonNode, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("sidebartest.node.created_sidebar_sensor")
+            .descriptionKey("sidebartest.node.created_sidebar_sensor.desc")
+            .color(0xFF336699));
+
+        Sidebar sidebar = new Sidebar(true, true);
+        Sidebar.SidebarNodeEntry addonEntry = sidebar.getEntriesForCategory(NodeCategory.SENSORS).stream()
+            .filter(candidate -> addonNode.equals(candidate.id()))
+            .findFirst()
+            .orElseThrow();
+        Sidebar.SidebarNodeEntry builtInEntry = sidebar.getEntriesForCategory(NodeCategory.FLOW).stream()
+            .filter(entry -> entry.builtInType().filter(NodeType.START::equals).isPresent())
+            .findFirst()
+            .orElseThrow();
+
+        Node addonCreated = Sidebar.createNodeFromEntry(addonEntry, 12, 34);
+        assertTrue(addonCreated.isUnsupportedAddonPlaceholder());
+        assertEquals(addonNode.toString(), addonCreated.getTypeId());
+        assertEquals(NodeType.STICKY_NOTE, addonCreated.getType());
+        assertEquals(12, addonCreated.getX());
+        assertEquals(34, addonCreated.getY());
+
+        Node builtInCreated = Sidebar.createNodeFromEntry(builtInEntry, 56, 78);
+        assertFalse(builtInCreated.isUnsupportedAddonPlaceholder());
+        assertEquals(NodeType.START.getPersistenceId(), builtInCreated.getTypeId());
+        assertEquals(NodeType.START, builtInCreated.getType());
+        assertEquals(56, builtInCreated.getX());
+        assertEquals(78, builtInCreated.getY());
     }
 
     @Test
