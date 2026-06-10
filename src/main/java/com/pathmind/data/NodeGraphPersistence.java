@@ -5,11 +5,13 @@ import com.google.gson.GsonBuilder;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeConnection;
 import com.pathmind.nodes.NodeParameter;
+import com.pathmind.nodes.PathmindNodes;
 import com.pathmind.nodes.NodeTraitRegistry;
 import com.pathmind.nodes.NodeType;
 import com.pathmind.nodes.NodeValueTrait;
 import com.pathmind.nodes.ParameterType;
 import com.pathmind.util.LegacyVariableSyntaxCompat;
+import net.minecraft.util.Identifier;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -279,11 +281,18 @@ public class NodeGraphPersistence {
 
         // Create nodes
         for (NodeGraphData.NodeData nodeData : data.getNodes()) {
-            if (nodeData == null || nodeData.getType() == null) {
+            if (nodeData == null) {
                 System.err.println("Skipping unsupported node entry during conversion.");
                 continue;
             }
-            Node node = new Node(nodeData.getType(), nodeData.getX(), nodeData.getY());
+            NodeType nodeType = nodeData.getType();
+            Node node = nodeType != null
+                ? new Node(nodeType, nodeData.getX(), nodeData.getY())
+                : createRegisteredAddonPlaceholder(nodeData);
+            if (node == null) {
+                System.err.println("Skipping unsupported node entry during conversion.");
+                continue;
+            }
 
             // Set the same ID using reflection
             try {
@@ -471,6 +480,25 @@ public class NodeGraphPersistence {
         }
 
         return nodes;
+    }
+
+    private static Node createRegisteredAddonPlaceholder(NodeGraphData.NodeData nodeData) {
+        String typeId = nodeData.getTypeId();
+        if (typeId == null || typeId.isBlank()) {
+            return null;
+        }
+        try {
+            Identifier id = Identifier.of(typeId);
+            boolean registeredAddonOnly = PathmindNodes.get(id)
+                .map(definition -> definition.builtInType().isEmpty())
+                .orElse(false);
+            if (!registeredAddonOnly) {
+                return null;
+            }
+            return Node.createUnsupportedAddonPlaceholder(id, nodeData.getX(), nodeData.getY());
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static void absorbLegacyWaitDurationAttachments(NodeGraphData data, List<Node> nodes, Map<String, Node> nodeMap) {
@@ -839,7 +867,7 @@ public class NodeGraphPersistence {
         for (Node node : nodes) {
             NodeGraphData.NodeData nodeData = new NodeGraphData.NodeData();
             nodeData.setId(node.getId());
-            nodeData.setType(node.getType());
+            nodeData.setTypeId(node.getTypeId());
             nodeData.setMode(node.getMode());
             nodeData.setX(node.getX());
             nodeData.setY(node.getY());
@@ -1468,10 +1496,10 @@ public class NodeGraphPersistence {
         StringBuilder raw = new StringBuilder();
         List<Node> nodeList = new ArrayList<>(nodes);
         nodeList.sort(Comparator
-            .comparing((Node node) -> node.getType() == null ? "" : node.getType().getPersistenceId())
+            .comparing((Node node) -> node.getTypeId() == null ? "" : node.getTypeId())
             .thenComparing(Node::getId));
         for (Node node : nodeList) {
-            raw.append(node.getType() == null ? "" : node.getType().getPersistenceId()).append('|');
+            raw.append(node.getTypeId() == null ? "" : node.getTypeId()).append('|');
             List<NodeParameter> params = new ArrayList<>(node.getParameters());
             params.sort(Comparator.comparing(NodeParameter::getName, Comparator.nullsFirst(String::compareToIgnoreCase)));
             for (NodeParameter param : params) {

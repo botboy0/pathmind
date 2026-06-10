@@ -140,6 +140,7 @@ public class Node {
     public static final int NO_OUTPUT = -1;
     private final String id;
     private final NodeType type;
+    private final String unsupportedAddonTypeId;
     private NodeMode mode;
     private final NodeLayoutState layoutState;
     private final NodeInteractionState interactionState;
@@ -342,8 +343,13 @@ public class Node {
     }
 
     public Node(NodeType type, int x, int y) {
+        this(type, x, y, null);
+    }
+
+    private Node(NodeType type, int x, int y, Identifier unsupportedAddonTypeId) {
         this.id = java.util.UUID.randomUUID().toString();
-        this.type = type;
+        this.type = Objects.requireNonNull(type, "type");
+        this.unsupportedAddonTypeId = unsupportedAddonTypeId == null ? null : unsupportedAddonTypeId.toString();
         this.mode = NodeMode.getDefaultModeForNodeType(type);
         this.layoutState = new NodeLayoutState(
             x,
@@ -372,6 +378,10 @@ public class Node {
         initializeParameters();
         recalculateDimensions();
         resetControlState();
+    }
+
+    public static Node createUnsupportedAddonPlaceholder(Identifier id, int x, int y) {
+        return new Node(NodeType.STICKY_NOTE, x, y, Objects.requireNonNull(id, "id"));
     }
 
     static final class PlacementFailure extends RuntimeException {
@@ -549,6 +559,14 @@ public class Node {
 
     public NodeType getType() {
         return type;
+    }
+
+    public String getTypeId() {
+        return unsupportedAddonTypeId != null ? unsupportedAddonTypeId : type.getPersistenceId();
+    }
+
+    public boolean isUnsupportedAddonPlaceholder() {
+        return unsupportedAddonTypeId != null;
     }
 
     NodeRuntimeState runtimeState() {

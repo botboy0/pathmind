@@ -1,8 +1,11 @@
 package com.pathmind.data;
 
 import com.pathmind.nodes.Node;
+import com.pathmind.nodes.NodeCategory;
 import com.pathmind.nodes.NodeConnection;
 import com.pathmind.nodes.NodeType;
+import com.pathmind.nodes.PathmindNodes;
+import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -241,6 +244,55 @@ class NodeGraphPersistenceTest {
         assertEquals("myaddon:scan_area", loaded.getNodes().getFirst().getTypeId());
         assertNull(loaded.getNodes().getFirst().getType());
         assertTrue(NodeGraphPersistence.toPrettyJson(loaded).contains("\"type\": \"myaddon:scan_area\""));
+    }
+
+    @Test
+    void convertToNodesCreatesPlaceholderForRegisteredAddonTypesOnly() throws Exception {
+        Identifier addonId = Identifier.of("placeholdertest", "scan_area_20260610");
+        PathmindNodes.register(addonId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("pathmind.placeholdertest.scan_area")
+            .descriptionKey("pathmind.placeholdertest.scan_area.desc")
+            .color(0x336699)
+            .draggableFromSidebar(false));
+
+        NodeGraphData.NodeData registeredAddon = new NodeGraphData.NodeData();
+        registeredAddon.setId("registered-addon");
+        registeredAddon.setTypeId(addonId.toString());
+        registeredAddon.setX(42);
+        registeredAddon.setY(84);
+        registeredAddon.setParameters(List.of());
+        registeredAddon.setParameterAttachments(List.of());
+
+        NodeGraphData.NodeData unknownAddon = new NodeGraphData.NodeData();
+        unknownAddon.setId("unknown-addon");
+        unknownAddon.setTypeId("unknownplaceholder:scan_area_20260610");
+        unknownAddon.setX(12);
+        unknownAddon.setY(24);
+        unknownAddon.setParameters(List.of());
+        unknownAddon.setParameterAttachments(List.of());
+
+        List<Node> restoredNodes = NodeGraphPersistence.convertToNodes(
+            new NodeGraphData(List.of(registeredAddon, unknownAddon), List.of()));
+        Map<String, Node> byId = restoredNodes.stream().collect(Collectors.toMap(Node::getId, Function.identity()));
+
+        Node placeholder = byId.get("registered-addon");
+        assertNotNull(placeholder);
+        assertEquals(42, placeholder.getX());
+        assertEquals(84, placeholder.getY());
+        assertEquals(NodeType.STICKY_NOTE, placeholder.getType());
+        assertTrue(invokeBoolean(placeholder, "isUnsupportedAddonPlaceholder"));
+        assertEquals(addonId.toString(), invokeString(placeholder, "getTypeId"));
+        assertFalse(byId.containsKey("unknown-addon"));
+
+        Path savePath = tempDir.resolve("addon-placeholder-graph.json");
+        assertTrue(NodeGraphPersistence.saveNodeGraphToPath(restoredNodes, List.of(), savePath));
+        NodeGraphData saved = NodeGraphPersistence.loadNodeGraphFromPath(savePath);
+
+        assertNotNull(saved);
+        assertEquals(1, saved.getNodes().size());
+        assertEquals(addonId.toString(), saved.getNodes().getFirst().getTypeId());
+        assertNull(saved.getNodes().getFirst().getType());
     }
 
     @Test
@@ -689,6 +741,14 @@ class NodeGraphPersistenceTest {
         assertNotNull(restoredBoolean.getParameter("Variable"));
         assertEquals("false", restoredBoolean.getParameter("Toggle").getStringValue());
         assertEquals(false, restoredBoolean.getBooleanToggleValue());
+    }
+
+    private boolean invokeBoolean(Node node, String methodName) throws Exception {
+        return (boolean) node.getClass().getMethod(methodName).invoke(node);
+    }
+
+    private String invokeString(Node node, String methodName) throws Exception {
+        return (String) node.getClass().getMethod(methodName).invoke(node);
     }
 
     private Node coordinateNode(int x, int y, int z) {
