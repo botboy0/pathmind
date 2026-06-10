@@ -1,16 +1,21 @@
 package com.pathmind.validation;
 
 import com.pathmind.data.PresetManager;
+import com.pathmind.data.NodeGraphData;
 import com.pathmind.nodes.Node;
+import com.pathmind.nodes.NodeCategory;
 import com.pathmind.nodes.NodeConnection;
 import com.pathmind.nodes.NodeMode;
 import com.pathmind.nodes.NodeType;
+import com.pathmind.nodes.PathmindNodes;
+import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -250,7 +255,61 @@ class GraphValidatorTest {
         assertFalse(hasIssueCode(result, "variable_type_mismatch"));
     }
 
+    @Test
+    void validateSavedGraphReportsUnsupportedPersistedNodeType() {
+        NodeGraphData graphData = new NodeGraphData(
+            List.of(savedNode("addon-scan", "missingaddon:scan_area")),
+            List.of()
+        );
+
+        GraphValidationResult result = GraphValidator.validate(
+            graphData,
+            PresetManager.getDefaultPresetName(),
+            true,
+            true
+        );
+
+        assertTrue(hasIssueCode(result, "unsupported_node_type"));
+        assertEquals("addon-scan", result.getIssues().stream()
+            .filter(issue -> "unsupported_node_type".equals(issue.getCode()))
+            .findFirst()
+            .orElseThrow()
+            .getNodeId());
+    }
+
+    @Test
+    void validateSavedGraphAllowsRegisteredAddonNodeTypeWithoutEnumConstant() {
+        Identifier addonId = Identifier.of("graphvalidatoraddon", "scan_area");
+        PathmindNodes.register(addonId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("graphvalidatoraddon.node.scan_area")
+            .descriptionKey("graphvalidatoraddon.node.scan_area.desc")
+            .color(0xFF336699)
+            .hasParameters(true));
+        NodeGraphData graphData = new NodeGraphData(
+            List.of(savedNode("addon-scan", addonId.toString())),
+            List.of()
+        );
+
+        GraphValidationResult result = GraphValidator.validate(
+            graphData,
+            PresetManager.getDefaultPresetName(),
+            true,
+            true
+        );
+
+        assertFalse(result.getIssues().stream()
+            .anyMatch(issue -> "unsupported_node_type".equals(issue.getCode()) && "addon-scan".equals(issue.getNodeId())));
+    }
+
     private boolean hasIssueCode(GraphValidationResult result, String code) {
         return result.getIssues().stream().anyMatch(issue -> issue != null && code.equals(issue.getCode()));
+    }
+
+    private NodeGraphData.NodeData savedNode(String id, String typeId) {
+        NodeGraphData.NodeData nodeData = new NodeGraphData.NodeData();
+        nodeData.setId(id);
+        nodeData.setTypeId(typeId);
+        return nodeData;
     }
 }

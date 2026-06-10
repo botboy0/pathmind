@@ -19,12 +19,13 @@ Start the public addon-node API by giving Pathmind and addon mods an ID-backed r
 - Added a metadata-backed sidebar search bridge so visible built-in and addon definitions can be discovered by ID, translation key, description key, or category metadata without adding `NodeType` enum constants.
 - Bridged modern, mid, and legacy compat editor context search to consume the sidebar search metadata through `NodeSearchMapper`, while preserving built-in `NodeType` instantiation and keeping addon-only results non-instantiating.
 - Bridged sidebar category row rendering to consume `Sidebar.SidebarNodeEntry` metadata through row facts, so visible addon entries can contribute deterministic row labels and indicator colors while staying non-instantiating.
+- Added a saved-graph validation entry point that checks persisted `NodeGraphData` type IDs against the registry and reports unsupported saved node type IDs without instantiating addon live nodes.
 
 ## Design
 
 The public addon path follows the Fabric/REI pattern of named entrypoint contracts rather than requiring addons to mix into Pathmind internals. Internal mixins remain available to Pathmind or addons for their own implementation details, but the semantic extension point is `PathmindNodePlugin`.
 
-The compat editor search loop now consumes registered metadata through `Sidebar.searchEntries(String)`, and sidebar category row rendering now consumes registered entry metadata through `Sidebar.toRowFacts(SidebarNodeEntry)`. Live graph creation and execution dispatch remain built-in-only. Addon-only editor search results deliberately return without adding graph nodes, and addon-only sidebar rows deliberately leave `hoveredNodeType` empty so clicking or dragging them cannot create or preview graph nodes until the graph structure can represent external node IDs. Current metadata consumers are `Sidebar.isNodeAvailable(Identifier)`, `Sidebar.getEntriesForCategory(NodeCategory)`, `Sidebar.toRowFacts(SidebarNodeEntry)`, `Sidebar.searchEntries(String)`, compat editor search mapping, and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
+The compat editor search loop now consumes registered metadata through `Sidebar.searchEntries(String)`, and sidebar category row rendering now consumes registered entry metadata through `Sidebar.toRowFacts(SidebarNodeEntry)`. Saved-graph validation consumes persisted `NodeGraphData` type IDs through `GraphValidator.validate(NodeGraphData, String, boolean, boolean)` and reports unsupported IDs only when they are neither registered nor built-in. Live graph creation and execution dispatch remain built-in-only. Addon-only editor search results deliberately return without adding graph nodes, and addon-only sidebar rows deliberately leave `hoveredNodeType` empty so clicking or dragging them cannot create or preview graph nodes until the graph structure can represent external node IDs. Current metadata consumers are `Sidebar.isNodeAvailable(Identifier)`, `Sidebar.getEntriesForCategory(NodeCategory)`, `Sidebar.toRowFacts(SidebarNodeEntry)`, `Sidebar.searchEntries(String)`, compat editor search mapping, saved-graph validation, and `NodeCompatibility.canAttachResolvedNode(Identifier, Identifier, int)`.
 
 ## Verification
 
@@ -52,6 +53,10 @@ The compat editor search loop now consumes registered metadata through `Sidebar.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding `NodeSearchMapper` and wiring compat editor search to sidebar metadata.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` failed before sidebar row rendering metadata because `Sidebar.SidebarRowFacts` and `Sidebar.toRowFacts(SidebarNodeEntry)` did not exist.
 - `.\gradlew.bat test --tests com.pathmind.nodes.NodeTypeSearchLabelTest` passed after adding row facts and building sidebar rows from `SidebarNodeEntry` metadata.
+- `.\gradlew.bat test --tests com.pathmind.validation.GraphValidatorTest` failed before saved-graph validation because `GraphValidator.validate(NodeGraphData, String, boolean, boolean)` did not exist.
+- `.\gradlew.bat test --tests com.pathmind.validation.GraphValidatorTest` passed after adding metadata-only saved type ID checks.
+- `.\gradlew.bat test --tests com.pathmind.nodes.PathmindNodesTest --tests com.pathmind.data.NodeGraphPersistenceTest --tests com.pathmind.validation.GraphValidatorTest` passed after the saved-graph validation bridge.
+- `npm run build` from `docs-trace` passed and generated static files in `build`.
 - `.\gradlew.bat assemble "-Pmc_version=1.21"` passed for the legacy compat source set.
 - `.\gradlew.bat assemble "-Pmc_version=1.21.11"` passed for the modern compat source set.
 - `.\gradlew.bat assemble "-Pmc_version=1.21.10"` compiled the mid compat source set but failed later in `remapJar` because `libraries.minecraft.net` DNS resolution failed while downloading `jtracy-1.0.36-natives-windows.jar`.
@@ -62,6 +67,7 @@ The compat editor search loop now consumes registered metadata through `Sidebar.
 - The registry currently captures metadata only; addon node creation, execution routing, and many runtime call-site lookups are still enum-backed in later call sites.
 - Compat editor search can show addon metadata, but selecting an addon-only result is intentionally a no-op until graph node structure supports external IDs.
 - `Sidebar` can now answer availability for addon IDs and expose addon IDs plus render/search metadata. Addon-only rows can be visible and hoverable, but dragging/instantiating sidebar rows into the live graph still depends on built-in `NodeType` or custom-node entries.
+- Saved-graph validation can report unsupported persisted addon IDs, but it does not instantiate addon nodes or validate addon-specific sockets, parameters, modes, or execution behavior.
 - `NodeCompatibility` can now compare registered resolved IDs by trait metadata, but live graph attachment still depends on `Node` instances backed by `NodeType`.
 - Built-in required-slot metadata is bridged from `NodeTraitRegistry.isParameterSlotAlwaysRequired`; dynamic runtime rules such as placement target requirements remain in `Node`.
 - Duplicate registration throws immediately, which is intentional for now but may need richer diagnostics once third-party addons are loaded in the wild.

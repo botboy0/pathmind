@@ -11,6 +11,8 @@ import com.pathmind.nodes.NodeConnection;
 import com.pathmind.nodes.NodeParameter;
 import com.pathmind.nodes.NodeTraitRegistry;
 import com.pathmind.nodes.NodeType;
+import com.pathmind.nodes.PathmindNodes;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -125,6 +127,54 @@ public final class GraphValidator {
                 .thenComparing(GraphValidationIssue::getMessage, String.CASE_INSENSITIVE_ORDER)
         );
         return new GraphValidationResult(issues);
+    }
+
+    public static GraphValidationResult validate(NodeGraphData data, String activePreset,
+                                                 boolean baritoneAvailable, boolean uiUtilsAvailable) {
+        List<GraphValidationIssue> issues = new ArrayList<>();
+        if (data == null || data.getNodes() == null) {
+            return GraphValidationResult.empty();
+        }
+
+        for (NodeGraphData.NodeData nodeData : data.getNodes()) {
+            validateSavedNodeType(nodeData, issues);
+        }
+
+        issues.sort(
+            Comparator.comparing((GraphValidationIssue issue) -> issue.getSeverity() == GraphValidationSeverity.ERROR ? 0 : 1)
+                .thenComparing(GraphValidationIssue::getMessage, String.CASE_INSENSITIVE_ORDER)
+        );
+        return new GraphValidationResult(issues);
+    }
+
+    private static void validateSavedNodeType(NodeGraphData.NodeData nodeData, List<GraphValidationIssue> issues) {
+        if (nodeData == null) {
+            return;
+        }
+        String typeId = nodeData.getTypeId();
+        if (isRegisteredSavedNodeType(typeId)) {
+            return;
+        }
+        issues.add(new GraphValidationIssue(
+            GraphValidationSeverity.ERROR,
+            "unsupported_node_type",
+            "Unsupported saved node type \"" + displayValue(typeId) + "\".",
+            nodeData.getId()
+        ));
+    }
+
+    private static boolean isRegisteredSavedNodeType(String typeId) {
+        if (typeId == null || typeId.isBlank()) {
+            return false;
+        }
+        if (NodeType.fromPersistenceId(typeId) != null) {
+            return true;
+        }
+        try {
+            return PathmindNodes.get(Identifier.of(typeId)).isPresent();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private static void validateInputConnections(Node node, Map<String, Integer> inputOccupancy, List<GraphValidationIssue> issues) {
