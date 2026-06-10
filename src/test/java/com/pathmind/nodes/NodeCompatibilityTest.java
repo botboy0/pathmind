@@ -262,6 +262,48 @@ class NodeCompatibilityTest {
     }
 
     @Test
+    void addonPlaceholderParameterCompatibilityUsesRegisteredDefinitions() {
+        Identifier hostId = Identifier.of("livecompataddon", "distance_check");
+        Identifier rangeCandidateId = Identifier.of("livecompataddon", "scan_range");
+        Identifier itemCandidateId = Identifier.of("livecompataddon", "scan_item");
+        PathmindNodes.register(hostId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("livecompataddon.node.distance_check")
+            .descriptionKey("livecompataddon.node.distance_check.desc")
+            .color(0xFF224466)
+            .parameterSlot("Range", true, NodeValueTrait.RANGE));
+        PathmindNodes.register(rangeCandidateId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("livecompataddon.node.scan_range")
+            .descriptionKey("livecompataddon.node.scan_range.desc")
+            .color(0xFF446622)
+            .providesTraits(NodeValueTrait.RANGE));
+        PathmindNodes.register(itemCandidateId, builder -> builder
+            .category(NodeCategory.SENSORS)
+            .translationKey("livecompataddon.node.scan_item")
+            .descriptionKey("livecompataddon.node.scan_item.desc")
+            .color(0xFF664422)
+            .providesTraits(NodeValueTrait.ITEM));
+
+        Node host = Node.createUnsupportedAddonPlaceholder(hostId, 0, 0);
+        Node rangeCandidate = Node.createUnsupportedAddonPlaceholder(rangeCandidateId, 0, 0);
+        Node itemCandidate = Node.createUnsupportedAddonPlaceholder(itemCandidateId, 0, 0);
+
+        assertTrue(NodeCompatibility.canAttachToSlot(host, rangeCandidate, NodeSlotType.PARAMETER, 0));
+        assertTrue(host.canAcceptParameterNode(rangeCandidate, 0));
+        assertFalse(host.canAcceptParameterNode(rangeCandidate, 1));
+        assertFalse(host.canAcceptParameterNode(itemCandidate, 0));
+    }
+
+    @Test
+    void builtInParameterCompatibilityStillUsesBuiltInMetadata() {
+        Node look = new Node(NodeType.LOOK, 0, 0);
+        Node amount = new Node(NodeType.PARAM_AMOUNT, 0, 0);
+
+        assertTrue(look.canAcceptParameterNode(amount, 0));
+    }
+
+    @Test
     void uiUtilsDelayPacketModesDoNotExposeEnabledParameter() {
         Node delayPackets = new Node(NodeType.UI_UTILS, 0, 0);
         delayPackets.setMode(NodeMode.UI_UTILS_ENABLE_DELAY_PACKETS);

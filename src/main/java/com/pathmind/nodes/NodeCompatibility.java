@@ -44,6 +44,9 @@ public final class NodeCompatibility {
                 return canAttachActionNode(host, candidate);
             case PARAMETER:
             default:
+                if (host.isUnsupportedAddonPlaceholder() || candidate.isUnsupportedAddonPlaceholder()) {
+                    return canAttachUnsupportedAddonPlaceholderParameterNode(host, candidate, slotIndex);
+                }
                 return canAttachParameterNode(host, candidate, slotIndex);
         }
     }
@@ -62,6 +65,26 @@ public final class NodeCompatibility {
             return false;
         }
         return true;
+    }
+
+    private static boolean canAttachUnsupportedAddonPlaceholderParameterNode(Node host, Node candidate, int slotIndex) {
+        Identifier hostId = resolveNodeTypeId(host);
+        Identifier candidateId = resolveNodeTypeId(candidate);
+        if (hostId == null || candidateId == null) {
+            return false;
+        }
+        return canAttachResolvedNode(hostId, candidateId, slotIndex);
+    }
+
+    private static Identifier resolveNodeTypeId(Node node) {
+        if (node == null) {
+            return null;
+        }
+        try {
+            return Identifier.of(node.getTypeId());
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     private static boolean canAttachParameterNode(Node host, Node candidate, int slotIndex) {
