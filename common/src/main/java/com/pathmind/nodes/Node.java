@@ -1,5 +1,8 @@
 package com.pathmind.nodes;
 
+import com.pathmind.api.addon.AddonNodeContext;
+import com.pathmind.api.addon.AddonNodeExecutor;
+import com.pathmind.api.addon.NodeResult;
 import com.pathmind.execution.PathmindNavigator;
 import net.minecraft.text.Text;
 import com.google.gson.Gson;
@@ -336,6 +339,10 @@ public class Node {
     private int templateVersion;
     private boolean customNodeInstance;
     private NodeGraphData templateGraphData;
+    // Addon node fields (set when type == NodeType.ADDON)
+    private String addonTypeId;
+    private java.util.Map<String, Object> addonExtraFields;
+    private boolean addonUnresolved;
 
     private boolean usesTemplateBacking() {
         return type == NodeType.TEMPLATE || type == NodeType.CUSTOM_NODE;
@@ -372,6 +379,18 @@ public class Node {
         initializeParameters();
         recalculateDimensions();
         resetControlState();
+    }
+
+    /**
+     * Constructs an ADDON node for a registered addon type. Used by the sidebar drag path.
+     *
+     * @param addonTypeId the namespaced addon type id (e.g. "pathmind_lua:script")
+     * @param x world x coordinate
+     * @param y world y coordinate
+     */
+    public Node(String addonTypeId, int x, int y) {
+        this(NodeType.ADDON, x, y);
+        this.addonTypeId = addonTypeId;
     }
 
     static final class PlacementFailure extends RuntimeException {
@@ -3103,6 +3122,32 @@ public class Node {
         this.templateGraphData = templateGraphData;
     }
 
+    // Addon node accessors
+
+    public String getAddonTypeId() {
+        return addonTypeId;
+    }
+
+    public void setAddonTypeId(String addonTypeId) {
+        this.addonTypeId = addonTypeId;
+    }
+
+    public java.util.Map<String, Object> getAddonExtraFields() {
+        return addonExtraFields;
+    }
+
+    public void setAddonExtraFields(java.util.Map<String, Object> addonExtraFields) {
+        this.addonExtraFields = addonExtraFields;
+    }
+
+    public boolean isAddonUnresolved() {
+        return addonUnresolved;
+    }
+
+    public void setAddonUnresolved(boolean addonUnresolved) {
+        this.addonUnresolved = addonUnresolved;
+    }
+
     public int getMessageFieldCount() {
         return Math.max(1, messageLines.size());
     }
@@ -3699,6 +3744,12 @@ public class Node {
     }
 
     public CompletableFuture<Void> execute(int executionId) {
+        // ADDON nodes dispatch through the registry — skip all built-in parameter and
+        // in-game-runtime checks, which do not apply to addon-provided behavior (API-06).
+        if (type == NodeType.ADDON) {
+            return executeAddonNode(executionId);
+        }
+
         CompletableFuture<Void> future = new CompletableFuture<>();
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
 
@@ -3749,6 +3800,51 @@ public class Node {
             NodeExecutionCompletion.completeExceptionally(future, new RuntimeException("Minecraft client not available"));
         }
 
+        return future;
+    }
+
+    /**
+     * Dispatches an ADDON node to its registered executor asynchronously (API-06).
+     * Returns a CompletableFuture<Void> that the execution chain awaits.
+     * If the addon type is unregistered or addonTypeId is null, completes normally (SKIPPED).
+     */
+    private CompletableFuture<Void> executeAddonNode(int executionId) {
+        if (addonTypeId == null || !NodeTypeRegistry.INSTANCE.hasType(addonTypeId)) {
+            LOGGER.warn("[Pathmind] Skipping unresolved addon node: {}", addonTypeId);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        AddonNodeContext ctx = new AddonNodeContext();
+        ctx.setAddonTypeId(addonTypeId);
+        // Pass script text from retained extra fields if present (set by serializer round-trip)
+        if (addonExtraFields != null && addonExtraFields.containsKey("script")) {
+            Object scriptObj = addonExtraFields.get("script");
+            ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
+        }
+
+        AddonNodeExecutor exec = NodeTypeRegistry.INSTANCE.executorFor(addonTypeId);
+        if (exec == null) {
+            LOGGER.warn("[Pathmind] No executor registered for addon node: {}", addonTypeId);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        try {
+            exec.execute(ctx).whenComplete((result, throwable) -> {
+                if (throwable != null) {
+                    NodeExecutionCompletion.completeExceptionally(future, throwable);
+                } else if (result == NodeResult.FAILURE) {
+                    // Route through the existing fail path so the graph stops at this node
+                    NodeExecutionCompletion.fail(this, net.minecraft.client.MinecraftClient.getInstance(), future,
+                        "Addon node '" + addonTypeId + "' reported FAILURE.");
+                } else {
+                    future.complete(null);
+                }
+            });
+        } catch (Throwable t) {
+            LOGGER.warn("[Pathmind] Addon executor threw during dispatch for {}: {}", addonTypeId, t.getMessage(), t);
+            NodeExecutionCompletion.completeExceptionally(future, t);
+        }
         return future;
     }
 
