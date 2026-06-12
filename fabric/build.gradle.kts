@@ -2,6 +2,7 @@ plugins {
     id("dev.architectury.loom")
     id("architectury-plugin")
     id("com.gradleup.shadow")
+    id("maven-publish")      // Publishes com.pathmind:pathmind-fabric to mavenLocal for addon consumers
 }
 
 architectury {
@@ -158,4 +159,21 @@ tasks.sourcesJar {
     dependsOn(commonSources)
     from(commonSources.archiveFile.map { zipTree(it) })
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Addon API publishing — publishes com.pathmind:pathmind-fabric:<version> to mavenLocal.
+// Dev loop: ./gradlew :fabric:publishToMavenLocal
+// IMPORTANT: After every Pathmind rebuild, delete the Loom remap cache in the addon repo:
+//   rm -rf <pathmind-lua>/.gradle/loom-cache/remapped_mods
+// Loom 1.14 caches by version coordinate, not content hash (Loom issue #1290).
+// Omitting this step silently compiles the addon against a stale API jar.
+publishing {
+    publications {
+        create<MavenPublication>("mavenFabric") {
+            groupId = "com.pathmind"
+            artifactId = "pathmind-fabric"
+            // version is inherited from the project version (gradle.properties mod_version)
+            from(components["java"])
+        }
+    }
 }
