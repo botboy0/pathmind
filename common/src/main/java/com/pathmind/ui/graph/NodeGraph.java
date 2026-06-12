@@ -1,5 +1,9 @@
 package com.pathmind.ui.graph;
 
+import com.pathmind.api.addon.AddonNodeBodyRenderer;
+import com.pathmind.api.addon.AddonNodeContext;
+import com.pathmind.api.addon.AddonNodeDefinition;
+import com.pathmind.nodes.NodeTypeRegistry;
 import com.pathmind.data.NodeGraphData;
 import com.pathmind.data.NodeGraphPersistence;
 import com.pathmind.data.PresetManager;
@@ -4077,6 +4081,8 @@ public class NodeGraph {
             renderTemplateNodeContent(context, textRenderer, node, isOverSidebar, mouseX, mouseY);
         } else if (node.getType() == NodeType.CUSTOM_NODE) {
             renderCustomNodeContent(context, textRenderer, node, isOverSidebar);
+        } else if (node.getType() == NodeType.ADDON) {
+            renderAddonNodeContent(context, textRenderer, node, x, y, width, height, isOverSidebar);
         } else {
             if (rendersInlineParameters(node)) {
                 if (shouldShowParameters(node)) {
@@ -7372,6 +7378,52 @@ public class NodeGraph {
         DrawContextBridge.drawBorderInLayer(context, previewLeft, previewTop, previewWidth, previewHeight,
             isOverSidebar ? UITheme.BORDER_SUBTLE : chipBorder);
         renderTemplatePreviewGraph(context, textRenderer, node, previewLeft, previewTop, previewWidth, previewHeight, isOverSidebar);
+    }
+
+    /**
+     * Renders an ADDON node's body content. Delegates to the addon's registered
+     * {@link AddonNodeBodyRenderer} if available. Falls back to a grayed-out placeholder
+     * for unresolved nodes (D-09) or when no renderer is registered.
+     *
+     * <p>The renderer call is wrapped in a try/catch so a buggy renderer cannot
+     * crash the editor frame (T-01-08).
+     */
+    private void renderAddonNodeContent(DrawContext context, TextRenderer textRenderer,
+            Node node, int x, int y, int width, int height, boolean isOverSidebar) {
+        String addonTypeId = node.getAddonTypeId();
+        AddonNodeDefinition def = addonTypeId != null
+            ? NodeTypeRegistry.INSTANCE.definitionFor(addonTypeId)
+            : null;
+
+        boolean unresolved = node.isAddonUnresolved() || def == null;
+        AddonNodeBodyRenderer renderer = def != null ? def.getBodyRenderer() : null;
+
+        if (!unresolved && renderer != null) {
+            // Build context for the renderer
+            AddonNodeContext ctx = new AddonNodeContext();
+            ctx.setAddonTypeId(addonTypeId);
+            if (node.getAddonExtraFields() != null && node.getAddonExtraFields().containsKey("script")) {
+                Object scriptObj = node.getAddonExtraFields().get("script");
+                ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
+            }
+            try {
+                renderer.render(ctx, context, x + 1, y + 18, width - 2, height - 19);
+            } catch (Throwable t) {
+                // T-01-08: renderer threw — log once and fall back to grayed body
+                org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                    .warn("[Pathmind] Addon body renderer threw for {}: {}", addonTypeId, t.getMessage());
+                renderAddonPlaceholderBody(context, x, y, width, height, isOverSidebar);
+            }
+        } else {
+            // Unresolved placeholder (D-09): grayed-out body indicating the addon is absent
+            renderAddonPlaceholderBody(context, x, y, width, height, isOverSidebar);
+        }
+    }
+
+    private void renderAddonPlaceholderBody(DrawContext context,
+            int x, int y, int width, int height, boolean isOverSidebar) {
+        int bodyColor = isOverSidebar ? UITheme.BACKGROUND_SECONDARY : UITheme.NODE_DIMMED_BG;
+        context.fill(x + 1, y + 18, x + width - 1, y + height - 1, bodyColor);
     }
 
     private void renderLockedCustomNodeBinding(DrawContext context, TextRenderer textRenderer, Node node, boolean isOverSidebar) {

@@ -1,5 +1,8 @@
 package com.pathmind.ui.sidebar;
 
+import com.pathmind.api.addon.AddonNodeCategory;
+import com.pathmind.api.addon.AddonNodeDefinition;
+import com.pathmind.nodes.NodeTypeRegistry;
 import com.pathmind.data.NodeGraphData;
 import com.pathmind.data.NodeGraphPersistence;
 import com.pathmind.data.PresetManager;
@@ -21,7 +24,9 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +66,9 @@ public class Sidebar {
     private NodeCategory hoveredCategory = null;
     private NodeCategory selectedCategory = null;
     private final List<CustomNodeEntry> customNodes = new ArrayList<>();
+    // Addon-declared categories, populated from NodeTypeRegistry after install (D-05)
+    private final Map<AddonNodeCategory, List<AddonNodeDefinition>> addonCategoryNodes = new LinkedHashMap<>();
+    private AddonNodeDefinition hoveredAddonDefinition = null;
     private int scrollOffset = 0;
     private int maxScroll = 0;
     private boolean scrollDragging = false;
@@ -90,6 +98,8 @@ public class Sidebar {
 
         // Organize nodes by category
         initializeCategoryNodes();
+        // Populate addon-declared categories from the installed registry (D-05)
+        initializeAddonCategoryNodes();
         calculateMaxScroll(400); // Default height for initialization
     }
     
@@ -104,6 +114,55 @@ public class Sidebar {
             categoryNodes.put(category, nodes);
         }
         refreshCustomNodes();
+    }
+
+    /**
+     * Populates the addon-category palette from the installed NodeTypeRegistry (D-05).
+     * Groups all registered AddonNodeDefinitions by their declared AddonNodeCategory.
+     * Called during sidebar construction and whenever the registry changes.
+     *
+     * <p>With no addons installed the map is left empty — no addon categories appear in the
+     * sidebar (API-09 standalone path).
+     */
+    public void initializeAddonCategoryNodes() {
+        addonCategoryNodes.clear();
+        hoveredAddonDefinition = null;
+        addonCategoryNodes.putAll(groupByCategory(NodeTypeRegistry.INSTANCE.allDefinitions()));
+    }
+
+    /**
+     * Groups the given addon definitions by their declared category. Exposed as a
+     * package-private pure static helper so AddonSidebarTest can test the grouping logic
+     * directly without constructing a full Sidebar (which may pull in client-only classes).
+     *
+     * @param definitions the addon node definitions to group
+     * @return an ordered map from AddonNodeCategory to the list of definitions in that category
+     */
+    static Map<AddonNodeCategory, List<AddonNodeDefinition>> groupByCategory(
+            Collection<AddonNodeDefinition> definitions) {
+        Map<AddonNodeCategory, List<AddonNodeDefinition>> result = new LinkedHashMap<>();
+        for (AddonNodeDefinition def : definitions) {
+            result.computeIfAbsent(def.getCategory(), k -> new ArrayList<>()).add(def);
+        }
+        return result;
+    }
+
+    /**
+     * Returns the addon definition currently hovered by the user in the addon-category
+     * section of the sidebar, or {@code null} if no addon entry is hovered.
+     * Mirrors {@link #getHoveredNodeType()} for addon entries (D-06).
+     *
+     * @return hovered addon definition, or null
+     */
+    public AddonNodeDefinition getHoveredAddonDefinition() {
+        return hoveredAddonDefinition;
+    }
+
+    /**
+     * Returns the addon category node map for testing. Package-private.
+     */
+    Map<AddonNodeCategory, List<AddonNodeDefinition>> getAddonCategoryNodesForTest() {
+        return addonCategoryNodes;
     }
 
     private List<NodeGroup> createGroupsForCategory(NodeCategory category) {
@@ -963,12 +1022,17 @@ public class Sidebar {
     }
     
     public boolean isHoveringNode() {
-        return hoveredNodeType != null || hoveredCustomNode != null;
+        return hoveredNodeType != null || hoveredCustomNode != null || hoveredAddonDefinition != null;
     }
-    
+
     public Node createNodeFromSidebar(int x, int y) {
         if (hoveredCustomNode != null) {
             return hoveredCustomNode.createNode(x, y);
+        }
+        if (hoveredAddonDefinition != null) {
+            // Build an ADDON node via the String constructor (Task 1) — routes through
+            // existing previewSidebarDrag(Node,...) / handleSidebarDrop(Node,...) overloads
+            return new Node(hoveredAddonDefinition.getId(), x, y);
         }
         if (hoveredNodeType != null) {
             return new Node(hoveredNodeType, x, y);
