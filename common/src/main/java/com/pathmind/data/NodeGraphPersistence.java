@@ -2,8 +2,11 @@ package com.pathmind.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.pathmind.api.addon.AddonNodeContext;
+import com.pathmind.api.addon.AddonNodeSerializer;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeConnection;
+import com.pathmind.nodes.NodeTypeRegistry;
 import com.pathmind.nodes.NodeParameter;
 import com.pathmind.nodes.NodeTraitRegistry;
 import com.pathmind.nodes.NodeType;
@@ -332,6 +335,38 @@ public class NodeGraphPersistence {
             node.setStartScreenTarget(nodeData.getStartScreenTarget());
             node.setRuntimeSourceNodeId(nodeData.getRuntimeSourceNodeId());
             node.recalculateDimensions();
+
+            // Addon node load — restore addonTypeId and deserialize extra fields (API-05, D-09)
+            if (nodeData.getType() == NodeType.ADDON && nodeData.getAddonTypeId() != null) {
+                String addonTypeId = nodeData.getAddonTypeId();
+                node.setAddonTypeId(addonTypeId);
+                if (NodeTypeRegistry.INSTANCE.hasType(addonTypeId)) {
+                    // Addon installed — deserialize into context and apply to node
+                    AddonNodeSerializer ser = NodeTypeRegistry.INSTANCE.serializerFor(addonTypeId);
+                    if (ser != null) {
+                        AddonNodeContext ctx = new AddonNodeContext();
+                        ctx.setAddonTypeId(addonTypeId);
+                        try {
+                            ser.deserialize(ctx, nodeData.getExtraFields());
+                            // Store restored state in the node's retained blob for later re-serialization
+                            if (nodeData.getExtraFields() != null) {
+                                node.setAddonExtraFields(new java.util.HashMap<>(nodeData.getExtraFields()));
+                            }
+                            if (ctx.getScriptText() != null && node.getAddonExtraFields() != null) {
+                                node.getAddonExtraFields().put("script", ctx.getScriptText());
+                            }
+                        } catch (Throwable t) {
+                            System.err.println("[Pathmind] Addon deserializer threw for " + addonTypeId + ": " + t.getMessage());
+                            node.setAddonExtraFields(nodeData.getExtraFields());
+                            node.setAddonUnresolved(true);
+                        }
+                    }
+                } else {
+                    // Addon absent — retain extraFields verbatim as placeholder (D-09)
+                    node.setAddonExtraFields(nodeData.getExtraFields());
+                    node.setAddonUnresolved(true);
+                }
+            }
 
             nodes.add(node);
             nodeMap.put(nodeData.getId(), node);
@@ -814,6 +849,38 @@ public class NodeGraphPersistence {
             NodeGraphData.NodeData nodeData = new NodeGraphData.NodeData();
             nodeData.setId(node.getId());
             nodeData.setType(node.getType());
+
+            // Addon node persistence (API-05, T-01-09)
+            if (node.getType() == NodeType.ADDON) {
+                String addonTypeId = node.getAddonTypeId();
+                if (addonTypeId == null) {
+                    // Pitfall 5: skip broken ADDON records with no addonTypeId
+                    System.err.println("[Pathmind] Skipping ADDON node with null addonTypeId during save (T-01-09)");
+                    continue;
+                }
+                nodeData.setAddonTypeId(addonTypeId);
+                AddonNodeSerializer ser = NodeTypeRegistry.INSTANCE.serializerFor(addonTypeId);
+                if (ser != null) {
+                    // Addon is installed — serialize current state
+                    AddonNodeContext ctx = new AddonNodeContext();
+                    ctx.setAddonTypeId(addonTypeId);
+                    if (node.getAddonExtraFields() != null && node.getAddonExtraFields().containsKey("script")) {
+                        Object scriptObj = node.getAddonExtraFields().get("script");
+                        ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
+                    }
+                    try {
+                        nodeData.setExtraFields(ser.serialize(ctx));
+                    } catch (Throwable t) {
+                        System.err.println("[Pathmind] Addon serializer threw for " + addonTypeId + ": " + t.getMessage());
+                        // Fall back to retained blob if any
+                        nodeData.setExtraFields(node.getAddonExtraFields());
+                    }
+                } else {
+                    // Addon absent — placeholder re-save: write back retained blob verbatim (D-09)
+                    nodeData.setExtraFields(node.getAddonExtraFields());
+                }
+            }
+
             nodeData.setMode(node.getMode());
             nodeData.setX(node.getX());
             nodeData.setY(node.getY());
