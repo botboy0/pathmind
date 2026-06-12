@@ -58,9 +58,12 @@ public final class NodeTypeRegistrar {
 
     /**
      * Seals this registrar so no further registrations are accepted.
-     * Package-private — only {@code AddonLoader} calls this.
+     * Called by {@code AddonLoader} after all entrypoints have run, and also called by
+     * {@code NodeTypeRegistry.install} to enforce the seal invariant (ASVS V4, T-01-05).
+     *
+     * <p>Calling this method more than once is safe (idempotent).
      */
-    void seal() {
+    public void seal() {
         this.sealed = true;
     }
 

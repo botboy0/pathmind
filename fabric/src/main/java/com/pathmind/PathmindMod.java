@@ -26,6 +26,10 @@ public class PathmindMod implements ModInitializer {
             LOGGER.warn("Pathmind targets Minecraft {} but detected {}", VersionSupport.SUPPORTED_RANGE, minecraftVersion);
         }
 
+        // Discover and load addon node type registrations (API-01/API-03/API-04/D-11).
+        // Must be last — all Pathmind internal state is ready at this point (Pattern 5).
+        com.pathmind.execution.AddonLoader.discoverAndLoad();
+
         LOGGER.info("Pathmind mod initialized successfully");
     }
 }
