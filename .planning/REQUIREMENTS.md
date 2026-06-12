@@ -77,13 +77,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmap) | | |
+| API-01 | Phase 1 | Pending |
+| API-02 | Phase 1 | Pending |
+| API-03 | Phase 1 | Pending |
+| API-04 | Phase 1 | Pending |
+| API-05 | Phase 1 | Pending |
+| API-06 | Phase 1 | Pending |
+| API-07 | Phase 1 | Pending |
+| API-08 | Phase 1 | Pending |
+| API-09 | Phase 1 | Pending |
+| API-10 | Phase 1 | Pending |
+| LUA-01 | Phase 1 | Pending |
+| LUA-05 | Phase 1 | Pending |
+| LUA-02 | Phase 2 | Pending |
+| LUA-03 | Phase 2 | Pending |
+| LUA-04 | Phase 2 | Pending |
+| BIND-01 | Phase 2 | Pending |
+| BIND-02 | Phase 2 | Pending |
+| BIND-03 | Phase 2 | Pending |
+| BIND-04 | Phase 2 | Pending |
+| EDIT-01 | Phase 3 | Pending |
+| EDIT-02 | Phase 3 | Pending |
+| EDIT-03 | Phase 3 | Pending |
+| EDIT-04 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-12*
-*Last updated: 2026-06-12 after initial definition*
+*Last updated: 2026-06-12 — traceability filled by roadmap creation*
