@@ -69,6 +69,8 @@ public class Sidebar {
     // Addon-declared categories, populated from NodeTypeRegistry after install (D-05)
     private final Map<AddonNodeCategory, List<AddonNodeDefinition>> addonCategoryNodes = new LinkedHashMap<>();
     private AddonNodeDefinition hoveredAddonDefinition = null;
+    private AddonNodeCategory hoveredAddonCategory = null;
+    private AddonNodeCategory selectedAddonCategory = null;
     private int scrollOffset = 0;
     private int maxScroll = 0;
     private boolean scrollDragging = false;
@@ -127,6 +129,8 @@ public class Sidebar {
     public void initializeAddonCategoryNodes() {
         addonCategoryNodes.clear();
         hoveredAddonDefinition = null;
+        hoveredAddonCategory = null;
+        selectedAddonCategory = null;
         addonCategoryNodes.putAll(groupByCategory(NodeTypeRegistry.INSTANCE.allDefinitions()));
     }
 
@@ -564,9 +568,18 @@ public class Sidebar {
             }
         }
         
+        // Add space for selected addon category entries
+        if (selectedAddonCategory != null) {
+            totalHeight += CATEGORY_HEADER_HEIGHT;
+            List<AddonNodeDefinition> addonDefs = addonCategoryNodes.get(selectedAddonCategory);
+            if (addonDefs != null) {
+                totalHeight += addonDefs.size() * NODE_HEIGHT;
+            }
+        }
+
         // Add padding
         totalHeight += PADDING * 2;
-        
+
         // Calculate max scroll with proper room for scrolling
         maxScroll = Math.max(0, totalHeight - sidebarHeight + 100); // Extra 100px for better scrolling
     }
@@ -579,7 +592,7 @@ public class Sidebar {
         // Store current sidebar height so scroll can be recalculated
         this.currentSidebarStartY = sidebarStartY;
         this.currentSidebarHeight = sidebarHeight;
-        categoryOpenAnimation.animateTo(selectedCategory != null ? 1f : 0f, UITheme.TRANSITION_ANIM_MS);
+        categoryOpenAnimation.animateTo((selectedCategory != null || selectedAddonCategory != null) ? 1f : 0f, UITheme.TRANSITION_ANIM_MS);
         categoryOpenAnimation.tick();
         float openProgress = categoryOpenAnimation.getValue();
         
@@ -634,7 +647,11 @@ public class Sidebar {
         if (selectedCategory != null) {
             headerLines = wrapText(selectedCategory.getDisplayName(), textRenderer, maxContentWidth);
             headerHeight = Math.max(CATEGORY_HEADER_HEIGHT, headerLines.size() * headerLineHeight);
+        } else if (selectedAddonCategory != null) {
+            headerLines = wrapText(selectedAddonCategory.getDisplayName(), textRenderer, maxContentWidth);
+            headerHeight = Math.max(CATEGORY_HEADER_HEIGHT, headerLines.size() * headerLineHeight);
         }
+
 
         List<GroupHeaderInfo> groupHeaders = null;
         List<NodeRowInfo> customNodeRows = null;
@@ -716,9 +733,43 @@ public class Sidebar {
                 hoveredCategory = category;
             }
         }
-        
+
+        // Render addon category tabs in the inner strip after built-in tabs (D-05)
+        hoveredAddonCategory = null;
+        if (!addonCategoryNodes.isEmpty()) {
+            int addonTabY = currentY + visibleTabIndex * (tabSize + tabSpacing);
+            for (Map.Entry<AddonNodeCategory, List<AddonNodeDefinition>> entry : addonCategoryNodes.entrySet()) {
+                AddonNodeCategory addonCat = entry.getKey();
+
+                boolean addonTabHovered = effectiveMouseX >= tabX && effectiveMouseX <= tabX + tabSize
+                    && effectiveMouseY >= addonTabY && effectiveMouseY < addonTabY + tabSize;
+                boolean addonTabSelected = addonCat == selectedAddonCategory;
+
+                int baseColor = addonCat.getColor();
+                int normalColor = addonTabSelected ? darkenColor(baseColor, 0.75f) : baseColor;
+                int hoverColor = lightenColor(baseColor, 1.2f);
+                int tabColor = addonTabSelected ? normalColor
+                    : (addonTabHovered ? AnimationHelper.lerpColor(normalColor, hoverColor, 1f) : normalColor);
+
+                int outlineColor = darkenColor(baseColor, 0.7f);
+                UIStyleHelper.drawBeveledPanel(context, tabX, addonTabY, tabSize, tabSize, tabColor, outlineColor, UITheme.PANEL_INNER_BORDER);
+
+                String icon = addonCat.getIcon();
+                int iconX = tabX + (tabSize - textRenderer.getWidth(icon)) / 2;
+                int iconY = addonTabY + (tabSize - textRenderer.fontHeight) / 2 + 1;
+                context.drawTextWithShadow(textRenderer, icon, iconX, iconY, UITheme.TEXT_HEADER);
+
+                if (addonTabHovered) {
+                    hoveredAddonCategory = addonCat;
+                }
+                addonTabY += tabSize + tabSpacing;
+            }
+        }
+
         // Render category name and nodes for selected category
         if (selectedCategory != null && openProgress > 0.001f) {
+            // No addon category is open in this path — clear stale hover state
+            hoveredAddonDefinition = null;
             int contentTop = sidebarStartY + PADDING;
             int contentBottom = sidebarStartY + sidebarHeight - PADDING;
             // Start content area at the very top of the sidebar, right after the title bar
@@ -925,6 +976,86 @@ public class Sidebar {
             DrawContextBridge.flush(context);
         }
 
+        // Render addon category content panel when an addon tab is selected (D-05)
+        if (selectedAddonCategory != null && openProgress > 0.001f) {
+            int contentTop = sidebarStartY + PADDING;
+            int contentBottom = sidebarStartY + sidebarHeight - PADDING;
+            int contentY = contentTop - scrollOffset;
+            int sidebarBottom = sidebarStartY + sidebarHeight;
+            int nodeBackgroundLeft = currentInnerSidebarWidth + 1;
+            int nodeBackgroundRight = totalWidth;
+            int contentClipLeft = nodeBackgroundLeft;
+            int contentClipRight = Math.min(totalWidth, contentTextRight + 2);
+            if (contentClipRight <= contentClipLeft) {
+                contentClipRight = contentClipLeft + 1;
+            }
+
+            context.enableScissor(contentClipLeft, contentTop, contentClipRight, contentBottom);
+
+            // Category header
+            if (headerLines != null && !headerLines.isEmpty()) {
+                int headerTextY = contentY + 4;
+                for (String line : headerLines) {
+                    context.drawTextWithShadow(
+                        textRenderer,
+                        Text.literal(line),
+                        contentTextX,
+                        headerTextY,
+                        selectedAddonCategory.getColor()
+                    );
+                    headerTextY += headerLineHeight;
+                }
+            }
+            contentY += headerHeight;
+
+            // Reset addon hover at start of addon content pass (mirrors hoveredNodeType = null at line 758)
+            hoveredAddonDefinition = null;
+
+            // Render addon node entry rows with hit-test
+            List<AddonNodeDefinition> addonDefs = addonCategoryNodes.get(selectedAddonCategory);
+            if (addonDefs != null) {
+                for (AddonNodeDefinition def : addonDefs) {
+                    List<String> lines = wrapText(def.getDisplayName(), textRenderer, nodeTextWidth);
+                    int rowHeight = Math.max(NODE_HEIGHT, lines.size() * nodeLineHeight + PADDING);
+
+                    if (contentY >= sidebarBottom) {
+                        break;
+                    }
+
+                    boolean nodeHovered = effectiveMouseX >= nodeBackgroundLeft && effectiveMouseX <= nodeBackgroundRight
+                        && effectiveMouseY >= contentY && effectiveMouseY < contentY + rowHeight;
+
+                    if (nodeHovered) {
+                        hoveredAddonDefinition = def;
+                        context.fill(nodeBackgroundLeft, contentY, nodeBackgroundRight, contentY + rowHeight, UITheme.BACKGROUND_TERTIARY);
+                    }
+
+                    int indicatorSize = 12;
+                    int indicatorX = currentInnerSidebarWidth + 8;
+                    int indicatorY = contentY + Math.max(3, (rowHeight - indicatorSize) / 2);
+                    UIStyleHelper.drawBeveledPanel(context, indicatorX, indicatorY, indicatorSize, indicatorSize,
+                        def.getColor(), UITheme.BORDER_SUBTLE, UITheme.PANEL_INNER_BORDER);
+
+                    int lineY = contentY + 4;
+                    for (String line : lines) {
+                        context.drawTextWithShadow(
+                            textRenderer,
+                            Text.literal(line),
+                            indicatorX + indicatorSize + 4,
+                            lineY,
+                            nodeHovered ? UITheme.TEXT_HEADER : UITheme.TEXT_PRIMARY
+                        );
+                        lineY += nodeLineHeight;
+                    }
+
+                    contentY += rowHeight;
+                }
+            }
+
+            context.disableScissor();
+            DrawContextBridge.flush(context);
+        }
+
         if (interactionsEnabled && showTooltips && hoveredCustomNode != null) {
             TooltipRenderer.render(
                 context,
@@ -952,6 +1083,8 @@ public class Sidebar {
             hoveredNodeType = null;
             hoveredCustomNode = null;
             hoveredCategory = null;
+            hoveredAddonDefinition = null;
+            hoveredAddonCategory = null;
         }
     }
     
@@ -969,23 +1102,41 @@ public class Sidebar {
                 scrollDragOffset = (int) mouseY - scrollMetrics.thumbTop();
                 return true;
             }
-            // Check tab clicks
+            // Check tab clicks — built-in categories
             if (mouseX >= 0 && mouseX <= currentInnerSidebarWidth && hoveredCategory != null) {
                 if (selectedCategory != null && hoveredCategory == selectedCategory) {
                     selectedCategory = null;
                 } else {
                     selectedCategory = hoveredCategory;
+                    selectedAddonCategory = null; // collapse any open addon category
                 }
                 // Clear any hovered node when switching or collapsing categories
                 hoveredNodeType = null;
+                hoveredAddonDefinition = null;
                 // Reset scroll to top when changing categories
                 scrollOffset = 0;
                 calculateMaxScroll(currentSidebarHeight);
                 return true;
             }
-            
+            // Check tab clicks — addon categories
+            if (mouseX >= 0 && mouseX <= currentInnerSidebarWidth && hoveredAddonCategory != null) {
+                if (selectedAddonCategory != null && hoveredAddonCategory == selectedAddonCategory) {
+                    selectedAddonCategory = null;
+                } else {
+                    selectedAddonCategory = hoveredAddonCategory;
+                    selectedCategory = null; // collapse any open built-in category
+                }
+                // Clear any hovered node/addon when switching or collapsing addon categories
+                hoveredNodeType = null;
+                hoveredAddonDefinition = null;
+                // Reset scroll to top when changing categories
+                scrollOffset = 0;
+                calculateMaxScroll(currentSidebarHeight);
+                return true;
+            }
+
             // Check node clicks for dragging
-            if (hoveredNodeType != null || hoveredCustomNode != null) {
+            if (hoveredNodeType != null || hoveredCustomNode != null || hoveredAddonDefinition != null) {
                 return true; // Signal that dragging should start
             }
         }
