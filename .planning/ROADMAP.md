@@ -29,7 +29,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can drag a Script node from the editor palette, connect it in a graph, run the graph, and the Script node passes through execution without error (no Lua yet — graceful no-op completion)
   4. A saved preset containing a Script node round-trips through save/load with script text and `_schema_version` intact
   5. Launching Minecraft without the addon jar installed leaves Pathmind fully functional across its existing 1.21–1.21.11 range with no errors or missing behavior
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+Plans:
+- [ ] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
+- [ ] 01-02-PLAN.md — NodeType.ADDON + async execution branch, opaque schema-versioned persistence (save/load + missing-addon placeholder), sidebar palette population + drag-to-canvas, editor-open failure surfacing [Wave 2]
+- [ ] 01-03-PLAN.md — maven-publish to mavenLocal, pathmind-lua sibling repo scaffold, Lua Script node impl (no-op executor + serializer + preview renderer), getting-started doc, end-of-phase in-game verification [Wave 2]
 
 ### Phase 2: Lua VM + Core Bindings
 **Goal**: The Script node executes real Lua code: Cobalt VM runs on a worker thread with a fresh-per-execution globals object, the async-sync bridging model handles awaitable actions, and the full Pathmind Lua binding surface (variables, movement, game state, error surfacing) is accessible from scripts — both repos remain in a working, loadable state
@@ -66,6 +70,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 0/TBD | Not started | - |
+| 1. API Foundation + Script Node Registration | 0/3 | Not started | - |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
