@@ -170,6 +170,9 @@ PathmindMod.onInitialize()                     [fabric/ platform layer]
          │       │
          │       └── FabricLoader.getEntrypointContainers("pathmind", PathmindAddonEntrypoint.class)
          │               for each container {
+         │                   // D-11 runtime check: compare container's declared "pathmind"
+         │                   // dependency version range against PathmindApiVersion.MIN_COMPATIBLE
+         │                   if (incompatible) { markFailed(addonId, reason); continue; }
          │                   try {
          │                       container.getEntrypoint().registerNodes(registrar)
          │                   } catch (Throwable t) {
@@ -424,6 +427,7 @@ public void deserialize(AddonNodeContext ctx, Map<String, Object> fields) {
 |---------|-------------|-------------|-----|
 | Addon discovery | Custom classpath scanner / `ServiceLoader` | `FabricLoader.getEntrypointContainers` | Classpath scanning fails across Fabric's per-mod classloaders; ServiceLoader is not loader-aware |
 | Mod version metadata in error messages | String parsing of mod files | `container.getProvider().getMetadata().getId()` | FabricLoader already exposes this; string parsing is brittle |
+| Addon API-version dependency lookup (D-11 runtime check) | Parsing the addon jar's fabric.mod.json by hand | `container.getProvider().getMetadata().getDependencies()` → the `pathmind` `ModDependency` | FabricLoader already parses each mod's declared dependencies; the `pathmind` dependency's version range is the addon's declared API range |
 | Addon-failure warning display | Custom overlay class | `NodeErrorNotificationOverlay` (existing) | The overlay is already wired into `PathmindHud`; reuse it |
 | JSON serialization of `Map<String, Object>` | Custom serializer | GSON (already used) | GSON handles `Map<String, Object>` transparently; it serializes nested maps as JSON objects |
 | Dev-loop cache busting | Git hooks or IDE task | Shell command: `./gradlew :fabric:publishToMavenLocal && del /s /q pathmind-lua\.gradle\loom-cache\remapped_mods` | Loom caches by version coordinate; content-hash check does not exist in Loom 1.14 |
@@ -659,30 +663,42 @@ if (currentNode.getType() == NodeType.ADDON) {
 | A2 | `maven-publish` + Loom 1.14 auto-wires `remapJar` to the publication artifact without manual `artifact(remapJar)` configuration | Standard Stack — Installing | Publication produces a dev-mapped (non-remapped) jar; addon cannot compile against it |
 | A3 | `NodeData.extraFields` field added as `Map<String, Object>` will serialize/deserialize correctly with GSON without additional type adapters | Pattern 4 / Pitfall 4 | Schema version reads fail with ClassCastException; addon node data silently lost on load |
 | A4 | `Sidebar.java` can be extended to accept addon categories via a parallel `Map<AddonNodeCategory, ...>` without a full rewrite | Pattern 3 | Full Sidebar refactor needed to support addon categories; larger task than planned |
-| A5 | `NodeGraph.java` can create `Node` instances with `NodeType.ADDON` + `addonTypeId` via the existing Node constructor pattern | Architecture Patterns | Node creation for addon nodes requires a new factory method; ripple changes to NodeGraph |
-| A6 | `NodeErrorNotificationOverlay` has a public API to queue error messages from outside the UI layer | Don't Hand-Roll | New overlay class needed for addon failures; extra work not in scope for Phase 1 |
-| A7 | The `AddonNodeBodyRenderer` functional interface hook can be called from within `NodeGraph`'s existing node-body rendering path without touching NodeGraph's core rendering loop | Pattern — API-07 | Deeper NodeGraph integration needed; risk of destabilizing the 3000+ line rendering class |
+| A5 | `NodeGraph.java` can create `Node` instances with `NodeType.ADDON` + `addonTypeId` via the existing Node constructor pattern | Architecture Patterns | **[VERIFIED — see Open Questions (RESOLVED) Q3]** `previewSidebarDrag(Node,int,int)` (NodeGraph.java:1804) and `handleSidebarDrop(Node,int,int)` (:2008) already accept a pre-built `Node`. An ADDON node `new Node(addonTypeId,x,y)` flows through these existing `Node` overloads — no new payload type or `String` overload needed |
+| A6 | `NodeErrorNotificationOverlay` has a public API to queue error messages from outside the UI layer | Don't Hand-Roll | **[VERIFIED — see Open Questions (RESOLVED) Q1]** `NodeErrorNotificationOverlay.getInstance().show(String message, int nodeColor)` is public (NodeErrorNotificationOverlay.java:42/46). No new overlay method needed |
+| A7 | The `AddonNodeBodyRenderer` functional interface hook can be called from within `NodeGraph`'s existing node-body rendering path without touching NodeGraph's core rendering loop | Pattern — API-07 | **[VERIFIED — see Open Questions (RESOLVED) Q2]** `renderNode(...)` (NodeGraph.java:3525) dispatches per-type via an `if/else if (node.getType() == ...)` chain (:3708+) with `context`/`x`/`y`/`width`/`height` in scope. The ADDON branch is one new `else if` clause — no loop restructure |
 
-**Items A4–A7 should be verified by reading the actual file code before finalizing the plan.** These are the only unverified claims that directly affect the planner's task scope estimates.
+**Item A4 remains the only ASSUMED scope claim. A5–A7 were verified against source during planning (revision iteration 1) and are recorded as resolved below.**
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`NodeErrorNotificationOverlay` public API surface**
-   - What we know: The class exists at `common/src/main/java/com/pathmind/ui/overlay/NodeErrorNotificationOverlay.java` and is used for existing validation errors.
-   - What's unclear: Whether it has a public static method like `NodeErrorNotificationOverlay.queueAddonError(String modId, Throwable t)` or requires the error to be queued through some other mechanism.
-   - Recommendation: Read the class file before writing the AddonLoader task. If no public enqueue method exists, add one in the same task that creates AddonLoader.
+> Resolved during planning revision iteration 1 (2026-06-13) by reading the actual source files. All three questions directly affected Plan 02 Task 3 scope; each is now answered concretely, and Plan 02 Task 3 was updated to match verified reality.
 
-2. **`NodeGraph.java` addon node body rendering hook**
-   - What we know: NodeGraph renders node bodies in immediate mode (~3000 lines). The D-06 decision requires a read-only script preview in Phase 1.
-   - What's unclear: Exactly where in the per-node rendering loop the addon body renderer callback should be injected. The rendering is immediate-mode; there may be a `renderNodeBody(Node, DrawContext, ...)` method or it may be inline in a large switch/if-chain.
-   - Recommendation: Read the node body rendering section of NodeGraph.java before writing the NodeGraph modification task.
+### Q1 — `NodeErrorNotificationOverlay` public API surface — RESOLVED
 
-3. **Drag-from-sidebar for addon nodes**
-   - What we know: The Sidebar renders `NodeType` items that NodeGraph converts to `Node` instances on drag. Addon nodes use `NodeType.ADDON` + a string ID.
-   - What's unclear: Whether the drag-and-drop code path in NodeGraph.java can accept a non-`NodeType` identifier (i.e., `NodeType.ADDON + addonTypeId`) through the existing drag mechanism, or whether a new drag payload type is needed.
-   - Recommendation: Read NodeGraph's drag-start handling before writing the drag-from-sidebar task.
+- **Question:** Does the overlay have a public method to queue an error message from outside the UI layer, or must a new enqueue method be added?
+- **Answer (verified):** The overlay exposes a public singleton accessor and a public `show` method:
+  - `NodeErrorNotificationOverlay.getInstance()` — public static, returns the singleton (NodeErrorNotificationOverlay.java:42).
+  - `public synchronized void show(String message, int nodeColor)` (NodeErrorNotificationOverlay.java:46) — adds a notification card; ignores null/empty messages; caps the stack at 4.
+- **Consequence for the plan:** Plan 02 Task 3 surfaces addon-load failures with `NodeErrorNotificationOverlay.getInstance().show("[Pathmind] Addon '" + addonId + "' failed to load: " + cause.getMessage(), 0xFFFF5722)`. **No new overlay method is needed** — the existing public API is sufficient. (Matches the original Task 3 action; confirmed correct.)
+
+### Q2 — `NodeGraph.java` addon node body rendering hook injection point — RESOLVED
+
+- **Question:** Where in NodeGraph's immediate-mode rendering does the `AddonNodeBodyRenderer` callback get injected — a dedicated `renderNodeBody(...)` method, or inline in a switch/if-chain?
+- **Answer (verified):** Node bodies are rendered in `private void renderNode(DrawContext context, TextRenderer textRenderer, Node node, int mouseX, int mouseY, float delta)` (NodeGraph.java:3525). Per-type body content is selected by an `if / else if (node.getType() == NodeType.X)` chain (first branch at :3708 for `NodeType.START`, continuing through `EVENT_FUNCTION`/`VARIABLE`/etc.). The local node-body bounds (`x`, `y`, `width`, `height`) and the `DrawContext context` are all in scope inside that chain.
+- **Consequence for the plan:** The addon body-render hook is a **single new `else if (node.getType() == NodeType.ADDON) { ... }` clause appended to the existing `renderNode` type chain** (after the `shouldUseCompactNodeContent` early-return at :3703–3705). Inside it: look up `AddonNodeDefinition def = NodeTypeRegistry.INSTANCE.definitionFor(node.getAddonTypeId())`; if `def != null && def.getBodyRenderer() != null && !node.isAddonUnresolved()`, build an `AddonNodeContext` and call `def.getBodyRenderer().render(ctx, context, x, y, width, height)` (wrapped in try/catch → grayed fallback, threat T-01-08); otherwise fill a grayed body (D-09 placeholder). **No restructuring of the rendering loop** — this is the same injection style every existing node type uses.
+
+### Q3 — Drag-from-sidebar for addon nodes (payload type feasibility) — RESOLVED
+
+- **Question:** Can the existing NodeGraph drag/drop path accept a `NodeType.ADDON + addonTypeId` payload, or is a new drag payload type required?
+- **Answer (verified):** The drag path is **already `Node`-based, not `NodeType`-based**. NodeGraph exposes two overloads of each drag method:
+  - `previewSidebarDrag(NodeType, int, int)` (:1800) which simply wraps `new Node(nodeType, x, y)` and delegates to `previewSidebarDrag(Node candidate, int, int)` (:1804).
+  - `handleSidebarDrop(NodeType, int, int)` (:2004) which wraps `new Node(nodeType, 0, 0)` and delegates to `handleSidebarDrop(Node newNode, int, int)` (:2008).
+  The `Node`-accepting overloads do all the real work (positioning, drop-target resolution, `addNode`). The drop ultimately calls the existing `addNode(node)` path.
+- **Consequence for the plan:** **No new drag payload type and no new `String` overload are required.** An ADDON node built via the Task 1 constructor `new Node(addonTypeId, x, y)` (which sets `type = NodeType.ADDON`) is passed directly into the existing `previewSidebarDrag(Node, int, int)` and `handleSidebarDrop(Node, int, int)` overloads. The sidebar reports the dragged addon entry via a new `getHoveredAddonDefinition()` accessor (mirroring the existing `getHoveredNodeType()` at Sidebar.java:1033); when that accessor is non-null, the editor builds the ADDON `Node` and routes it through the `Node` overloads. This is **strictly less integration** than the original Task 3 action assumed (which proposed adding a `previewSidebarDrag(String, …)` overload) — Plan 02 Task 3 was updated accordingly.
+
+**Scope verdict (scope_sanity):** With Q1–Q3 resolved, none of Task 3's three assumptions failed. Two were exactly as assumed (Q1 overlay API, the renderNode chain hook) and one (Q3 drag path) is simpler than assumed. The body-render hook is one `else if` clause; the drag path reuses existing `Node` overloads; the sidebar adds a parallel map plus one hover accessor; PathmindScreens adds a failure-surfacing loop. The Task 3 modifications to NodeGraph.java are additive insertions at three named, verified sites (renderNode chain at :3708+, and the existing `Node` drag overloads at :1804/:2008) — they do **not** require touching the 7,000-line file's structure. **Task 3 stays a single task; the original scope holds.** (See the updated Plan 02 Task 3 action for the corrected drag-path wiring.)
 
 ---
 
@@ -726,6 +742,7 @@ if (currentNode.getType() == NodeType.ADDON) {
 | Malicious addon registering a duplicate node ID to shadow a built-in behavior | Tampering | `NodeTypeRegistrar.register()` throws `IllegalArgumentException` on duplicate; whole addon is disabled via D-08 failure UX |
 | Addon supplying `null` executor (execution skipped silently) | Tampering | Null check in `NodeTypeRegistrar.register()`; NullPointerException caught and converted to `IllegalArgumentException` with informative message |
 | Addon injecting path traversal chars in node ID (e.g., `"../../../evil:id"`) | Tampering | Validate node ID against regex `^[a-z0-9_-]+:[a-z0-9_/.-]+$` in `NodeTypeRegistrar.register()` |
+| Addon declaring an incompatible API version range (D-11) | Spoofing / Tampering | Two-layer check: fabric.mod.json `pathmind` dependency lets the Fabric loader block hard mismatches; the runtime check in `AddonLoader.discoverAndLoad()` reads the container's declared `pathmind` dependency version and compares against `PathmindApiVersion.MIN_COMPATIBLE`, disabling incompatible addons via the D-08 failure UX |
 | Stale mavenLocal jar exposing a version mismatch at runtime | Information Disclosure | Dev loop doc + cache-deletion command prevents silently running wrong code |
 | `extraFields` in NodeData containing arbitrary data written by a malicious addon | Tampering | Pathmind only reads `extraFields` back through the addon's own `AddonNodeSerializer.deserialize`; Pathmind itself does not interpret the blob |
 
@@ -742,9 +759,11 @@ if (currentNode.getType() == NodeType.ADDON) {
 - `common/src/main/java/com/pathmind/nodes/NodeType.java` — 99 enum constants, no ADDON sentinel yet
 - `common/src/main/java/com/pathmind/nodes/NodeBehaviorDefinitionRegistry.java` — `EnumMap<NodeType, NodeBehaviorDefinition>`; confirms enum-keyed design
 - `common/src/main/java/com/pathmind/nodes/NodeCategory.java` — enum with 9 categories; confirms sidebar cannot accept runtime categories without parallel map approach
-- `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java` — `Map<NodeCategory, List<NodeType>>` confirmed; `initializeCategoryNodes()` iterates `NodeCategory.values()`; parallel map extension is feasible
+- `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java` — `Map<NodeCategory, List<NodeType>>` confirmed; `initializeCategoryNodes()` iterates `NodeCategory.values()`; parallel map extension is feasible; `getHoveredNodeType()` accessor at :1033 is the pattern for a parallel `getHoveredAddonDefinition()`
+- `common/src/main/java/com/pathmind/ui/graph/NodeGraph.java` — **[verified rev. 1]** `Node`-accepting drag overloads `previewSidebarDrag(Node,int,int)` (:1804) and `handleSidebarDrop(Node,int,int)` (:2008); per-type body render chain in `renderNode(...)` (:3525, branches at :3708+)
+- `common/src/main/java/com/pathmind/ui/overlay/NodeErrorNotificationOverlay.java` — **[verified rev. 1]** public `getInstance()` (:42) + `show(String,int)` (:46)
 - `common/src/main/java/com/pathmind/data/NodeGraphData.java` — `NodeData` class; no `addonTypeId` or `extraFields` fields yet
-- `fabric/src/main/java/com/pathmind/PathmindMod.java` — `onInitialize()` body confirmed; `AddonLoader` call will be appended at the end
+- `fabric/src/main/java/com/pathmind/PathmindMod.java` — `onInitialize()` body confirmed (version check then success log at :29); `AddonLoader` call will be appended before the success log
 - `fabric/src/main/resources/fabric.mod.json` — existing `entrypoints` block; `"pathmind"` key does not yet exist
 - `fabric/build.gradle.kts` — no `maven-publish` plugin yet; `shadowJar` + `remapJar` pipeline confirmed
 - `build.gradle.kts` — `maven_group=com.pathmind` confirmed; Gradle 9.2.0 (wrapper)
@@ -759,8 +778,9 @@ if (currentNode.getType() == NodeType.ADDON) {
 
 **Confidence breakdown:**
 - Standard stack: MEDIUM — key patterns confirmed via prior research citing official sources; dev-loop mechanics are ASSUMED until first build
-- Architecture: MEDIUM — component design confirmed against actual codebase; API shape is ASSUMED (no existing API to verify against)
+- Architecture: MEDIUM — component design confirmed against actual codebase; API shape is ASSUMED (no existing API to verify against); the three open questions (A5–A7) that affected Plan 02 Task 3 scope are now VERIFIED against source
 - Pitfalls: HIGH — all pitfalls sourced from documented issues or confirmed code patterns in existing codebase
 
 **Research date:** 2026-06-12
+**Revised:** 2026-06-13 (revision iteration 1 — resolved the three open questions against source; updated A5–A7 to VERIFIED; added D-11 runtime-check detail to the architecture diagram and security domain)
 **Valid until:** 2026-07-12 (API shape may drift; re-verify if planning is delayed)
