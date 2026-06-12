@@ -13,7 +13,7 @@ Three phases co-evolve Pathmind and its first external addon. Phase 1 builds the
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: API Foundation + Script Node Registration** - Publish the Pathmind addon API artifact, wire addon discovery into PathmindMod, and ship the Script node as a registered, persistent, palette-visible node in the sibling addon repo (completed 2026-06-12)
+- [ ] **Phase 1: API Foundation + Script Node Registration** - Publish the Pathmind addon API artifact, wire addon discovery into PathmindMod, and ship the Script node as a registered, persistent, palette-visible node in the sibling addon repo (gap closure in progress — verification found 3 BLOCKERs)
 - [ ] **Phase 2: Lua VM + Core Bindings** - Wire Cobalt VM on a worker thread with per-execution fresh globals, establish the async-sync bridging model, and expose the full Pathmind Lua binding surface (variables, actions, game state, error reporting)
 - [ ] **Phase 3: Script Node Editor + Autosuggestions** - Complete the in-game editor UX: functional multiline editor with line numbers, inline error display co-located with the node, and prefix-match autosuggestions for the pathmind.* API
 
@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A saved preset containing a Script node round-trips through save/load with script text and `_schema_version` intact
   5. Launching Minecraft without the addon jar installed leaves Pathmind fully functional across its existing 1.21–1.21.11 range with no errors or missing behavior
 
-**Plans**: 3 plans (2 waves)Plans:
+**Plans**: 6 plans (3 + 3 gap-closure)
 **Wave 1**
 
 - [x] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
@@ -42,6 +42,17 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] 01-02-PLAN.md — NodeType.ADDON + async execution branch, opaque schema-versioned persistence (save/load + missing-addon placeholder), sidebar palette population + drag-to-canvas, editor-open failure surfacing [Wave 2]
 - [x] 01-03-PLAN.md — maven-publish to mavenLocal, pathmind-lua sibling repo scaffold, Lua Script node impl (no-op executor + serializer + preview renderer), getting-started doc, end-of-phase in-game verification [Wave 2]
+
+**Gap closure** *(verification found 3 BLOCKERs — these plans close them)*
+
+**Wave 1 (gaps)**
+
+- [ ] 01-04-PLAN.md — shared AddonNodeDataCopy helper; wire ADDON fields through applyLoadedData, clipboard, and createGraphSnapshot (CR-02 + CR-03) [Wave 1]
+- [ ] 01-05-PLAN.md — render addon categories in the sidebar + set hoveredAddonDefinition in the hit-test so the Script node is placeable from the palette (CR-01) [Wave 1]
+
+**Wave 2 (gaps)** *(blocked on 01-04)*
+
+- [ ] 01-06-PLAN.md — ADDON conversion round-trip regression test (createGraphSnapshot + convertToNodes); fix WR-08 doc Fabric API version + WR-10 test scaffolding [Wave 2]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -84,6 +95,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 3/3 | Complete   | 2026-06-12 |
+| 1. API Foundation + Script Node Registration | 3/6 | Gap closure | - |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
