@@ -7,6 +7,7 @@ Three phases co-evolve Pathmind and its first external addon. Phase 1 builds the
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
@@ -19,47 +20,60 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: API Foundation + Script Node Registration
+
 **Goal**: The Pathmind addon API is published as a consumable Maven artifact, addon discovery is wired into mod init, and the sibling addon repo ships a Script node that is palette-visible, placeable, and persistable — both mods load cleanly and Pathmind works standalone without the addon jar
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
 **Requirements**: API-01, API-02, API-03, API-04, API-05, API-06, API-07, API-08, API-09, API-10, LUA-01, LUA-05
 **Success Criteria** (what must be TRUE):
+
   1. A developer can declare a `"pathmind"` entrypoint in `fabric.mod.json` and have their `PathmindAddonEntrypoint.register(registrar)` called at mod init with informative load-time errors if registration is malformed
   2. The `com.pathmind.api` Maven artifact can be added to the sibling addon repo's `build.gradle` via `modCompileOnly` with zero impl classes on the classpath — addon compiles cleanly against only the API jar
   3. User can drag a Script node from the editor palette, connect it in a graph, run the graph, and the Script node passes through execution without error (no Lua yet — graceful no-op completion)
   4. A saved preset containing a Script node round-trips through save/load with script text and `_schema_version` intact
   5. Launching Minecraft without the addon jar installed leaves Pathmind fully functional across its existing 1.21–1.21.11 range with no errors or missing behavior
-**Plans**: 3 plans (2 waves)
-Plans:
+
+**Plans**: 3 plans (2 waves)Plans:
+**Wave 1**
+
 - [ ] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 01-02-PLAN.md — NodeType.ADDON + async execution branch, opaque schema-versioned persistence (save/load + missing-addon placeholder), sidebar palette population + drag-to-canvas, editor-open failure surfacing [Wave 2]
 - [ ] 01-03-PLAN.md — maven-publish to mavenLocal, pathmind-lua sibling repo scaffold, Lua Script node impl (no-op executor + serializer + preview renderer), getting-started doc, end-of-phase in-game verification [Wave 2]
 
 ### Phase 2: Lua VM + Core Bindings
+
 **Goal**: The Script node executes real Lua code: Cobalt VM runs on a worker thread with a fresh-per-execution globals object, the async-sync bridging model handles awaitable actions, and the full Pathmind Lua binding surface (variables, movement, game state, error surfacing) is accessible from scripts — both repos remain in a working, loadable state
 **Mode:** mvp
 **Depends on**: Phase 1
 **Requirements**: LUA-02, LUA-03, LUA-04, BIND-01, BIND-02, BIND-03, BIND-04
 **Success Criteria** (what must be TRUE):
+
   1. A Script node with `pathmind.setVar("x", 42); pathmind.getVar("x")` executes on a worker thread, the tree advances only after the script finishes, and the variable is readable by a downstream Pathmind node
   2. A script that calls `pathmind.moveTo(x, y, z)` blocks the worker thread until Baritone reports navigation complete, while the game tick thread continues ticking normally
   3. A script that calls `pathmind.getPosition()`, `pathmind.getInventory()`, or `pathmind.getBlock(x,y,z)` returns correct values dispatched safely from the main thread
   4. A script that runs an infinite loop (or any runaway code) is interrupted within the configured wall-clock timeout — the game does not freeze or hang
   5. A script that throws a Lua error surfaces the error message and line number visibly to the user; the graph stops at the Script node rather than silently continuing
   6. UAT checkpoint: human in-game testing required — Lua execution and Baritone integration directly affect game behavior
+
 **Plans**: TBD
 
 ### Phase 3: Script Node Editor + Autosuggestions
+
 **Goal**: The Script node has a functional in-game code editor with line numbers, inline error display, and prefix-match autosuggestions — the complete UX for authoring Lua scripts without leaving Minecraft
 **Mode:** mvp
 **Depends on**: Phase 2
 **Requirements**: EDIT-01, EDIT-02, EDIT-03, EDIT-04
 **Success Criteria** (what must be TRUE):
+
   1. User can type, navigate with arrow keys, select text, copy/paste, and scroll within the Script node's editor area — all standard plain-text editing behaviors work without leaking keypresses to the node graph
   2. A line-number gutter is visible alongside the editor and stays synchronized with the text as lines are added or removed
   3. The most recent script error (message + line number) is displayed directly on the node body without opening any separate UI — absent if the last run succeeded
   4. Typing `pathmind.` in the editor triggers a prefix-match suggestion list of `pathmind.*` API names that can be selected to complete the token
   5. UAT checkpoint: human in-game testing required — editor keyboard routing and EditBoxWidget shortcut behavior need in-game verification
+
 **Plans**: TBD
 **UI hint**: yes
 
