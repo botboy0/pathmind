@@ -7,6 +7,7 @@ import com.pathmind.nodes.StartScreenTarget;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Serializable data structure for saving and loading node graphs.
@@ -140,6 +141,9 @@ public class NodeGraphData {
         private Integer templateVersion;
         private Boolean customNodeInstance;
         private NodeGraphData templateGraph;
+        // Addon node fields — null for all non-ADDON nodes (GSON omits null fields, API-09)
+        private String addonTypeId;
+        private Map<String, Object> extraFields;
 
         public NodeData() {
             this.parameters = new ArrayList<>();
@@ -344,6 +348,22 @@ public class NodeGraphData {
 
         public void setTemplateGraph(NodeGraphData templateGraph) {
             this.templateGraph = templateGraph;
+        }
+
+        public String getAddonTypeId() {
+            return addonTypeId;
+        }
+
+        public void setAddonTypeId(String addonTypeId) {
+            this.addonTypeId = addonTypeId;
+        }
+
+        public Map<String, Object> getExtraFields() {
+            return extraFields;
+        }
+
+        public void setExtraFields(Map<String, Object> extraFields) {
+            this.extraFields = extraFields;
         }
     }
     

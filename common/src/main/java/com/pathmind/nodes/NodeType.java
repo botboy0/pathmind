@@ -177,7 +177,10 @@ public enum NodeType {
     PARAM_BLOCK_FACE("pathmind.node.type.paramBlockFace", 0xFF8BC34A, "pathmind.node.type.paramBlockFace.desc"),
     PARAM_ROTATION("pathmind.node.type.paramRotation", 0xFF8BC34A, "pathmind.node.type.paramRotation.desc"),
     PARAM_PLACE_TARGET("pathmind.node.type.paramPlaceTarget", 0xFF8BC34A, "pathmind.node.type.paramPlaceTarget.desc"),
-    PARAM_CLOSEST("pathmind.node.type.paramClosest", 0xFF8BC34A, "pathmind.node.type.paramClosest.desc");
+    PARAM_CLOSEST("pathmind.node.type.paramClosest", 0xFF8BC34A, "pathmind.node.type.paramClosest.desc"),
+
+    // Addon nodes
+    ADDON("pathmind.node.type.addon", 0xFF888888, "pathmind.node.type.addon.desc");
 
     private final String translationKey;
     private final int baseColor;

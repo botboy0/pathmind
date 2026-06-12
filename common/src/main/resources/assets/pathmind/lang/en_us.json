@@ -760,6 +760,8 @@
   "pathmind.settings.showHudOverlays": "Show HUD overlays",
   "pathmind.settings.showTooltips": "Show tooltips",
   "pathmind.settings.title": "Settings",
+  "pathmind.node.type.addon": "Addon Node",
+  "pathmind.node.type.addon.desc": "A node provided by an installed addon",
   "pathmind.title": "Pathmind Node Editor",
   "screen.pathmind.visual_editor.subtitle": "Create and manage node-based workflows",
   "screen.pathmind.visual_editor.title": "Pathmind Visual Editor"

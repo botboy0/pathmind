@@ -151,7 +151,11 @@ final class NodeTypeDefinition {
             NodeType.OPERATOR_RANDOM);
 
         register(NodeCategory.CUSTOM,
-            NodeType.CUSTOM_NODE);
+            NodeType.CUSTOM_NODE,
+            // ADDON nodes: runtime-declared types whose sidebar category is provided by the
+            // addon definition (AddonNodeCategory). NodeCategory.CUSTOM is used only for
+            // NodeTypeDefinition metadata purposes (category test, NON_DRAGGABLE guard).
+            NodeType.ADDON);
 
         register(NodeCategory.PARAMETERS,
             NodeType.PARAM_COORDINATE,
@@ -288,7 +292,9 @@ final class NodeTypeDefinition {
             NodeType.SENSOR_VILLAGER_TRADE,
             NodeType.DROP_SLOT,
             NodeType.PARAM_ROTATION,
-            NodeType.PARAM_PLACE_TARGET);
+            NodeType.PARAM_PLACE_TARGET,
+            // ADDON nodes are dragged from the addon-category palette, not the built-in sidebar
+            NodeType.ADDON);
 
         add(BARITONE_TYPES,
             NodeType.GOTO,

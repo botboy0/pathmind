@@ -1,11 +1,14 @@
 package com.pathmind.screen;
 
 import com.pathmind.PathmindCommon;
+import com.pathmind.execution.AddonLoader;
+import com.pathmind.ui.overlay.NodeErrorNotificationOverlay;
 import com.pathmind.util.BaritoneDependencyChecker;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 
 import java.lang.reflect.Constructor;
+import java.util.Map;
 
 /**
  * Centralized helpers for opening Pathmind screens without crashing when dependencies are missing.
@@ -33,8 +36,26 @@ public final class PathmindScreens {
 
         try {
             client.setScreen(instantiateVisualEditor());
+            // D-08: surface any addon-load failures that occurred during mod initialization
+            surfaceAddonLoadFailures();
         } catch (ReflectiveOperationException | LinkageError e) {
             PathmindCommon.LOGGER.error("Failed to open Pathmind visual editor", e);
+        }
+    }
+
+    /**
+     * Surfaces addon-load failures recorded by {@link AddonLoader} as HUD notifications
+     * when the editor opens (D-08 in-game warning).
+     * Each failure is shown once per editor open.
+     */
+    private static void surfaceAddonLoadFailures() {
+        Map<String, Throwable> failedAddons = AddonLoader.getFailedAddons();
+        for (Map.Entry<String, Throwable> entry : failedAddons.entrySet()) {
+            String addonId = entry.getKey();
+            Throwable cause = entry.getValue();
+            String message = "[Pathmind] Addon '" + addonId + "' failed to load: "
+                + (cause != null ? cause.getMessage() : "unknown error");
+            NodeErrorNotificationOverlay.getInstance().show(message, 0xFFFF5722);
         }
     }
 
