@@ -4,6 +4,7 @@ import com.pathmind.api.addon.AddonNodeBodyRenderer;
 import com.pathmind.api.addon.AddonNodeContext;
 import com.pathmind.api.addon.AddonNodeDefinition;
 import com.pathmind.nodes.NodeTypeRegistry;
+import com.pathmind.data.AddonNodeDataCopy;
 import com.pathmind.data.NodeGraphData;
 import com.pathmind.data.NodeGraphPersistence;
 import com.pathmind.data.PresetManager;
@@ -15697,6 +15698,7 @@ public class NodeGraph {
                 node.setBooleanToggleValue(storedToggle == null || storedToggle);
             }
             node.recalculateDimensions();
+            AddonNodeDataCopy.restoreAddonFieldsToNode(nodeData, node);
 
             nodes.add(node);
             nodeMap.put(nodeData.getId(), node);

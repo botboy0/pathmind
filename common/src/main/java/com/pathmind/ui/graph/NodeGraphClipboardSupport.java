@@ -1,5 +1,6 @@
 package com.pathmind.ui.graph;
 
+import com.pathmind.data.AddonNodeDataCopy;
 import com.pathmind.data.NodeGraphData;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeConnection;
@@ -144,6 +145,7 @@ final class NodeGraphClipboardSupport {
                 newNode.setBooleanToggleValue(storedToggle == null || storedToggle);
             }
             newNode.recalculateDimensions();
+            AddonNodeDataCopy.restoreAddonFieldsToNode(nodeData, newNode);
             nodes.add(newNode);
             idToNode.put(nodeData.getId(), newNode);
         }
@@ -236,6 +238,7 @@ final class NodeGraphClipboardSupport {
             NodeGraphData.NodeData nodeData = new NodeGraphData.NodeData();
             nodeData.setId(node.getId());
             nodeData.setType(node.getType());
+            AddonNodeDataCopy.copyAddonFieldsToNodeData(node, nodeData);
             nodeData.setMode(node.getMode());
             nodeData.setX(node.getX());
             nodeData.setY(node.getY());

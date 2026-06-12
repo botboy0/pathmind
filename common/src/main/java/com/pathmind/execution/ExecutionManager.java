@@ -5,6 +5,7 @@ import com.pathmind.nodes.NodeConnection;
 import com.pathmind.nodes.NodeParameter;
 import com.pathmind.nodes.NodeType;
 import com.pathmind.nodes.ParameterType;
+import com.pathmind.data.AddonNodeDataCopy;
 import com.pathmind.data.NodeGraphData;
 import com.pathmind.data.NodeGraphPersistence;
 import com.pathmind.data.PresetManager;
@@ -3007,6 +3008,7 @@ public class ExecutionManager {
                 nodeData.setCustomNodeInstance(node.isCustomNodeInstance());
                 nodeData.setTemplateGraph(node.getTemplateGraphData());
             }
+            AddonNodeDataCopy.copyAddonFieldsToNodeData(node, nodeData);
 
             snapshot.getNodes().add(nodeData);
         }
