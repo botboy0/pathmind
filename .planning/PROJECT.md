@@ -65,6 +65,7 @@ A third party can drop `pathmind.jar` + `pathmind-lua-addon.jar` into a mods fol
 - **Strategy: co-evolution, not big-bang refactor.** The addon and Pathmind's addon-support refactor are built up at the same time whenever reasonable — the addon's real needs drive which internals get API surface.
 - **Deep research is a first-class requirement.** Before/while designing the API, extract and learn patterns from established open-source addon-supported mods: Roughly Enough Items (plugin/entrypoint + registry model) and Fabric API (modular API + entrypoint model). Mixins may bridge gaps temporarily, but the end-state is a formal API.
 - Lua VM choice (e.g., LuaJ or alternatives) is an open research question — must run on the JVM inside a Fabric mod on MC 1.21.4 / Java 21.
+- **Workflow note:** YOLO mode, but the user wants human-driven UAT (`/gsd-verify-work`) after any slice that majorly affects in-game behavior — pause for manual in-game testing at those checkpoints.
 
 ## Constraints
 
