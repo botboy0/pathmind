@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans (2 waves)Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
+- [x] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -84,6 +84,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 0/3 | Not started | - |
+| 1. API Foundation + Script Node Registration | 1/3 | In Progress|  |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
