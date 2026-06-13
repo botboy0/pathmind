@@ -1019,7 +1019,10 @@ public class Sidebar {
             int contentY = contentTop - scrollOffset;
             int sidebarBottom = sidebarStartY + sidebarHeight;
             int nodeBackgroundLeft = currentInnerSidebarWidth + 1;
-            int nodeBackgroundRight = totalWidth;
+            ScrollbarHelper.Metrics addonScrollMetrics = getCategoryScrollMetrics();
+            int nodeBackgroundRight = addonScrollMetrics != null && addonScrollMetrics.maxScroll() > 0
+                ? addonScrollMetrics.trackLeft() - 2
+                : totalWidth;
             int contentClipLeft = nodeBackgroundLeft;
             int contentClipRight = Math.min(totalWidth, contentTextRight + 2);
             if (contentClipRight <= contentClipLeft) {
@@ -1089,6 +1092,7 @@ public class Sidebar {
             }
 
             context.disableScissor();
+            renderCategoryScrollbar(context, totalWidth, contentTop, contentBottom);
             DrawContextBridge.flush(context);
         }
 
@@ -1477,7 +1481,7 @@ public class Sidebar {
     }
 
     private ScrollbarHelper.Metrics getCategoryScrollMetrics() {
-        if (selectedCategory == null || maxScroll <= 0) {
+        if ((selectedCategory == null && selectedAddonCategory == null) || maxScroll <= 0) {
             return null;
         }
         int contentTop = currentSidebarStartY + PADDING;
