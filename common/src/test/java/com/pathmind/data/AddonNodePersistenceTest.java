@@ -64,7 +64,11 @@ class AddonNodePersistenceTest {
 
     @BeforeAll
     static void installSyntheticRegistry() {
-        // Guard: install-once singleton — tolerate prior installation from other test classes
+        // Guard: install-once singleton — tolerate prior installation from other test classes.
+        // This install is retained even though no test in THIS class calls NodeTypeRegistry.INSTANCE
+        // directly: AddonNodeConversionRoundTripTest (Plan 01-06) exercises the full conversion path
+        // and requires test_mod:script to be in the registry. Whichever test class runs first wins;
+        // the hasType guard ensures the second class's @BeforeAll is a safe no-op (WR-10b).
         if (!NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
             try {
                 NodeTypeRegistrar registrar = new NodeTypeRegistrar();

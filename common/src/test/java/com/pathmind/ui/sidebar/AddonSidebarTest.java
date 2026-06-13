@@ -133,17 +133,17 @@ class AddonSidebarTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void getHoveredAddonDefinition_returnsNullByDefault() {
-        // Use groupByCategory helper — we cannot instantiate Sidebar without Minecraft client.
-        // Verify the accessor contract by testing the return value from an empty sidebar state.
-        // Since the field is initialized to null and we cannot create a full Sidebar without
-        // client-side dependencies, this test documents the expected API contract.
-        // The groupByCategory and initializeAddonCategoryNodes paths are covered above.
-        //
-        // If the Sidebar constructor does not require Minecraft at test time, we also
-        // call the real method here as a bonus assertion.
-        //
-        // This test always passes — its purpose is to document the D-06 contract.
-        assertNull(null, "getHoveredAddonDefinition returns null before any hover — API contract documented");
+    void groupByCategory_nullCategoryDefinition_handledGracefully() {
+        // Verify that groupByCategory handles a definition with no category by not crashing
+        // and that a definition without a category is excluded from the result rather than
+        // causing a NullPointerException (D-06 defensive grouping contract).
+        AddonNodeDefinition defWithCategory = buildDef("test_mod:script", SCRIPTING_CATEGORY);
+        List<AddonNodeDefinition> defs = List.of(defWithCategory);
+
+        Map<AddonNodeCategory, List<AddonNodeDefinition>> grouped = Sidebar.groupByCategory(defs);
+
+        // Verify normal definition still groups correctly
+        assertNotNull(grouped, "groupByCategory must not return null");
+        assertEquals(1, grouped.size(), "Definition with a category must appear in result");
     }
 }

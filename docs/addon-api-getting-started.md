@@ -90,7 +90,7 @@ dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
     mappings("net.fabricmc:yarn:1.21.4+build.8:v2")
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:0.102.0+1.21.4")
+    modImplementation("net.fabricmc.fabric-api:fabric-api:0.119.4+1.21.4")
 
     // Pathmind API — compile-only, zero impl classes on your classpath
     modCompileOnly("com.pathmind:pathmind-fabric:${property("pathmind_version")}")
