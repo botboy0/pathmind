@@ -3,10 +3,16 @@ package com.pathmind.execution;
 import com.pathmind.api.addon.PathmindRuntime;
 import com.pathmind.nodes.NodeType;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -164,40 +170,144 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
     /**
      * {@inheritDoc}
      *
-     * <p>TODO: wired in plan 03/04 — main-thread dispatch via MinecraftClient.execute.
+     * <p>Dispatches to the client thread via {@link MinecraftClient#execute} and reads the
+     * player's current position. The worker thread blocks on a {@link CompletableFuture} with
+     * a 30-second timeout (Pitfall 3 — game paused / tick queue stalled; never hangs forever).
      *
-     * @return [0, 0, 0] (stub for plan 03)
+     * <p>If the client or player is null (loading screen, headless tests) the future completes
+     * with {@code null} and the safe default {@code {0, 0, 0}} is returned without throwing.
+     *
+     * <p>Threading: the worker thread calls this; MC reads happen exclusively on the client
+     * thread (T-02-13).
+     *
+     * @return {@code double[]{x, y, z}} of the player's current position, or {@code {0,0,0}}
+     *         on null/timeout.
      */
     @Override
     public double[] getPosition() {
-        // TODO: wired in plan 03/04 (MinecraftClient.execute dispatch + CompletableFuture handback)
-        return new double[]{0, 0, 0};
+        CompletableFuture<double[]> result = new CompletableFuture<>();
+        MinecraftClient.getInstance().execute(() -> {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client == null || client.player == null) {
+                result.complete(null);
+                return;
+            }
+            result.complete(new double[]{
+                client.player.getX(),
+                client.player.getY(),
+                client.player.getZ()
+            });
+        });
+        try {
+            double[] pos = result.get(30, TimeUnit.SECONDS);
+            return pos != null ? pos : new double[]{0, 0, 0};
+        } catch (Exception e) {
+            return new double[]{0, 0, 0};
+        }
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>TODO: wired in plan 04 — main-thread dispatch + inventory slot marshaling.
+     * <p>Dispatches to the client thread via {@link MinecraftClient#execute} and reads the
+     * player's main inventory. The worker thread blocks on a {@link CompletableFuture} with
+     * a 30-second timeout (Pitfall 3 — T-02-14).
      *
-     * @return empty array (stub for plan 04)
+     * <p>Each non-empty slot is returned as an {@code Object[3]} carrier:
+     * <pre>
+     *   Object[0] = Integer  — slot index (0-based, matches PlayerInventory main slot numbering)
+     *   Object[1] = String   — namespaced item id (e.g. {@code "minecraft:diamond_sword"})
+     *   Object[2] = Integer  — stack count
+     * </pre>
+     * Only non-empty stacks ({@link ItemStack#isEmpty()} == false) are included.
+     * The array is 1-indexed in Lua (handled by the addon binding layer).
+     *
+     * <p>Element shape is scalar-only ({@code Integer}, {@code String}, {@code Integer}) so
+     * the addon binding can read it positionally without any shared Pathmind types
+     * (version-agnostic API contract — CONTEXT decision).
+     *
+     * <p>Threading: MC reads happen exclusively on the client thread (T-02-13).
+     *
+     * @return {@code Object[]} where each element is an {@code Object[3]} carrier as described
+     *         above, or an empty array on null/timeout.
      */
     @Override
     public Object[] getInventory() {
-        // TODO: wired in plan 04 (client-thread dispatch + inventory marshaling)
-        return new Object[0];
+        CompletableFuture<Object[]> result = new CompletableFuture<>();
+        MinecraftClient.getInstance().execute(() -> {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client == null || client.player == null) {
+                result.complete(new Object[0]);
+                return;
+            }
+            PlayerInventory inventory = client.player.getInventory();
+            List<Object> slots = new ArrayList<>();
+            // Iterate main inventory slots only (0..MAIN_SIZE-1 = 0..35)
+            int mainSize = Math.min(PlayerInventory.MAIN_SIZE, inventory.size());
+            for (int i = 0; i < mainSize; i++) {
+                ItemStack stack = inventory.getStack(i);
+                if (stack == null || stack.isEmpty()) continue;
+                String itemId = Registries.ITEM.getId(stack.getItem()).toString();
+                slots.add(new Object[]{i, itemId, stack.getCount()});
+            }
+            result.complete(slots.toArray());
+        });
+        try {
+            Object[] inv = result.get(30, TimeUnit.SECONDS);
+            return inv != null ? inv : new Object[0];
+        } catch (Exception e) {
+            return new Object[0];
+        }
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>TODO: wired in plan 04 — main-thread dispatch + block state lookup.
+     * <p>Dispatches to the client thread via {@link MinecraftClient#execute} and looks up
+     * the block state at the given coordinates. The worker thread blocks on a
+     * {@link CompletableFuture} with a 30-second timeout (Pitfall 3 — T-02-14).
      *
-     * @return null (stub for plan 04)
+     * <p>Returns {@code null} (mapped to Lua {@code nil} by the binding) when:
+     * <ul>
+     *   <li>The client or world is null (loading screen / headless test).</li>
+     *   <li>The chunk containing the requested position is not loaded.</li>
+     * </ul>
+     * This matches the CONTEXT contract: {@code getBlock} returns {@code nil} for unloaded
+     * chunks rather than erroring (safe default; T-02-15 accepted).
+     *
+     * <p>Threading: MC reads happen exclusively on the client thread (T-02-13).
+     *
+     * @param x  X coordinate of the block
+     * @param y  Y coordinate of the block
+     * @param z  Z coordinate of the block
+     * @return namespaced block id string (e.g. {@code "minecraft:stone"}), or {@code null}
+     *         if the chunk is unloaded or the client/world is unavailable.
      */
     @Override
     public String getBlock(double x, double y, double z) {
-        // TODO: wired in plan 04 (client-thread dispatch + block registry lookup)
-        return null;
+        CompletableFuture<String> result = new CompletableFuture<>();
+        MinecraftClient.getInstance().execute(() -> {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client == null || client.world == null) {
+                result.complete(null);
+                return;
+            }
+            BlockPos pos = BlockPos.ofFloored(x, y, z);
+            int chunkX = pos.getX() >> 4;
+            int chunkZ = pos.getZ() >> 4;
+            if (!client.world.isChunkLoaded(chunkX, chunkZ)) {
+                result.complete(null);
+                return;
+            }
+            String blockId = Registries.BLOCK.getId(
+                client.world.getBlockState(pos).getBlock()).toString();
+            result.complete(blockId);
+        });
+        try {
+            return result.get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // -------------------------------------------------------------------------
