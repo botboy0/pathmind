@@ -75,6 +75,15 @@ public class Sidebar {
     private int maxScroll = 0;
     private boolean scrollDragging = false;
     private int scrollDragOffset = 0;
+    // GAP-A: separate vertical scroll for the category ICON BAR (the inner strip of
+    // category tabs), independent of the content-panel scroll above. Mirrors the
+    // scrollOffset/maxScroll pattern. Recomputed every render frame from the tab layout.
+    private int iconBarScrollOffset = 0;
+    private int iconBarMaxScroll = 0;
+    // Geometry of the icon-bar viewport for the current frame, captured during render so
+    // mouseScrolled / mouseClicked can hit-test against the scrolled tab strip (GAP-A).
+    private int iconBarViewportTop = 0;
+    private int iconBarViewportHeight = 0;
     private int currentSidebarHeight = 400; // Store current sidebar height
     private int currentSidebarStartY = 0;
     private int currentInnerSidebarWidth = INNER_SIDEBAR_WIDTH;
@@ -661,21 +670,17 @@ public class Sidebar {
         int availableTabHeight = Math.max(TAB_SIZE, sidebarHeight - TOP_PADDING * 2);
         int tabSize = TAB_SIZE;
         int tabSpacing = TAB_SPACING;
-        if (totalVisibleTabs > 0) {
-            int defaultRequiredHeight = totalVisibleTabs * TAB_SIZE + (totalVisibleTabs - 1) * TAB_SPACING;
-            if (defaultRequiredHeight > availableTabHeight) {
-                float scale = availableTabHeight / (float) defaultRequiredHeight;
-                tabSize = Math.max(12, Math.round(TAB_SIZE * scale));
-                tabSpacing = Math.max(2, Math.round(TAB_SPACING * scale));
-
-                int scaledRequiredHeight = totalVisibleTabs * tabSize + (totalVisibleTabs - 1) * tabSpacing;
-                if (scaledRequiredHeight > availableTabHeight) {
-                    tabSpacing = 2;
-                    int maxSizeFromHeight = (availableTabHeight - (totalVisibleTabs - 1) * tabSpacing) / totalVisibleTabs;
-                    tabSize = Math.max(8, maxSizeFromHeight);
-                }
-            }
-        }
+        // GAP-A: count addon tabs alongside built-in tabs for icon-bar overflow math.
+        int totalIconBarTabs = totalVisibleTabs + addonCategoryNodes.size();
+        // GAP-A: keep tabs at a readable size (no more shrinking toward single-digit px).
+        // When the icon strip overflows the available height we SCROLL it instead of
+        // squashing every tab. Compute the icon-bar scroll bounds here so render and
+        // hit-testing share one source of truth.
+        int totalTabHeight = totalIconBarTabs > 0
+            ? totalIconBarTabs * tabSize + (totalIconBarTabs - 1) * tabSpacing
+            : 0;
+        iconBarMaxScroll = Math.max(0, totalTabHeight - availableTabHeight);
+        iconBarScrollOffset = ScrollbarHelper.clampScroll(iconBarScrollOffset, iconBarMaxScroll);
 
         currentInnerSidebarWidth = INNER_SIDEBAR_WIDTH;
 
@@ -746,8 +751,15 @@ public class Sidebar {
         context.fill(0, sidebarStartY, currentInnerSidebarWidth, sidebarStartY + sidebarHeight, UITheme.BACKGROUND_SIDEBAR);
         context.drawVerticalLine(currentInnerSidebarWidth, sidebarStartY, sidebarStartY + sidebarHeight, UITheme.BORDER_SUBTLE);
 
-        // Tabs stay static (don't scroll with content)
-        int currentY = sidebarStartY + TOP_PADDING;
+        // GAP-A: the icon bar scrolls independently of the content panel. Tabs start at
+        // TOP_PADDING and are shifted up by iconBarScrollOffset; the strip is scissor-clipped
+        // to its viewport so scrolled tabs clip cleanly instead of bleeding into the content.
+        iconBarViewportTop = sidebarStartY + TOP_PADDING;
+        iconBarViewportHeight = availableTabHeight;
+        int currentY = iconBarViewportTop - iconBarScrollOffset;
+
+        // Clip the icon strip to its viewport (full inner-strip width).
+        context.enableScissor(0, iconBarViewportTop, currentInnerSidebarWidth, iconBarViewportTop + iconBarViewportHeight);
 
         // Render colored tabs
         hoveredCategory = null;
@@ -832,6 +844,10 @@ public class Sidebar {
                 addonTabY += tabSize + tabSpacing;
             }
         }
+
+        // GAP-A: end the icon-strip clip and draw the icon-bar scrollbar when it overflows.
+        context.disableScissor();
+        renderIconBarScrollbar(context);
 
         // Render category name and nodes for selected category
         if (selectedCategory != null && openProgress > 0.001f) {
@@ -1216,6 +1232,11 @@ public class Sidebar {
     }
     
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+        // GAP-A: wheel over the icon-bar column scrolls the icon strip, not the content panel.
+        if (iconBarMaxScroll > 0 && mouseX >= 0 && mouseX <= currentInnerSidebarWidth) {
+            iconBarScrollOffset = ScrollbarHelper.applyWheel(iconBarScrollOffset, amount, 20, iconBarMaxScroll);
+            return true;
+        }
         if (mouseX >= 0 && mouseX <= currentRenderedWidth) {
             scrollOffset = ScrollbarHelper.applyWheel(scrollOffset, amount, 20, maxScroll);
             return true;
@@ -1509,6 +1530,33 @@ public class Sidebar {
             UITheme.BORDER_DEFAULT,
             UITheme.BORDER_DEFAULT
         );
+    }
+
+    /**
+     * GAP-A: draw a thin scrollbar in the icon-bar column when the category tabs overflow
+     * the available vertical space. Reuses the content-panel scrollbar visual style.
+     */
+    private void renderIconBarScrollbar(DrawContext context) {
+        if (iconBarMaxScroll <= 0 || iconBarViewportHeight <= 0) {
+            return;
+        }
+        ScrollbarHelper.renderSettingsStyle(
+            context,
+            getIconBarScrollMetrics(),
+            UITheme.BACKGROUND_SIDEBAR,
+            UITheme.BORDER_DEFAULT,
+            UITheme.BORDER_DEFAULT
+        );
+    }
+
+    /**
+     * GAP-A: scrollbar metrics for the icon bar. The track sits at the right edge of the
+     * inner icon strip so it never overlaps the tabs.
+     */
+    private ScrollbarHelper.Metrics getIconBarScrollMetrics() {
+        int trackLeft = currentInnerSidebarWidth - SCROLLBAR_MARGIN - UITheme.SCROLLBAR_WIDTH;
+        return ScrollbarHelper.metrics(trackLeft, iconBarViewportTop, UITheme.SCROLLBAR_WIDTH,
+            Math.max(1, iconBarViewportHeight), iconBarMaxScroll, iconBarScrollOffset, SCROLLBAR_MIN_KNOB_HEIGHT);
     }
 
     private ScrollbarHelper.Metrics getCategoryScrollMetrics() {
