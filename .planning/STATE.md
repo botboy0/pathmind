@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 01-12-PLAN.md
-last_updated: "2026-06-13T11:55:55.790Z"
+last_updated: "2026-06-13T12:19:13.495Z"
 last_activity: 2026-06-13 -- Phase 01 execution started
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 15
+  completed_plans: 15
   percent: 33
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 01 (api-foundation-script-node-registration) — EXECUTING
-Plan: 5 of 13
+Plan: 6 of 13
 Status: Ready to execute
 Last activity: 2026-06-13 -- Phase 01 execution started
 
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-api-foundation-script-node-registration P11 | 3 | 2 tasks | 2 files |
 | Phase 01 P12 | 1 | 1 tasks | 1 files |
 | Phase 01-api-foundation-script-node-registration P13 | 1min | 1 tasks | 1 files |
+| Phase 01-api-foundation-script-node-registration P15 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,8 @@ Recent decisions affecting current work:
 - Roadmap: Cobalt 0.7.3 (CC:Tweaked fork) selected as Lua VM; shadow-relocate into addon JAR
 - Roadmap: API artifact published to mavenLocal during dev; addon compiles against `com.pathmind.api` only
 - [Phase ?]: Use Collections.synchronizedMap(new LinkedHashMap<>()) over ConcurrentHashMap to preserve insertion order required by D-08 failure-surface UI (NEW-CR-01 closure)
+- [Phase ?]: GAP-C: resolved addon nodes always render their real body via renderer.render in all positions (matching built-ins); the over-sidebar invalid-drop cue is the discolored frame, not a blanked body
+- [Phase ?]: GAP-A: category icon bar scrolls on overflow (separate axis from content-panel scroll) instead of shrinking tabs; reuses ScrollbarHelper + content-panel scrollbar style
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-13T11:55:55.786Z
+Last session: 2026-06-13T12:18:39.718Z
 Stopped at: Completed 01-12-PLAN.md
 Resume file: None
