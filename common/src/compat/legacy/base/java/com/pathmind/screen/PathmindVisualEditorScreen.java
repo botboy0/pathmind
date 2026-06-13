@@ -1102,7 +1102,7 @@ public class PathmindVisualEditorScreen extends Screen {
             context.fill(x + 1, y + 1, x + width - 1, y + 14, nodeColor);
             context.drawTextWithShadow(
                 this.textRenderer,
-                Text.literal(renderType == NodeType.TEMPLATE ? tempNode.getTemplateName() : renderType.getDisplayName()),
+                Text.literal(renderType == NodeType.TEMPLATE ? tempNode.getTemplateName() : tempNode.getDisplayName().getString()),
                 x + 4,
                 y + 4,
                 UITheme.TEXT_HEADER
