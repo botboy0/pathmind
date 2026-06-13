@@ -117,11 +117,19 @@ public final class AddonNodeDataCopy {
                 ctx.setAddonTypeId(addonTypeId);
                 try {
                     ser.deserialize(ctx, nodeData.getExtraFields());
-                    // Store restored state in the node's retained blob for later re-serialization
-                    if (nodeData.getExtraFields() != null) {
-                        node.setAddonExtraFields(new HashMap<>(nodeData.getExtraFields()));
-                    }
-                    if (ctx.getScriptText() != null && node.getAddonExtraFields() != null) {
+                    // Build the base map unconditionally so addonExtraFields is always non-null
+                    // on the success path — mirrors the seeding pattern in Node(String,int,int).
+                    // When on-disk extraFields is null (a freshly-placed never-edited node),
+                    // start from an empty map so the serializer-seeded default survives (NEW-CR-02).
+                    HashMap<String, Object> base = nodeData.getExtraFields() != null
+                        ? new HashMap<>(nodeData.getExtraFields())
+                        : new HashMap<>();
+                    node.setAddonExtraFields(base);
+                    // WR-05: clear any stale unresolved flag set by a prior addon-absent load
+                    node.setAddonUnresolved(false);
+                    // Inject serializer-seeded default (e.g. DEFAULT_SCRIPT) into the map so it
+                    // survives even when the on-disk extraFields was null.
+                    if (ctx.getScriptText() != null) {
                         node.getAddonExtraFields().put("script", ctx.getScriptText());
                     }
                 } catch (Throwable t) {
