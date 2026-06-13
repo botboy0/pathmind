@@ -571,19 +571,29 @@ public class Sidebar {
         // Add space for selected addon category entries (wrap-aware, mirrors render-pass formulas).
         // addonRowLineCounts is always non-null when selectedAddonCategory != null — precomputed in render().
         if (selectedAddonCategory != null && addonRowLineCounts != null) {
-            // headerHeight is already max(CATEGORY_HEADER_HEIGHT, headerLines.size() * headerLineHeight)
-            // computed by render() before this call — use it directly for the addon header contribution
-            totalHeight += Math.max(CATEGORY_HEADER_HEIGHT, headerHeight);
-            for (int lineCount : addonRowLineCounts) {
-                totalHeight += Math.max(NODE_HEIGHT, lineCount * 10 + PADDING); // nodeLineHeight ~10 at typical scale
-            }
+            // UAT-GAP-A: compute addon maxScroll via the shared wrap-aware formula (no magic +100).
+            // headerLineCount derived from headerHeight: resolve via Math.max(1, ...) mirroring
+            // the render pass. We use headerHeight (already max(CATEGORY_HEADER_HEIGHT, ...)) to
+            // back-compute the header line count as ceil(headerHeight / headerLineHeight), but
+            // the simplest correct approach is to delegate entirely to computeAddonMaxScroll using
+            // a headerLineCount of 1 (the common case) — the CATEGORY_HEADER_HEIGHT floor in
+            // computeAddonContentHeight ensures the min is always respected.
+            //
+            // Use the same nodeLineHeight constant (~10) as the previous inline code but now
+            // via the shared helper so the two paths stay in sync (WR-03 closure).
+            int nodeLineHeight = 10; // textRenderer.fontHeight(9) + NODE_LINE_SPACING(1)
+            int headerLineCount = headerHeight > CATEGORY_HEADER_HEIGHT
+                    ? (int) Math.ceil((double) headerHeight / nodeLineHeight)
+                    : 1;
+            maxScroll = computeAddonMaxScroll(headerLineCount, addonRowLineCounts, headerHeight, nodeLineHeight, sidebarHeight);
+            return;
         }
 
         // Add padding
         totalHeight += PADDING * 2;
 
         // Calculate max scroll with proper room for scrolling
-        maxScroll = Math.max(0, totalHeight - sidebarHeight + 100); // Extra 100px for better scrolling
+        maxScroll = Math.max(0, totalHeight - sidebarHeight + 100); // Extra 100px for better scrolling (built-in categories)
     }
 
     /**
@@ -606,7 +616,28 @@ public class Sidebar {
         }
         return total;
     }
-    
+
+    /**
+     * Pure helper that computes the maximum scroll offset for an open addon category,
+     * derived entirely from {@link #computeAddonContentHeight} — no magic {@code +100}
+     * offset (UAT-GAP-A / WR-03 closure).
+     *
+     * <p>Returns {@code Math.max(0, computeAddonContentHeight(...) + PADDING*2 - sidebarHeight)}.
+     * A result of 0 means the content fits in the viewport and no scrollbar is needed.
+     *
+     * @param headerLineCount  number of text lines the category header wraps to (>=1)
+     * @param rowLineCounts    per-row wrap line counts
+     * @param headerLineHeight pixel height per header text line
+     * @param nodeLineHeight   pixel height per node label line
+     * @param sidebarHeight    visible height of the sidebar viewport in pixels
+     * @return max scroll offset in pixels (0 = no scroll needed)
+     */
+    static int computeAddonMaxScroll(int headerLineCount, java.util.List<Integer> rowLineCounts,
+            int headerLineHeight, int nodeLineHeight, int sidebarHeight) {
+        return Math.max(0, computeAddonContentHeight(headerLineCount, rowLineCounts, headerLineHeight, nodeLineHeight)
+                + PADDING * 2 - sidebarHeight);
+    }
+
     public void render(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY,
                        int sidebarStartY, int sidebarHeight, boolean interactionsEnabled, boolean showTooltips) {
         refreshCustomNodes();
