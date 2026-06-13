@@ -235,6 +235,11 @@ final class NodeGraphClipboardSupport {
             if (node == null) {
                 continue;
             }
+            // WR-01: skip degenerate ADDON nodes with null addonTypeId — aligns with on-disk save path (NodeGraphPersistence)
+            if (node.getType() == NodeType.ADDON && node.getAddonTypeId() == null) {
+                System.err.println("[Pathmind] Skipping ADDON node with null addonTypeId during clipboard copy (T-01-09)");
+                continue;
+            }
             NodeGraphData.NodeData nodeData = new NodeGraphData.NodeData();
             nodeData.setId(node.getId());
             nodeData.setType(node.getType());
