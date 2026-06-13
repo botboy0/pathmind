@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A saved preset containing a Script node round-trips through save/load with script text and `_schema_version` intact
   5. Launching Minecraft without the addon jar installed leaves Pathmind fully functional across its existing 1.21–1.21.11 range with no errors or missing behavior
 
-**Plans**: 10 plans (3 + 3 code-review gap-closure + 4 UAT gap-closure)
+**Plans**: 13 plans (3 + 3 code-review gap-closure + 4 UAT gap-closure + 3 re-verification round-3 gap-closure)
 **Wave 1**
 
 - [x] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
@@ -62,6 +62,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 01-08-PLAN.md — GAP-2 + GAP-3: ADDON node display name from the registry + default-field (script) seeding in the addon constructor so placed nodes are fully formed at drop time [Wave 1]
 - [x] 01-09-PLAN.md — GAP-4 + GAP-5: scissor-clip + sidebar-overlap suppression for the addon body preview, and a missing-addon indicator on orphaned ADDON nodes [Wave 1]
 - [x] 01-10-PLAN.md — WR-01/WR-02/WR-06 hardening: align null-addonTypeId skip policy across snapshot/clipboard, defensive-copy extraFields maps, delegate persistence ADDON branches to AddonNodeDataCopy [Wave 1]
+
+**Re-verification round-3 gap closure** *(round-3 re-verification + fresh code review found NEW-CR-02 BLOCKER re-opening LUA-05, plus NEW-CR-01 and NEW-WR-01 warnings — these plans close them; all parallel, disjoint files)*
+
+**Wave 1 (round-3 gaps)**
+
+- [ ] 01-11-PLAN.md — NEW-CR-02 + WR-05: unconditional base-map init + setAddonUnresolved(false) in AddonNodeDataCopy.restoreAddonFieldsToNode so freshly-placed never-edited Script nodes keep their default script across close-and-reopen; new AddonNodeReloadRegressionTest gates both paths (LUA-05, API-05) [Wave 1]
+- [ ] 01-12-PLAN.md — NEW-CR-01: make AddonLoader.failedAddons thread-safe via Collections.synchronizedMap(new LinkedHashMap<>()) preserving insertion order for the D-08 failure-surface UI (API-05) [Wave 1]
+- [ ] 01-13-PLAN.md — NEW-WR-01: replace 6 Java assert JSON-field presence/absence checks in AddonNodePersistenceTest with executable JUnit assertTrue/assertFalse so the API-05/LUA-05 persistence-JSON contract fails the build on regression (API-05, LUA-05) [Wave 1]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -104,6 +112,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 10/10 | Complete   | 2026-06-13 |
+| 1. API Foundation + Script Node Registration | 10/13 | Gap closure | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
