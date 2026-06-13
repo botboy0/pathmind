@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A saved preset containing a Script node round-trips through save/load with script text and `_schema_version` intact
   5. Launching Minecraft without the addon jar installed leaves Pathmind fully functional across its existing 1.21–1.21.11 range with no errors or missing behavior
 
-**Plans**: 13 plans (3 + 3 code-review gap-closure + 4 UAT gap-closure + 3 re-verification round-3 gap-closure)
+**Plans**: 14 plans (3 + 3 code-review gap-closure + 4 UAT gap-closure + 3 re-verification round-3 gap-closure + 1 UAT round-5 editor-render gap-closure)
 **Wave 1**
 
 - [x] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
@@ -70,6 +70,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 01-11-PLAN.md — NEW-CR-02 + WR-05: unconditional base-map init + setAddonUnresolved(false) in AddonNodeDataCopy.restoreAddonFieldsToNode so freshly-placed never-edited Script nodes keep their default script across close-and-reopen; new AddonNodeReloadRegressionTest gates both paths (LUA-05, API-05) [Wave 1]
 - [x] 01-12-PLAN.md — NEW-CR-01: make AddonLoader.failedAddons thread-safe via Collections.synchronizedMap(new LinkedHashMap<>()) preserving insertion order for the D-08 failure-surface UI (API-05) [Wave 1]
 - [x] 01-13-PLAN.md — NEW-WR-01: replace 6 Java assert JSON-field presence/absence checks in AddonNodePersistenceTest with executable JUnit assertTrue/assertFalse so the API-05/LUA-05 persistence-JSON contract fails the build on regression (API-05, LUA-05) [Wave 1]
+
+**UAT round-5 editor-render gap closure** *(in-game UAT round 5 found 3 editor-render gaps on the addon-node render surface — one consolidated plan closes all three)*
+
+**Wave 1 (UAT round-5 gaps)**
+
+- [ ] 01-14-PLAN.md — UAT-GAP-B (drag-preview title routed through Node.getDisplayName in 3 compat layers) + UAT-GAP-C (resolved addon nodes under the sidebar use a neutral dimmed body, never the missing-addon placeholder) + UAT-GAP-A (addon scroll range via computeAddonContentHeight, magic +100 removed; tests for no-overflow→no-scrollbar and overflow→scrollbar) (LUA-01, API-07) [Wave 1]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -112,6 +118,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 13/13 | Complete   | 2026-06-13 |
+| 1. API Foundation + Script Node Registration | 13/14 | Gap closure (UAT round 5) | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
