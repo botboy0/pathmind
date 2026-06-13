@@ -104,7 +104,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — moveTo awaitable: PathmindRuntimeImpl.moveTo wraps PathmindNavigator.startGoto + pathmind.moveTo blocks worker with timeout-clock pause (BIND-02) [Wave 3]
+- [x] 02-03-PLAN.md — moveTo awaitable: PathmindRuntimeImpl.moveTo wraps PathmindNavigator.startGoto + pathmind.moveTo blocks worker with timeout-clock pause (BIND-02) [Wave 3]
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -135,5 +135,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
-| 2. Lua VM + Core Bindings | 2/4 | In Progress|  |
+| 2. Lua VM + Core Bindings | 3/4 | In Progress|  |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
