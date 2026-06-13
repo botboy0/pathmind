@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-06-13T14:57:08.150Z"
+status: verifying
+stopped_at: Completed 02-04-PLAN.md (Tasks 1-2); UAT pending human
+last_updated: "2026-06-13T15:09:44.672Z"
 last_activity: 2026-06-13 -- Phase 2 execution started
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 19
-  completed_plans: 18
-  percent: 33
+  completed_plans: 19
+  percent: 67
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 Phase: 2 (Lua VM + Core Bindings) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-13 -- Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02-lua-vm-core-bindings P01 | 16min | 3 tasks | 10 files |
 | Phase 02-lua-vm-core-bindings P02 | 6min | 2 tasks | 3 files |
 | Phase 02-lua-vm-core-bindings P03 | 7min | 2 tasks | 4 files |
+| Phase 02-lua-vm-core-bindings P04 | 10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Shadow plugin isZip64=true required for Architectury+Cobalt jar exceeding 65535 entries
 - [Phase ?]: CobaltVm source imports use org.squiddev.cobalt (compile-time); shadow relocation to com.mrmysterium.pathmindlua.shadow.cobalt happens at JAR time
 - [Phase ?]: Compute-time timeout clock pause via computeMs accumulator in CobaltVm
+- [Phase ?]: Inventory iteration: inventory.getStack(i) avoids private .main field; player position: getX/Y/Z not getPos() (Yarn mappings); carrier shape: Object[3] positional array for version-agnostic addon contract
 
 ### Pending Todos
 
@@ -100,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-13T14:57:08.145Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-06-13T15:09:44.664Z
+Stopped at: Completed 02-04-PLAN.md (Tasks 1-2); UAT pending human
 Resume file: None

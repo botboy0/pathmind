@@ -32,7 +32,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **BIND-01**: Script can read and write node-tree variables shared with other Pathmind nodes (`pathmind.getVar` / `pathmind.setVar`)
 - [x] **BIND-02**: Script can invoke Pathmind actions (movement/Baritone, interaction) and block until the action completes
-- [ ] **BIND-03**: Script can query game state Pathmind already exposes (player position, inventory, blocks) with main-thread-safe dispatch
+- [x] **BIND-03**: Script can query game state Pathmind already exposes (player position, inventory, blocks) with main-thread-safe dispatch
 - [x] **BIND-04**: Script errors surface to the user with message and line number (never silently swallowed)
 
 ### In-Node Editor
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LUA-04 | Phase 2 | Complete |
 | BIND-01 | Phase 2 | Complete |
 | BIND-02 | Phase 2 | Complete |
-| BIND-03 | Phase 2 | Pending |
+| BIND-03 | Phase 2 | Complete |
 | BIND-04 | Phase 2 | Complete |
 | EDIT-01 | Phase 3 | Pending |
 | EDIT-02 | Phase 3 | Pending |

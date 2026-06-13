@@ -14,7 +14,7 @@ Three phases co-evolve Pathmind and its first external addon. Phase 1 builds the
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: API Foundation + Script Node Registration** - Publish the Pathmind addon API artifact, wire addon discovery into PathmindMod, and ship the Script node as a registered, persistent, palette-visible node in the sibling addon repo (gap closure in progress — verification found 3 BLOCKERs) (completed 2026-06-13)
-- [ ] **Phase 2: Lua VM + Core Bindings** - Wire Cobalt VM on a worker thread with per-execution fresh globals, establish the async-sync bridging model, and expose the full Pathmind Lua binding surface (variables, actions, game state, error reporting)
+- [x] **Phase 2: Lua VM + Core Bindings** - Wire Cobalt VM on a worker thread with per-execution fresh globals, establish the async-sync bridging model, and expose the full Pathmind Lua binding surface (variables, actions, game state, error reporting) (completed 2026-06-13)
 - [ ] **Phase 3: Script Node Editor + Autosuggestions** - Complete the in-game editor UX: functional multiline editor with line numbers, inline error display co-located with the node, and prefix-match autosuggestions for the pathmind.* API
 
 ## Phase Details
@@ -108,7 +108,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 02-04-PLAN.md — game state: getPosition/getInventory/getBlock with main-thread dispatch + bindings + end-of-phase in-game UAT (BIND-03, all six success criteria) [Wave 4]
+- [x] 02-04-PLAN.md — game state: getPosition/getInventory/getBlock with main-thread dispatch + bindings + end-of-phase in-game UAT (BIND-03, all six success criteria) [Wave 4]
 
 ### Phase 3: Script Node Editor + Autosuggestions
 
@@ -135,5 +135,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
-| 2. Lua VM + Core Bindings | 3/4 | In Progress|  |
+| 2. Lua VM + Core Bindings | 4/4 | Complete   | 2026-06-13 |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
