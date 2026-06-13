@@ -4,6 +4,7 @@ import com.pathmind.api.addon.PathmindRuntime;
 import com.pathmind.nodes.NodeType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.HashMap;
@@ -126,15 +127,34 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
     /**
      * {@inheritDoc}
      *
-     * <p>TODO: wired in plan 03 — full PathmindNavigator/Baritone awaitable integration.
+     * <p>Wraps {@link PathmindNavigator#startGoto(net.minecraft.util.math.BlockPos, String, CompletableFuture)}
+     * and returns the same future that PathmindNavigator will complete when the player
+     * arrives or when navigation fails.
      *
-     * @throws UnsupportedOperationException always (stub for plan 03)
+     * <p>Threading contract: this method does NOT block — it returns the future immediately.
+     * Blocking is the addon worker thread's responsibility (it calls {@code navFuture.get()}).
+     * The game tick thread drives navigation and completes the future on arrival or failure.
+     *
+     * <p>Note (Pitfall 6): a second concurrent {@code moveTo} call will cancel the prior
+     * navigation because {@link PathmindNavigator} calls {@code stopInternal(false, "replaced")}
+     * inside {@code startGoto}. For v1 scripting, one moveTo at a time per script is expected.
+     *
+     * <p>Baritone-absent behavior: PathmindNavigator has its own A* pathfinding fallback
+     * used when Baritone is absent. No Baritone-presence gate is needed here — the Navigator
+     * handles the fallback internally (RESEARCH.md Finding 2).
      */
     @Override
     public CompletableFuture<Void> moveTo(double x, double y, double z) {
-        // TODO: wired in plan 03 (PathmindNavigator.startGoto + Baritone integration)
-        throw new UnsupportedOperationException(
-            "pathmind.moveTo is not yet wired — implemented in plan 03");
+        CompletableFuture<Void> navFuture = new CompletableFuture<>();
+        BlockPos target = BlockPos.ofFloored(x, y, z);
+        boolean started = PathmindNavigator.getInstance().startGoto(target, "Lua moveTo", navFuture);
+        if (!started) {
+            // startGoto returns false only when targetPos or future is null — impossible here,
+            // but complete exceptionally so the worker's .get() surfaces a clear error.
+            navFuture.completeExceptionally(
+                new RuntimeException("moveTo: PathmindNavigator.startGoto returned false"));
+        }
+        return navFuture;
     }
 
     // -------------------------------------------------------------------------
