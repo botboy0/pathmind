@@ -58,10 +58,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1 (UAT gaps)**
 
-- [ ] 01-07-PLAN.md — GAP-1: addon-aware scroll metrics + wrap-aware addon content height + addon-pass scrollbar so overflowing addon categories scroll (WR-03/WR-04) [Wave 1]
-- [ ] 01-08-PLAN.md — GAP-2 + GAP-3: ADDON node display name from the registry + default-field (script) seeding in the addon constructor so placed nodes are fully formed at drop time [Wave 1]
-- [ ] 01-09-PLAN.md — GAP-4 + GAP-5: scissor-clip + sidebar-overlap suppression for the addon body preview, and a missing-addon indicator on orphaned ADDON nodes [Wave 1]
-- [ ] 01-10-PLAN.md — WR-01/WR-02/WR-06 hardening: align null-addonTypeId skip policy across snapshot/clipboard, defensive-copy extraFields maps, delegate persistence ADDON branches to AddonNodeDataCopy [Wave 1]
+- [x] 01-07-PLAN.md — GAP-1: addon-aware scroll metrics + wrap-aware addon content height + addon-pass scrollbar so overflowing addon categories scroll (WR-03/WR-04) [Wave 1]
+- [x] 01-08-PLAN.md — GAP-2 + GAP-3: ADDON node display name from the registry + default-field (script) seeding in the addon constructor so placed nodes are fully formed at drop time [Wave 1]
+- [x] 01-09-PLAN.md — GAP-4 + GAP-5: scissor-clip + sidebar-overlap suppression for the addon body preview, and a missing-addon indicator on orphaned ADDON nodes [Wave 1]
+- [x] 01-10-PLAN.md — WR-01/WR-02/WR-06 hardening: align null-addonTypeId skip policy across snapshot/clipboard, defensive-copy extraFields maps, delegate persistence ADDON branches to AddonNodeDataCopy [Wave 1]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -104,6 +104,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 6/6 | Complete   | 2026-06-13 |
+| 1. API Foundation + Script Node Registration | 10/10 | Complete   | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
