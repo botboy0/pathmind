@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-13T10:00:43.806Z"
+stopped_at: Completed 01-12-PLAN.md
+last_updated: "2026-06-13T10:04:43.526Z"
 last_activity: 2026-06-13 -- Phase 01 execution started
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 01 (api-foundation-script-node-registration) — EXECUTING
-Plan: 2 of 13
+Plan: 3 of 13
 Status: Ready to execute
 Last activity: 2026-06-13 -- Phase 01 execution started
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-api-foundation-script-node-registration P11 | 3 | 2 tasks | 2 files |
+| Phase 01 P12 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ Recent decisions affecting current work:
 - Roadmap: Co-evolve API + addon across 3 phases (coarse granularity); no throwaway stub phases — Script node is real from Phase 1 (palette-visible, persistent, graceful no-op execution)
 - Roadmap: Cobalt 0.7.3 (CC:Tweaked fork) selected as Lua VM; shadow-relocate into addon JAR
 - Roadmap: API artifact published to mavenLocal during dev; addon compiles against `com.pathmind.api` only
+- [Phase ?]: Use Collections.synchronizedMap(new LinkedHashMap<>()) over ConcurrentHashMap to preserve insertion order required by D-08 failure-surface UI (NEW-CR-01 closure)
 
 ### Pending Todos
 
@@ -88,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-13T10:00:43.802Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-api-foundation-script-node-registration/01-CONTEXT.md
+Last session: 2026-06-13T10:04:43.522Z
+Stopped at: Completed 01-12-PLAN.md
+Resume file: None
