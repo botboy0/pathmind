@@ -5,6 +5,7 @@ import com.pathmind.api.addon.AddonNodeDefinition;
 import com.pathmind.api.addon.AddonNodeExecutor;
 import com.pathmind.api.addon.AddonNodeSerializer;
 import com.pathmind.api.addon.NodeResult;
+import com.pathmind.execution.PathmindRuntimeImpl;
 import com.pathmind.execution.PathmindNavigator;
 import net.minecraft.text.Text;
 import com.google.gson.Gson;
@@ -3850,6 +3851,8 @@ public class Node {
             Object scriptObj = addonExtraFields.get("script");
             ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
         }
+        // Wire runtime services (Phase 2 — PathmindRuntime bridge)
+        ctx.setRuntime(new PathmindRuntimeImpl(ExecutionManager.getInstance()));
 
         AddonNodeExecutor exec = NodeTypeRegistry.INSTANCE.executorFor(addonTypeId);
         if (exec == null) {

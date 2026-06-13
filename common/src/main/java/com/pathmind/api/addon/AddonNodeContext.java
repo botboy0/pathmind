@@ -17,6 +17,7 @@ public final class AddonNodeContext {
 
     private String addonTypeId;
     private String scriptText;
+    private PathmindRuntime runtime;
 
     /**
      * Constructs an empty addon node context.
@@ -59,5 +60,24 @@ public final class AddonNodeContext {
      */
     public void setScriptText(String scriptText) {
         this.scriptText = scriptText;
+    }
+
+    /**
+     * Returns the runtime services for this execution context.
+     * Set by Pathmind before invoking the executor.
+     *
+     * @return the runtime services, or null if not yet wired
+     */
+    public PathmindRuntime getRuntime() {
+        return runtime;
+    }
+
+    /**
+     * Sets the runtime services for this execution context.
+     *
+     * @param runtime the runtime services provided by Pathmind
+     */
+    public void setRuntime(PathmindRuntime runtime) {
+        this.runtime = runtime;
     }
 }
