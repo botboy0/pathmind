@@ -7404,7 +7404,8 @@ public class NodeGraph {
             // drawer so the renderer's text does not paint over the animated panel.
             boolean bodyUnderSidebar = x < sidebarWidthForRendering;
             if (bodyUnderSidebar) {
-                renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
+                // UAT-GAP-C: resolved addon nodes use a neutral dimmed body (no "addon missing" text)
+                renderAddonNeutralBody(context, x, y, width, height, isOverSidebar);
                 return;
             }
 
@@ -7432,6 +7433,18 @@ public class NodeGraph {
             // Unresolved placeholder (D-09): grayed-out body indicating the addon is absent
             renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
         }
+    }
+
+    /**
+     * Renders a neutral dimmed body for a RESOLVED addon node whose body is currently under
+     * the open sidebar drawer (UAT-GAP-C sidebar-overlap suppression). Fills the body rect
+     * with the standard dimmed background — no "addon missing" text, no addonTypeId label.
+     * Use this only when the addon is present and registered; the missing-addon path must
+     * continue to use {@link #renderAddonPlaceholderBody}.
+     */
+    private void renderAddonNeutralBody(DrawContext context, int x, int y, int width, int height, boolean isOverSidebar) {
+        int bodyColor = isOverSidebar ? UITheme.BACKGROUND_SECONDARY : UITheme.NODE_DIMMED_BG;
+        context.fill(x + 1, y + 18, x + width - 1, y + height - 1, bodyColor);
     }
 
     /**
