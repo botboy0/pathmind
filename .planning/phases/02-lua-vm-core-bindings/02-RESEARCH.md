@@ -63,7 +63,7 @@ Phase 2 wires the stub `LuaNodeExecutor` (currently a no-op pass-through) into a
 
 The critical design centre-point is the async-sync bridge: the game tick thread must never block, but Lua is inherently synchronous. The solution is that `LuaNodeExecutor.execute()` returns a `CompletableFuture<NodeResult>` immediately, then spins a Java worker thread that runs Cobalt's `LuaThread.runMain(...)` synchronously. When the Lua script calls a blocking action such as `moveTo`, the worker suspends by blocking on a `CompletableFuture<Void>` that PathmindNavigator completes from the tick thread when navigation ends. The timeout clock only measures Lua compute time; it is paused while the worker is blocked on an action future.
 
-**Primary recommendation:** Build the phase as four vertical slices — (1) bare Cobalt VM executes a print-hello script and returns SUCCESS/FAILURE; (2) `getVar`/`setVar` round-trip works; (3) `moveTo` awaitable with Baritone absent/present paths; (4) game-state queries (`getPosition`, `getInventory`, `getBlock`). Each slice leaves both repos loadable.
+**Primary recommendation:** Build the phase as four vertical slices — (1) bare Cobalt VM executes a return-arithmetic script and returns SUCCESS/FAILURE; (2) `getVar`/`setVar` round-trip works; (3) `moveTo` awaitable with Baritone absent/present paths; (4) game-state queries (`getPosition`, `getInventory`, `getBlock`). Each slice leaves both repos loadable.
 
 ---
 
@@ -509,13 +509,13 @@ public double[] getPosition() {
   - `Map<String, String> values` — a map of well-known string keys to string-encoded values
 - Numeric values are stored as `NodeType.PARAM_AMOUNT` with keys `"Amount"`, `"Count"`, `"Threshold"`, `"Value"` all set to the same string (e.g. `"42.0"`)
 - Boolean values are stored as `NodeType.PARAM_BOOLEAN` with key `"Toggle"` = `"true"` or `"false"`
-- String values: [ASSUMED] likely stored as `NodeType.PARAM_TEXT` or similar — needs verification during implementation; the variable system was designed for node parameters, not arbitrary strings
+- String values are stored as `NodeType.PARAM_MESSAGE` with key `"Text"` (verified — see Open Questions Q1 RESOLVED: `ExecutionManager.buildPresetInputValueMap` lines ~960-999 calls `putRuntimeValue(values, "Text", safeValue)` for message/string parameters)
 - **Public accessors:**
   - `getRuntimeVariableFromAnyActiveChain(String name)` — reads from current chain scope, then falls back to `globalRuntimeVariables`
   - `setRuntimeVariableForAnyActiveChain(String name, RuntimeVariable value)` — writes to current chain scope AND mirrors to `globalRuntimeVariables`
 - **The `PathmindRuntime` implementation** must call these two methods. It does NOT directly touch `globalRuntimeVariables`.
-- **Marshaling strategy for `getVariable`:** Read the `RuntimeVariable.type` to determine what to return to Lua. For `PARAM_AMOUNT`: parse `values.get("amount")` (normalized key) or `values.get("Amount")` as Double. For `PARAM_BOOLEAN`: parse `values.get("toggle")` as Boolean. For unknown type: return nil.
-- **Marshaling strategy for `setVariable`:** Create a `RuntimeVariable` with the appropriate `NodeType` based on the Lua value's Java type (Double → `PARAM_AMOUNT` with standard keys; Boolean → `PARAM_BOOLEAN` with `"Toggle"` key). String type needs investigation — see Assumptions Log.
+- **Marshaling strategy for `getVariable`:** Read the `RuntimeVariable.type` to determine what to return to Lua. For `PARAM_AMOUNT`: parse `values.get("Amount")` as Double. For `PARAM_BOOLEAN`: parse `values.get("Toggle")` as Boolean. For `PARAM_MESSAGE`: return `values.get("Text")` as String. For unknown type: return nil.
+- **Marshaling strategy for `setVariable`:** Create a `RuntimeVariable` with the appropriate `NodeType` based on the Lua value's Java type (Double → `PARAM_AMOUNT` with key `"Amount"`; Boolean → `PARAM_BOOLEAN` with keys `"Mode"="literal"`/`"Toggle"`/`"Variable"=""`; String → `PARAM_MESSAGE` with key `"Text"`).
 
 ### Finding 4: Main-thread dispatch idiom — verified
 
@@ -568,11 +568,11 @@ For the overlay (secondary channel, not the primary v1 channel), `NodeErrorNotif
 **How to avoid:** Use `result.get(TIMEOUT, TimeUnit.SECONDS)` with a reasonable timeout (e.g. 30s); on timeout, surface a Lua error to the script. Alternatively check `ExecutionManager.singleplayerPaused` before submitting and spin-wait briefly.
 **Warning signs:** Script hangs indefinitely on `getPosition()` when the game is paused.
 
-### Pitfall 4: RuntimeVariable marshaling — string type unknown
+### Pitfall 4: RuntimeVariable marshaling — string type (RESOLVED)
 **What goes wrong:** `setVar("name", "hello")` from Lua creates a `RuntimeVariable` with an unknown `NodeType`; other Pathmind nodes (e.g. OPERATOR_EQUALS) read the variable and fail type-check.
-**Why it happens:** `RuntimeVariable.type` encodes Pathmind's visual type system (`NodeType.PARAM_AMOUNT`, `NodeType.PARAM_BOOLEAN`, etc.); there is no obvious `NodeType.PARAM_TEXT` exposed in the variable system.
-**How to avoid:** During implementation, grep for `NodeType.PARAM_TEXT` or `NodeType.PARAM_STRING` usage in `NodeVariableListCommandExecutor` and `ExecutionManager` to find if/how text variables are stored. [ASSUMED — see Assumptions Log A2]
-**Warning signs:** `getVar("name")` returns nil or wrong type after `setVar` with a string value.
+**Why it happens:** `RuntimeVariable.type` encodes Pathmind's visual type system (`NodeType.PARAM_AMOUNT`, `NodeType.PARAM_BOOLEAN`, etc.).
+**Resolution:** String variables use `NodeType.PARAM_MESSAGE` with key `"Text"` — verified in `ExecutionManager.buildPresetInputValueMap` (lines ~960-999) and recorded in `02-PATTERNS.md`. The marshaling convention is now PARAM_AMOUNT→"Amount", PARAM_BOOLEAN→Mode/Toggle/Variable, PARAM_MESSAGE→"Text".
+**Warning signs:** `getVar("name")` returns nil or wrong type after `setVar` with a string value — would indicate the "Text" key assumption is wrong at impl time; the round-trip unit test in 02-02 catches this empirically.
 
 ### Pitfall 5: Timeout clock not actually pausing during action
 **What goes wrong:** The "compute-only" timeout requirement means the clock must stop while the worker is blocked on `moveTo` / game-state futures. A naive `ScheduledFuture` that fires after 5s total wall-clock time will kill scripts that navigate for more than 5s.
@@ -735,32 +735,26 @@ pathmind.setVar("ground_block", block or "unknown")
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | `LuaError.getMessage()` returns a string in the format `"chunkname:line: message"` | Finding 1, Pitfall 1 | Chat message shows wrong format or no line number; low risk — parse defensively |
-| A2 | Pathmind variable system does not have a canonical `NodeType.PARAM_TEXT` for string variables | Finding 3 | `setVar("name", "hello")` creates a variable that other nodes cannot read correctly; must be verified by grepping during implementation |
+| A1 | `LuaError.getMessage()` returns a string in the format `"chunkname:line: message"` | Finding 1, Pitfall 1 | Chat message shows wrong format or no line number; low risk — parse defensively. RESOLVED-BY-PLAN: 02-01 smoke test asserts the format empirically (Open Questions Q2). |
+| A2 | String variables use `NodeType.PARAM_MESSAGE` with key `"Text"` | Finding 3 | RESOLVED — verified via codebase read of `ExecutionManager.buildPresetInputValueMap` (lines ~960-999), recorded in 02-PATTERNS.md. If the key is wrong at impl time, marshaling silently breaks — the 02-02 round-trip unit test catches it (Open Questions Q1). |
 | A3 | `LuaState.interrupt()` is safe to call from any thread (e.g. a ScheduledExecutorService thread) | Pattern 3 | If not thread-safe, the timeout mechanism is broken; mitigated by Cobalt's stated design ("interruptible at arbitrary points") |
 | A4 | `CoreLibraries.standardGlobals(state)` returns a fully self-contained table with no reference to the state's main thread identity | Standard Stack | If it captures thread identity, concurrent executions on different states might interfere |
 | A5 | The LuaClosure returned by `LoadState.load(...)` is associated with the `globals` table passed and does not share state with other closures | Pattern 1 | Fresh-globals-per-execution guarantee fails; concurrent script nodes pollute each other |
 
-**If this table is empty:** All claims in this research were verified or cited — no user confirmation needed. (Not the case — A2 in particular needs implementation-time verification.)
+**If this table is empty:** All claims in this research were verified or cited — no user confirmation needed. (Not the case — A1/A3/A4/A5 carry residual risk verified by plan smoke tests.)
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **String variable NodeType for `setVar`**
-   - What we know: `PARAM_AMOUNT` stores numbers (keys: Amount/Count/Threshold/Value), `PARAM_BOOLEAN` stores booleans (key: Toggle); both found in `NodeVariableListCommandExecutor.java`
-   - What's unclear: What `NodeType` and what key map is used to store a plain string variable set by a script? Is there a `PARAM_TEXT`?
-   - Recommendation: Grep `NodeVariableListCommandExecutor` for `PARAM_TEXT`, `PARAM_STRING`, and any `"Text"` or `"Value"` keys during plan T-01 (or the first implementation task that touches `setVar`). If no string type exists, define a convention (e.g. use `PARAM_AMOUNT` with the string value as-is for round-trip fidelity within Lua; document the limitation).
+1. **String variable NodeType for `setVar`** — RESOLVED
+   - Resolution: String variables are stored as `NodeType.PARAM_MESSAGE` with key `"Text"`. Verified via codebase read of `ExecutionManager.buildPresetInputValueMap` (lines ~960-999) — it calls `putRuntimeValue(values, "Text", safeValue)` for message/string parameters. Recorded in `02-PATTERNS.md` (PathmindRuntimeImpl variable read/write patterns + RuntimeVariable Construction shared pattern). This is a verified codebase read, not an assumption — but confidence on long-term stability is LOW: if the key is wrong at implementation time, marshaling silently breaks. The 02-02 round-trip + cross-store-read unit test exercises it empirically (set via PathmindRuntimeImpl, read back via `ExecutionManager.getRuntimeVariableFromAnyActiveChain`) so a wrong key surfaces as a failing test rather than a silent production bug.
 
-2. **`LuaError` line number extraction**
-   - What we know: Cobalt decorates errors with chunk name and line when loaded with `@chunkname`
-   - What's unclear: Is the format stable across all error types (syntax, runtime, Java-thrown)? Does `LuaError.getLevel()` or similar give the line as an integer?
-   - Recommendation: Write a unit test in the addon that intentionally throws a Lua error on a known line, captures the `LuaError`, and asserts the message format. This gates the BIND-04 implementation.
+2. **`LuaError` line number extraction** — RESOLVED-BY-PLAN
+   - Resolution: 02-01 includes a smoke/unit test (`CobaltVmSmokeTest`) that intentionally throws a Lua error and asserts the `chunk:line: message` format as an early acceptance criterion. The executor confirms the format empirically (the test documents the real format and adjusts the message-parsing to surface message+line defensively) rather than assuming it. The chunk is loaded with the `@script` name so Cobalt decorates errors file-style. This gates the BIND-04 implementation: the chat-error case in the smoke test asserts the captured `sendErrorToChat` message contains a line number.
 
-3. **Shadow relocation and Cobalt internal class loading**
-   - What we know: Shadow rewrites bytecode constant pool; `Class.forName` string literals are NOT rewritten
-   - What's unclear: Does Cobalt 0.7.3 use `Class.forName` for any internal loading (compiler, lib discovery)?
-   - Recommendation: `grep -r "Class.forName" ./cobalt-0.7.3-sources/` during the plan task that sets up shadow. If found, add those string literals to the shadow `include` exclusion or use a different relocation strategy.
+3. **Shadow relocation and Cobalt internal class loading** — RESOLVED-BY-PLAN
+   - Resolution: 02-01 Task 1 includes a grep/source check of the resolved Cobalt jar (cached under the Gradle caches dir) for reflective `Class.forName(` usage referencing `org.squiddev.cobalt.*` string literals before finalizing the shadow relocation rules. If any are found, the task adds a `mergeServiceFiles()` call and a build-file comment documenting the literals so the relocated service-loader/reflection paths are handled rather than silently broken. The shadowJar verification (jar inspection confirming `com/mrmysterium/pathmindlua/shadow/cobalt/LuaState.class` exists and no `org/squiddev/cobalt/` paths remain) is the empirical gate.
 
 ---
 
@@ -791,7 +785,7 @@ The planner should organize tasks as independent vertical slices, each leaving b
 | Slice | Pathmind change | Addon change | Done when |
 |-------|----------------|-------------|-----------|
 | **S0: Build wiring** | Publish API artifact to mavenLocal | Add Cobalt dependency, shadow task, verify it compiles | `./gradlew shadowJar` succeeds in addon |
-| **S1: Bare VM executes** | Add `getRuntime()` to `AddonNodeContext`; add `PathmindRuntime` interface stub (no impl yet); add `PathmindRuntimeImpl` stub | Replace no-op executor with Cobalt VM lifecycle; `pathmind` table has no-op stubs; script `print("hello")` executes and node completes SUCCESS | Script node executes real Lua; errors surface to chat |
+| **S1: Bare VM executes** | Add `getRuntime()` to `AddonNodeContext`; add `PathmindRuntime` interface stub (no impl yet); add `PathmindRuntimeImpl` stub | Replace no-op executor with Cobalt VM lifecycle; `pathmind` table has no-op stubs; script `return 1 + 1` executes and node completes SUCCESS | Script node executes real Lua; errors surface to chat |
 | **S2: getVar/setVar** | Implement `getVariable`/`setVariable` in `PathmindRuntimeImpl` (wrap `getRuntimeVariableFromAnyActiveChain` / `setRuntimeVariableForAnyActiveChain`) | Wire `pathmind.getVar`/`pathmind.setVar` to `PathmindRuntime` | Script can exchange scalars with other Pathmind nodes |
 | **S3: moveTo awaitable** | Implement `moveTo(x,y,z)` in `PathmindRuntimeImpl` (wrap `PathmindNavigator.startGoto`) | Wire `pathmind.moveTo`; worker blocks on nav CF; timeout clock pauses | Script navigates and resumes after arrival; Baritone absent path tested |
 | **S4: Game-state reads** | Implement `getPosition`, `getInventory`, `getBlock` in `PathmindRuntimeImpl` with `client.execute` dispatch | Wire all three bindings | All `pathmind.*` functions work in a complete test script |
@@ -831,7 +825,7 @@ The planner should organize tasks as independent vertical slices, each leaving b
 - Pathmind codebase internals (ExecutionManager, PathmindNavigator): HIGH — read directly from source files in this repo
 - Addon repo state: HIGH — read directly from source files in pathmind-lua repo
 - Shadow relocation pattern: MEDIUM — standard Gradle Shadow plugin behavior, well-documented
-- String variable NodeType: LOW — not found in codebase search; tagged as assumption A2
+- String variable NodeType: RESOLVED (was LOW) — verified via codebase read of `ExecutionManager.buildPresetInputValueMap`; recorded in 02-PATTERNS.md; round-trip unit test in 02-02 gates it empirically
 
 **Research date:** 2026-06-13
 **Valid until:** 2026-07-13 (Cobalt is stable; Pathmind internals change with every plan)
