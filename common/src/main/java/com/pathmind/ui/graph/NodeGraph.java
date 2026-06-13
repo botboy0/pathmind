@@ -7400,14 +7400,12 @@ public class NodeGraph {
         AddonNodeBodyRenderer renderer = def != null ? def.getBodyRenderer() : null;
 
         if (!unresolved && renderer != null) {
-            // GAP-4: suppress the live preview when the node body is under the open sidebar
-            // drawer so the renderer's text does not paint over the animated panel.
-            boolean bodyUnderSidebar = x < sidebarWidthForRendering;
-            if (bodyUnderSidebar) {
-                // UAT-GAP-C: resolved addon nodes use a neutral dimmed body (no "addon missing" text)
-                renderAddonNeutralBody(context, x, y, width, height, isOverSidebar);
-                return;
-            }
+            // UAT-GAP-C: a resolved addon node ALWAYS renders its real body via the renderer,
+            // in every position — exactly like a built-in node always renders its body. The
+            // invalid-drop / over-sidebar indicator is the discolored FRAME applied by
+            // renderNode (3573-3599) before body dispatch; the body must not be blanked here.
+            // The scissor clip below keeps the renderer's output inside the node bounds, so it
+            // cannot bleed over the open sidebar drawer.
 
             // Build context for the renderer
             AddonNodeContext ctx = new AddonNodeContext();
@@ -7433,18 +7431,6 @@ public class NodeGraph {
             // Unresolved placeholder (D-09): grayed-out body indicating the addon is absent
             renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
         }
-    }
-
-    /**
-     * Renders a neutral dimmed body for a RESOLVED addon node whose body is currently under
-     * the open sidebar drawer (UAT-GAP-C sidebar-overlap suppression). Fills the body rect
-     * with the standard dimmed background — no "addon missing" text, no addonTypeId label.
-     * Use this only when the addon is present and registered; the missing-addon path must
-     * continue to use {@link #renderAddonPlaceholderBody}.
-     */
-    private void renderAddonNeutralBody(DrawContext context, int x, int y, int width, int height, boolean isOverSidebar) {
-        int bodyColor = isOverSidebar ? UITheme.BACKGROUND_SECONDARY : UITheme.NODE_DIMMED_BG;
-        context.fill(x + 1, y + 18, x + width - 1, y + height - 1, bodyColor);
     }
 
     /**
