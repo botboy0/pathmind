@@ -3008,6 +3008,11 @@ public class ExecutionManager {
                 nodeData.setCustomNodeInstance(node.isCustomNodeInstance());
                 nodeData.setTemplateGraph(node.getTemplateGraphData());
             }
+            // WR-01: skip degenerate ADDON nodes with null addonTypeId — aligns with on-disk save path (NodeGraphPersistence)
+            if (node.getType() == NodeType.ADDON && node.getAddonTypeId() == null) {
+                System.err.println("[Pathmind] Skipping ADDON node with null addonTypeId during snapshot (T-01-09)");
+                continue;
+            }
             AddonNodeDataCopy.copyAddonFieldsToNodeData(node, nodeData);
 
             snapshot.getNodes().add(nodeData);

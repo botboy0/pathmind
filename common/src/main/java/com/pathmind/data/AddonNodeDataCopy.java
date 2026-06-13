@@ -16,14 +16,14 @@ import java.util.HashMap;
  * across every Node&lt;&gt;NodeData conversion site. The four sites that convert nodes
  * (NodeGraphPersistence, NodeGraph.applyLoadedData, NodeGraphClipboardSupport,
  * ExecutionManager.createGraphSnapshot) all need the same two operations; this class
- * is the single canonical encoding for the three previously-broken sites.
- * NodeGraphPersistence keeps its own inline ADDON branches because it owns the
- * primary on-disk load/save path; this class is used by the secondary conversion sites.
+ * is the single canonical encoding for all four conversion sites.
+ * NodeGraphPersistence delegates its ADDON branches to this class, keeping only the
+ * null-addonTypeId {@code continue} skip decision inline at the save call site.
  *
- * <p>Mirrors the exact behaviour documented in NodeGraphPersistence:
+ * <p>Mirrors the exact behaviour implemented in NodeGraphPersistence:
  * <ul>
- *   <li>Save direction (lines 854–882): {@link #copyAddonFieldsToNodeData}</li>
- *   <li>Load direction (lines 339–368): {@link #restoreAddonFieldsToNode}</li>
+ *   <li>Save direction ({@code buildNodeGraphData}): {@link #copyAddonFieldsToNodeData}</li>
+ *   <li>Load direction ({@code convertToNodes}): {@link #restoreAddonFieldsToNode}</li>
  * </ul>
  *
  * @see NodeGraphPersistence
@@ -38,18 +38,19 @@ public final class AddonNodeDataCopy {
      * Copies the ADDON identity fields from a live {@link Node} onto a
      * {@link NodeGraphData.NodeData} record (the save/clone direction).
      *
-     * <p>Replicates the ADDON save logic from
-     * {@code NodeGraphPersistence.buildNodeGraphData} lines 854–882.
+     * <p>Delegates to the same encoding implemented in
+     * {@code NodeGraphPersistence.buildNodeGraphData}.
      *
      * <p>Guards on {@code node.getType() == NodeType.ADDON}; silently no-ops for
      * all other node types so callers can invoke this unconditionally per node.
      *
      * <p>When {@code addonTypeId} is {@code null} this method logs a warning via
      * {@code System.err} and returns without setting any addon fields.
-     * <strong>Callers in ExecutionManager that skip null-addonTypeId nodes must
-     * continue to handle that case themselves</strong> — this method does not drop
-     * the node from any collection; it only omits the addon fields from the record,
-     * matching the behaviour described for the save path in the plan threat model.
+     * <strong>Callers SHOULD skip null-addonTypeId ADDON nodes before calling this
+     * method</strong> (matching the on-disk save path's {@code continue} policy) —
+     * this method omits addon fields for such nodes as a defensive fallback, but it
+     * does not remove the node from any collection. Use a {@code continue} guard
+     * before adding the node to any snapshot or clipboard list.
      *
      * @param node     the source live node
      * @param nodeData the target serializable record to populate
@@ -77,12 +78,13 @@ public final class AddonNodeDataCopy {
                 nodeData.setExtraFields(ser.serialize(ctx));
             } catch (Throwable t) {
                 System.err.println("[Pathmind] Addon serializer threw for " + addonTypeId + ": " + t.getMessage());
-                // Fall back to retained blob if any
-                nodeData.setExtraFields(node.getAddonExtraFields());
+                // Fall back to retained blob if any — defensive copy (WR-02)
+                nodeData.setExtraFields(node.getAddonExtraFields() != null ? new HashMap<>(node.getAddonExtraFields()) : null);
             }
         } else {
             // Addon absent — placeholder re-save: write back retained blob verbatim (D-09)
-            nodeData.setExtraFields(node.getAddonExtraFields());
+            // Defensive copy to prevent aliasing across clipboard/snapshot restores (WR-02)
+            nodeData.setExtraFields(node.getAddonExtraFields() != null ? new HashMap<>(node.getAddonExtraFields()) : null);
         }
     }
 
@@ -90,8 +92,8 @@ public final class AddonNodeDataCopy {
      * Restores the ADDON identity fields from a {@link NodeGraphData.NodeData} record
      * onto a freshly-constructed {@link Node} (the load direction).
      *
-     * <p>Replicates the ADDON load logic from
-     * {@code NodeGraphPersistence.convertToNodes} lines 339–368, including the
+     * <p>Implements the ADDON load logic used by
+     * {@code NodeGraphPersistence.convertToNodes}, including the
      * deserializer round-trip, the {@code "script"} key injection, the
      * {@code catch(Throwable)} fallback, and the missing-addon placeholder branch.
      *
@@ -124,13 +126,15 @@ public final class AddonNodeDataCopy {
                     }
                 } catch (Throwable t) {
                     System.err.println("[Pathmind] Addon deserializer threw for " + addonTypeId + ": " + t.getMessage());
-                    node.setAddonExtraFields(nodeData.getExtraFields());
+                    // Defensive copy to prevent aliasing across multiple restores (WR-02)
+                    node.setAddonExtraFields(nodeData.getExtraFields() != null ? new HashMap<>(nodeData.getExtraFields()) : null);
                     node.setAddonUnresolved(true);
                 }
             }
         } else {
             // Addon absent — retain extraFields verbatim as placeholder (D-09)
-            node.setAddonExtraFields(nodeData.getExtraFields());
+            // Defensive copy to prevent aliasing across clipboard/snapshot restores (WR-02)
+            node.setAddonExtraFields(nodeData.getExtraFields() != null ? new HashMap<>(nodeData.getExtraFields()) : null);
             node.setAddonUnresolved(true);
         }
     }
