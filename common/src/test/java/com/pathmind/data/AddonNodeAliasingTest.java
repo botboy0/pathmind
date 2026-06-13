@@ -1,11 +1,5 @@
 package com.pathmind.data;
 
-import com.pathmind.api.addon.AddonNodeCategory;
-import com.pathmind.api.addon.AddonNodeContext;
-import com.pathmind.api.addon.AddonNodeDefinition;
-import com.pathmind.api.addon.AddonNodeSerializer;
-import com.pathmind.api.addon.NodeResult;
-import com.pathmind.api.addon.NodeTypeRegistrar;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeType;
 import com.pathmind.nodes.NodeTypeRegistry;
@@ -15,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -33,51 +26,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AddonNodeAliasingTest {
 
-    private static final String TEST_ADDON_ID = "aliasing_test_mod:script";
+    // Shared constant from the consolidated test registry (order-independent)
+    private static final String TEST_ADDON_ID = AddonTestRegistry.ALIASING_ADDON_ID;
     // Deliberately unregistered — exercises the missing-addon (placeholder) branch
     private static final String UNREGISTERED_ADDON_ID = "aliasing_test_mod:missing_addon";
 
-    private static final AddonNodeSerializer TEST_SERIALIZER = new AddonNodeSerializer() {
-        @Override
-        public Map<String, Object> serialize(AddonNodeContext ctx) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("_schema_version", 1);
-            map.put("script", ctx.getScriptText() != null ? ctx.getScriptText() : "");
-            return map;
-        }
-
-        @Override
-        public void deserialize(AddonNodeContext ctx, Map<String, Object> fields) {
-            if (fields == null) {
-                return;
-            }
-            Object scriptObj = fields.get("script");
-            if (scriptObj != null) {
-                ctx.setScriptText(scriptObj.toString());
-            }
-        }
-    };
-
     @BeforeAll
     static void installSyntheticRegistry() {
-        if (!NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
-            try {
-                NodeTypeRegistrar registrar = new NodeTypeRegistrar();
-                AddonNodeCategory category = new AddonNodeCategory(
-                    "aliasing_test_mod.scripting", "Scripting", 0xFF334455, "A");
-                AddonNodeDefinition def = AddonNodeDefinition.builder(TEST_ADDON_ID)
-                    .displayName("Aliasing Test Script")
-                    .category(category)
-                    .build();
-                registrar.register(def,
-                    ctx -> CompletableFuture.completedFuture(NodeResult.SUCCESS),
-                    TEST_SERIALIZER);
-                registrar.seal();
-                NodeTypeRegistry.INSTANCE.install(registrar);
-            } catch (IllegalStateException e) {
-                // Already installed by parallel test run — acceptable
-            }
-        }
+        // Delegate to the shared registry helper — ensures order-independence across the
+        // full test suite. Only the first call installs; subsequent calls are no-ops.
+        AddonTestRegistry.ensureInstalled();
         assertTrue(!NodeTypeRegistry.INSTANCE.hasType(UNREGISTERED_ADDON_ID),
             "UNREGISTERED_ADDON_ID must not be registered for placeholder-branch tests");
     }

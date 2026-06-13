@@ -1,20 +1,12 @@
 package com.pathmind.data;
 
-import com.pathmind.api.addon.AddonNodeCategory;
-import com.pathmind.api.addon.AddonNodeContext;
-import com.pathmind.api.addon.AddonNodeDefinition;
-import com.pathmind.api.addon.AddonNodeSerializer;
-import com.pathmind.api.addon.NodeResult;
-import com.pathmind.api.addon.NodeTypeRegistrar;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeType;
-import com.pathmind.nodes.NodeTypeRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,64 +27,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AddonNodeReloadRegressionTest {
 
-    private static final String TEST_ADDON_ID = "test_mod:script";
-
-    /**
-     * The default script text this test serializer seeds when the fields map is null.
-     * Must be non-empty so the null-path produces verifiably observable data.
-     */
-    private static final String DEFAULT_SCRIPT = "-- default script (NEW-CR-02 test)";
-
-    /**
-     * Inline serializer that seeds DEFAULT_SCRIPT when fields is null, and reads the
-     * "script" key when fields is non-null. Matches the contract the plan expects from
-     * the real LuaScriptSerializer.
-     */
-    private static final AddonNodeSerializer TEST_SERIALIZER = new AddonNodeSerializer() {
-        @Override
-        public Map<String, Object> serialize(AddonNodeContext ctx) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("_schema_version", 1);
-            map.put("script", ctx.getScriptText() != null ? ctx.getScriptText() : "");
-            return map;
-        }
-
-        @Override
-        public void deserialize(AddonNodeContext ctx, Map<String, Object> fields) {
-            if (fields == null) {
-                // Null-fields path: seed the default so restoreAddonFieldsToNode can write it
-                ctx.setScriptText(DEFAULT_SCRIPT);
-                return;
-            }
-            Object scriptObj = fields.get("script");
-            if (scriptObj != null) {
-                ctx.setScriptText(scriptObj.toString());
-            }
-        }
-    };
+    // Shared constants from the consolidated test registry (order-independent)
+    private static final String TEST_ADDON_ID = AddonTestRegistry.SCRIPT_ADDON_ID;
+    private static final String DEFAULT_SCRIPT = AddonTestRegistry.DEFAULT_SCRIPT;
 
     @BeforeAll
     static void installSyntheticRegistry() {
-        // Install-once guard: tolerate prior installation from AddonNodeConversionRoundTripTest
-        // or parallel test runs (NodeTypeRegistry is JVM-wide install-once).
-        if (!NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
-            try {
-                NodeTypeRegistrar registrar = new NodeTypeRegistrar();
-                AddonNodeCategory category = new AddonNodeCategory(
-                    "test_mod.scripting", "Scripting", 0xFF112233, "S");
-                AddonNodeDefinition def = AddonNodeDefinition.builder(TEST_ADDON_ID)
-                    .displayName("Test Script")
-                    .category(category)
-                    .build();
-                registrar.register(def,
-                    ctx -> CompletableFuture.completedFuture(NodeResult.SUCCESS),
-                    TEST_SERIALIZER);
-                registrar.seal();
-                NodeTypeRegistry.INSTANCE.install(registrar);
-            } catch (IllegalStateException e) {
-                // Already installed by a parallel test run — acceptable
-            }
-        }
+        // Delegate to the shared registry helper — ensures order-independence across the
+        // full test suite. Only the first call installs; subsequent calls are no-ops.
+        AddonTestRegistry.ensureInstalled();
     }
 
     // -------------------------------------------------------------------------

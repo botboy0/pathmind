@@ -1,22 +1,14 @@
 package com.pathmind.data;
 
-import com.pathmind.api.addon.AddonNodeCategory;
-import com.pathmind.api.addon.AddonNodeContext;
-import com.pathmind.api.addon.AddonNodeDefinition;
-import com.pathmind.api.addon.AddonNodeSerializer;
-import com.pathmind.api.addon.NodeResult;
-import com.pathmind.api.addon.NodeTypeRegistrar;
 import com.pathmind.nodes.Node;
 import com.pathmind.nodes.NodeType;
 import com.pathmind.nodes.NodeTypeRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -38,64 +30,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AddonNodeConversionRoundTripTest {
 
-    private static final String TEST_ADDON_ID = "test_mod:script";
+    // Shared constant from the consolidated test registry (order-independent)
+    private static final String TEST_ADDON_ID = AddonTestRegistry.SCRIPT_ADDON_ID;
     // Use a deliberately-unregistered ID for the missing-addon (D-09) test path
     private static final String UNREGISTERED_ADDON_ID = "test_mod:unknown_addon_type";
 
-    /**
-     * Serializer shared by the round-trip tests. Mirrors the one in AddonNodePersistenceTest
-     * so the install-once guard can tolerate whichever test class runs first.
-     */
-    private static final AddonNodeSerializer TEST_SERIALIZER = new AddonNodeSerializer() {
-        @Override
-        public Map<String, Object> serialize(AddonNodeContext ctx) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("_schema_version", 1);
-            map.put("script", ctx.getScriptText() != null ? ctx.getScriptText() : "");
-            return map;
-        }
-
-        @Override
-        public void deserialize(AddonNodeContext ctx, Map<String, Object> fields) {
-            if (fields == null) {
-                return;
-            }
-            // GSON Double-erasure handling (Pitfall 4): use ((Number)).intValue()
-            Object versionObj = fields.get("_schema_version");
-            if (versionObj instanceof Number) {
-                int version = ((Number) versionObj).intValue();
-                // version-aware migration would go here
-                assertTrue(version >= 1, "_schema_version must be >= 1");
-            }
-            Object scriptObj = fields.get("script");
-            if (scriptObj != null) {
-                ctx.setScriptText(scriptObj.toString());
-            }
-        }
-    };
-
     @BeforeAll
     static void installSyntheticRegistry() {
-        // Guard: install-once singleton — tolerate prior installation from AddonNodePersistenceTest
-        // or from a parallel test run (NodeTypeRegistry is JVM-wide install-once).
-        if (!NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
-            try {
-                NodeTypeRegistrar registrar = new NodeTypeRegistrar();
-                AddonNodeCategory category = new AddonNodeCategory(
-                    "test_mod.scripting", "Scripting", 0xFF112233, "S");
-                AddonNodeDefinition def = AddonNodeDefinition.builder(TEST_ADDON_ID)
-                    .displayName("Test Script")
-                    .category(category)
-                    .build();
-                registrar.register(def,
-                    ctx -> CompletableFuture.completedFuture(NodeResult.SUCCESS),
-                    TEST_SERIALIZER);
-                registrar.seal();
-                NodeTypeRegistry.INSTANCE.install(registrar);
-            } catch (IllegalStateException e) {
-                // Already installed by a parallel test run — acceptable
-            }
-        }
+        // Delegate to the shared registry helper — ensures order-independence across the
+        // full test suite. Only the first call installs; subsequent calls are no-ops.
+        AddonTestRegistry.ensureInstalled();
         // Confirm test_mod:unknown_addon_type is NOT registered so the missing-addon branch runs
         assertTrue(!NodeTypeRegistry.INSTANCE.hasType(UNREGISTERED_ADDON_ID),
             "UNREGISTERED_ADDON_ID must not be registered for Test 4 to exercise the placeholder branch");

@@ -2,21 +2,15 @@ package com.pathmind.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.pathmind.api.addon.AddonNodeCategory;
 import com.pathmind.api.addon.AddonNodeContext;
-import com.pathmind.api.addon.AddonNodeDefinition;
 import com.pathmind.api.addon.AddonNodeSerializer;
-import com.pathmind.api.addon.NodeResult;
-import com.pathmind.api.addon.NodeTypeRegistrar;
 import com.pathmind.nodes.NodeType;
-import com.pathmind.nodes.NodeTypeRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,9 +27,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AddonNodePersistenceTest {
 
-    private static final String TEST_ADDON_ID = "test_mod:script";
+    // Shared constant from the consolidated test registry (order-independent)
+    private static final String TEST_ADDON_ID = AddonTestRegistry.SCRIPT_ADDON_ID;
 
-    /** Serializer for the synthetic test_mod:script node. */
+    /**
+     * Class-local serializer used by the serializer contract tests in this class
+     * (serialize_*, deserialize_*). These tests call TEST_SERIALIZER directly — they do
+     * NOT go through NodeTypeRegistry — so this serializer is independent of the shared
+     * registry serializer installed by AddonTestRegistry.ensureInstalled().
+     *
+     * <p>In particular, {@link #deserialize_toleratesNullFields} asserts that
+     * {@code ctx.getScriptText()} is {@code null} after {@code deserialize(ctx, null)}.
+     * The shared registry serializer seeds DEFAULT_SCRIPT on null-fields (NEW-CR-02);
+     * using a class-local serializer here preserves the original contract assertion
+     * for this serializer-interface test.
+     */
     private static final AddonNodeSerializer TEST_SERIALIZER = new AddonNodeSerializer() {
         @Override
         public Map<String, Object> serialize(AddonNodeContext ctx) {
@@ -66,29 +72,12 @@ class AddonNodePersistenceTest {
 
     @BeforeAll
     static void installSyntheticRegistry() {
-        // Guard: install-once singleton — tolerate prior installation from other test classes.
-        // This install is retained even though no test in THIS class calls NodeTypeRegistry.INSTANCE
-        // directly: AddonNodeConversionRoundTripTest (Plan 01-06) exercises the full conversion path
-        // and requires test_mod:script to be in the registry. Whichever test class runs first wins;
-        // the hasType guard ensures the second class's @BeforeAll is a safe no-op (WR-10b).
-        if (!NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
-            try {
-                NodeTypeRegistrar registrar = new NodeTypeRegistrar();
-                AddonNodeCategory category = new AddonNodeCategory(
-                    "test_mod.scripting", "Scripting", 0xFF112233, "S");
-                AddonNodeDefinition def = AddonNodeDefinition.builder(TEST_ADDON_ID)
-                    .displayName("Test Script")
-                    .category(category)
-                    .build();
-                registrar.register(def,
-                    ctx -> CompletableFuture.completedFuture(NodeResult.SUCCESS),
-                    TEST_SERIALIZER);
-                registrar.seal();
-                NodeTypeRegistry.INSTANCE.install(registrar);
-            } catch (IllegalStateException e) {
-                // Already installed by a parallel test run — acceptable
-            }
-        }
+        // Delegate to the shared registry helper — ensures order-independence across the
+        // full test suite. Only the first call installs; subsequent calls are no-ops.
+        // Note: the shared registry serializer (AddonTestRegistry.SHARED_SERIALIZER) seeds
+        // DEFAULT_SCRIPT on null-fields; the class-local TEST_SERIALIZER above is used
+        // only for direct serializer contract tests in this class (not via registry).
+        AddonTestRegistry.ensureInstalled();
     }
 
     // -------------------------------------------------------------------------
