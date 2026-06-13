@@ -47,8 +47,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1 (gaps)**
 
-- [ ] 01-04-PLAN.md — shared AddonNodeDataCopy helper; wire ADDON fields through applyLoadedData, clipboard, and createGraphSnapshot (CR-02 + CR-03) [Wave 1]
-- [ ] 01-05-PLAN.md — render addon categories in the sidebar + set hoveredAddonDefinition in the hit-test so the Script node is placeable from the palette (CR-01) [Wave 1]
+- [x] 01-04-PLAN.md — shared AddonNodeDataCopy helper; wire ADDON fields through applyLoadedData, clipboard, and createGraphSnapshot (CR-02 + CR-03) [Wave 1]
+- [x] 01-05-PLAN.md — render addon categories in the sidebar + set hoveredAddonDefinition in the hit-test so the Script node is placeable from the palette (CR-01) [Wave 1]
 
 **Wave 2 (gaps)** *(blocked on 01-04)*
 
@@ -95,6 +95,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 3/6 | Gap closure | - |
+| 1. API Foundation + Script Node Registration | 5/6 | In Progress|  |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
