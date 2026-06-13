@@ -19,8 +19,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Persistence round-trip tests for ADDON node serialization and deserialization (API-05).
@@ -176,10 +178,10 @@ class AddonNodePersistenceTest {
 
         // Verify JSON contains the expected fields
         assertNotNull(json, "serialized JSON must not be null");
-        assert json.contains("addonTypeId") : "JSON must contain addonTypeId";
-        assert json.contains(TEST_ADDON_ID) : "JSON must contain the addon type id";
-        assert json.contains("_schema_version") : "JSON must contain _schema_version";
-        assert json.contains("extraFields") : "JSON must contain extraFields";
+        assertTrue(json.contains("addonTypeId"), "JSON must contain addonTypeId");
+        assertTrue(json.contains(TEST_ADDON_ID), "JSON must contain the addon type id");
+        assertTrue(json.contains("_schema_version"), "JSON must contain _schema_version");
+        assertTrue(json.contains("extraFields"), "JSON must contain extraFields");
 
         // Deserialize back and verify
         NodeGraphData restored = gson.fromJson(json, NodeGraphData.class);
@@ -218,8 +220,8 @@ class AddonNodePersistenceTest {
         String json = gson.toJson(graph);
 
         // GSON omits null fields (no serializeNulls) — JSON must NOT contain addon keys
-        assert !json.contains("addonTypeId") : "Built-in node JSON must not contain addonTypeId";
-        assert !json.contains("extraFields") : "Built-in node JSON must not contain extraFields";
+        assertFalse(json.contains("addonTypeId"), "Built-in node JSON must not contain addonTypeId");
+        assertFalse(json.contains("extraFields"), "Built-in node JSON must not contain extraFields");
 
         NodeGraphData restored = gson.fromJson(json, NodeGraphData.class);
         NodeGraphData.NodeData restoredNode = restored.getNodes().get(0);
