@@ -45,7 +45,15 @@ import java.util.Map;
 public final class AddonLoader {
 
     private static final Logger LOGGER = PathmindCommon.LOGGER;
-    private static final Map<String, Throwable> failedAddons = new LinkedHashMap<>();
+    // Collections.synchronizedMap wrapping a LinkedHashMap gives us:
+    // (a) thread-safe individual put/get operations (init-write thread vs. UI-read thread), and
+    // (b) insertion-order iteration for the D-08 failure-surface UI.
+    // NOTE: callers that ITERATE the map (not merely get/put) must synchronize on the map
+    // instance per the Collections.synchronizedMap contract. Current callers do not iterate
+    // the live map directly — getFailedAddons returns an unmodifiable snapshot used for
+    // single lookups — so no caller changes are required.
+    private static final Map<String, Throwable> failedAddons =
+            Collections.synchronizedMap(new LinkedHashMap<>());
 
     /**
      * Discovers all addons declaring a {@code "pathmind"} entrypoint, runs the D-11
