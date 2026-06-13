@@ -9,9 +9,11 @@ import com.pathmind.api.addon.NodeTypeRegistrar;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,15 +29,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>GAP-3: {@code new Node(addonTypeId, x, y)} must seed {@code addonExtraFields}
  * (including the {@code "script"} key) at construction, before any save/reopen cycle.
+ *
+ * <p><b>Test isolation note:</b> {@code NodeTypeRegistry.INSTANCE} is a JVM-wide install-once
+ * singleton shared across all test classes. This class uses reflection to add its unique type
+ * ({@code test_mod:creation_test_type}) directly into the already-installed registry maps,
+ * bypassing the install-once guard. This is test-only code and does not affect production
+ * behavior — the production path always installs the registry once at mod startup.
  */
 class AddonNodeCreationTest {
 
-    private static final String TEST_ADDON_ID = "test_mod:script";
+    // Use a distinct ID that no other test class registers, so there is no risk of
+    // a conflicting serializer being installed for this type by a sibling test class.
+    private static final String TEST_ADDON_ID = "test_mod:creation_test_type";
     private static final String DEFAULT_SCRIPT = "-- default script";
 
     /**
-     * Serializer that mimics the Lua addon serializer: returns a default script on the
-     * null-fields path and reads back the "script" key on the non-null path.
+     * Serializer that seeds a default script on the null-fields path (mimicking the real
+     * Lua addon serializer's constructor-seeding behavior).
      */
     private static final AddonNodeSerializer TEST_SERIALIZER = new AddonNodeSerializer() {
         @Override
@@ -49,7 +59,7 @@ class AddonNodeCreationTest {
         @Override
         public void deserialize(AddonNodeContext ctx, Map<String, Object> fields) {
             if (fields == null) {
-                // null-fields path: seed default script
+                // null-fields path: seed the default script (GAP-3 production behavior)
                 ctx.setScriptText(DEFAULT_SCRIPT);
                 return;
             }
@@ -60,28 +70,51 @@ class AddonNodeCreationTest {
         }
     };
 
+    /**
+     * Injects the creation-test type directly into the already-installed
+     * {@code NodeTypeRegistry.INSTANCE} via reflection. This is necessary because
+     * {@code INSTANCE.install()} is a one-shot operation — whichever test class runs
+     * first (AddonNodePersistenceTest or AddonNodeConversionRoundTripTest) exhausts
+     * the install slot. Using reflection to populate the internal maps is the least
+     * invasive way to add a test-only type without modifying production code or the
+     * existing sibling test classes.
+     */
     @BeforeAll
-    static void installSyntheticRegistry() {
-        // Guard: install-once singleton — tolerate prior installation by sibling test classes
-        // (NodeTypeRegistry is JVM-wide install-once).
-        if (!NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
-            try {
-                NodeTypeRegistrar registrar = new NodeTypeRegistrar();
-                AddonNodeCategory category = new AddonNodeCategory(
-                    "test_mod.scripting", "Scripting", 0xFF112233, "S");
-                AddonNodeDefinition def = AddonNodeDefinition.builder(TEST_ADDON_ID)
-                    .displayName("Test Script")
-                    .category(category)
-                    .build();
-                registrar.register(def,
-                    ctx -> CompletableFuture.completedFuture(NodeResult.SUCCESS),
-                    TEST_SERIALIZER);
-                registrar.seal();
-                NodeTypeRegistry.INSTANCE.install(registrar);
-            } catch (IllegalStateException e) {
-                // Already installed by a parallel test run — acceptable
-            }
+    @SuppressWarnings("unchecked")
+    static void installSyntheticTypeViaReflection() throws Exception {
+        if (NodeTypeRegistry.INSTANCE.hasType(TEST_ADDON_ID)) {
+            return; // already installed by a prior run in the same JVM — safe no-op
         }
+
+        // Build the definition
+        AddonNodeCategory category = new AddonNodeCategory(
+            "test_mod.scripting", "Scripting", 0xFF112233, "S");
+        AddonNodeDefinition def = AddonNodeDefinition.builder(TEST_ADDON_ID)
+            .displayName("Test Script")
+            .category(category)
+            .build();
+
+        // Inject directly into the private maps of NodeTypeRegistry.INSTANCE.
+        // This bypasses the install-once guard intentionally — test code only.
+        NodeTypeRegistry registry = NodeTypeRegistry.INSTANCE;
+
+        Field definitionsField = NodeTypeRegistry.class.getDeclaredField("definitions");
+        definitionsField.setAccessible(true);
+        Map<String, AddonNodeDefinition> definitions =
+            (Map<String, AddonNodeDefinition>) definitionsField.get(registry);
+        definitions.put(TEST_ADDON_ID, def);
+
+        Field executorsField = NodeTypeRegistry.class.getDeclaredField("executors");
+        executorsField.setAccessible(true);
+        Map<String, com.pathmind.api.addon.AddonNodeExecutor> executors =
+            (Map<String, com.pathmind.api.addon.AddonNodeExecutor>) executorsField.get(registry);
+        executors.put(TEST_ADDON_ID, ctx -> CompletableFuture.completedFuture(NodeResult.SUCCESS));
+
+        Field serializersField = NodeTypeRegistry.class.getDeclaredField("serializers");
+        serializersField.setAccessible(true);
+        Map<String, AddonNodeSerializer> serializers =
+            (Map<String, AddonNodeSerializer>) serializersField.get(registry);
+        serializers.put(TEST_ADDON_ID, TEST_SERIALIZER);
     }
 
     // -------------------------------------------------------------------------
