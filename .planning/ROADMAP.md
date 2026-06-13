@@ -100,7 +100,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — getVar/setVar: real PathmindRuntimeImpl variable marshaling + pathmind.getVar/setVar scalar round-trip (BIND-01) [Wave 2]
+- [x] 02-02-PLAN.md — getVar/setVar: real PathmindRuntimeImpl variable marshaling + pathmind.getVar/setVar scalar round-trip (BIND-01) [Wave 2]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -135,5 +135,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
-| 2. Lua VM + Core Bindings | 1/4 | In Progress|  |
+| 2. Lua VM + Core Bindings | 2/4 | In Progress|  |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
