@@ -2,8 +2,16 @@
 phase: 01-api-foundation-script-node-registration
 verified: 2026-06-13T12:45:00Z
 status: human_needed
-score: 5/5 code-verified; UAT round 5 found 3 editor-render gaps — all FIXED in round-4 gap closure (plan 01-14), pending in-game re-UAT
+score: 5/5 code-verified; UAT round 6 confirmed GAP-B fixed; GAP-C partially fixed (text gone but body wrongly blanked); GAP-A re-diagnosed (wrong surface in round 4) — both reopened for round-5 gap closure (plan 01-15)
 overrides_applied: 0
+uat_round_6:
+  date: 2026-06-13
+  source: "in-game re-UAT after plan 01-14 — MC 1.21.4"
+  confirmed_pass:
+    - "UAT-GAP-B (drag-preview title): CONFIRMED FIXED in-game — palette drag box now shows 'Script', not 'Addon Node'."
+  reopened:
+    - "UAT-GAP-C (refinement): the '⚠ addon missing' text is correctly gone, BUT renderAddonNeutralBody blanks the node's body content when dragged over the sidebar. Built-in nodes keep their content and only DISCOLOR THE FRAME. Correct fix: remove the bodyUnderSidebar→renderAddonNeutralBody suppression (NodeGraph.java:7405-7410) so resolved addon nodes render their normal body via renderer.render (already scissor-clipped); the invalid-drop frame discoloration is already applied by renderNode (lines 3573-3599), matching built-ins. Do NOT blank content."
+    - "UAT-GAP-A (re-diagnosed — round-4 fixed the WRONG surface): the overflowing element is the CATEGORY ICON BAR (vertical strip of category icons, Sidebar.java:750-834), NOT the expanded node list. The icon bar has NO scroll state, NO scrollbar, and NO wheel handler — when categories (built-in + the addon 'Scripting' tab) exceed available height, tabs are only down-scaled (Sidebar.java:664-677) and overflow off-screen. The round-4 computeAddonMaxScroll change applied to the node-list panel and is irrelevant to this gap. Correct fix: add vertical scroll for the category icon bar (offset + clamp + scrollbar drawn in the icon column + mouse-wheel handling over the icon-bar region + offset BOTH rendering and click hit-testing), modeled on the existing content-panel scroll (scrollOffset/maxScroll/scrollDragging, Sidebar.java:74-77)."
 uat_round_5:
   date: 2026-06-13
   source: "in-game UAT — MC 1.21.4, pathmind-fabric 1.1.5 + pathmind-lua 0.1.0"
