@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 Phase: 2 (Lua VM + Core Bindings) — EXECUTING
 Plan: 4 of 4
 Status: Phase complete — ready for verification
-Last activity: 2026-06-13 -- Phase 2 execution started
+Last activity: 2026-06-13 - Completed quick task 260613-u9f: Fix getBlock unloaded-chunk detection
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -89,6 +89,12 @@ None yet.
 - Phase 2: Cobalt 0.7.3 exact thread-interrupt API needs verification against CC:Tweaked source before finalizing async design
 - Phase 2: Baritone completion callback exact API needs verification against existing PathmindNavigator code
 - Phase 3: EditBoxWidget keyboard shortcut behavior needs in-game verification before finalizing editor UX
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260613-u9f | Fix getBlock unloaded-chunk detection (return nil not void_air) | 2026-06-13 | ca8c1fd | [260613-u9f-fix-getblock-unloaded-chunk-detection-re](./quick/260613-u9f-fix-getblock-unloaded-chunk-detection-re/) |
 
 ## Deferred Items
 
