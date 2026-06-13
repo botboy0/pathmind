@@ -96,7 +96,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Cobalt build wiring + shadow relocation; PathmindRuntime interface + AddonNodeContext.getRuntime(); real worker-thread CobaltVm executor (fresh sandboxed globals, compute-time timeout, Lua error → chat + graph-halt) [Wave 1]
+- [x] 02-01-PLAN.md — Cobalt build wiring + shadow relocation; PathmindRuntime interface + AddonNodeContext.getRuntime(); real worker-thread CobaltVm executor (fresh sandboxed globals, compute-time timeout, Lua error → chat + graph-halt) [Wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -135,5 +135,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
-| 2. Lua VM + Core Bindings | 0/4 | Planned     | - |
+| 2. Lua VM + Core Bindings | 1/4 | In Progress|  |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |

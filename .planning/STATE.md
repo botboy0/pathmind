@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-12-PLAN.md
-last_updated: "2026-06-13T14:05:30.542Z"
-last_activity: 2026-06-13 -- Phase 2 planning complete
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-06-13T14:30:44.811Z"
+last_activity: 2026-06-13 -- Phase 2 execution started
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 19
+  completed_plans: 16
   percent: 33
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** A third party can drop `pathmind.jar` + `pathmind-lua-addon.jar` into a mods folder and get a working Lua script node — proving the addon API is real, stable, and consumable by external developers.
-**Current focus:** Phase 01 — api-foundation-script-node-registration
+**Current focus:** Phase 2 — Lua VM + Core Bindings
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 2 (Lua VM + Core Bindings) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-13 -- Phase 2 planning complete
+Last activity: 2026-06-13 -- Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P12 | 1 | 1 tasks | 1 files |
 | Phase 01-api-foundation-script-node-registration P13 | 1min | 1 tasks | 1 files |
 | Phase 01-api-foundation-script-node-registration P15 | 4min | 2 tasks | 2 files |
+| Phase 02-lua-vm-core-bindings P01 | 16min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Use Collections.synchronizedMap(new LinkedHashMap<>()) over ConcurrentHashMap to preserve insertion order required by D-08 failure-surface UI (NEW-CR-01 closure)
 - [Phase ?]: GAP-C: resolved addon nodes always render their real body via renderer.render in all positions (matching built-ins); the over-sidebar invalid-drop cue is the discolored frame, not a blanked body
 - [Phase ?]: GAP-A: category icon bar scrolls on overflow (separate axis from content-panel scroll) instead of shrinking tabs; reuses ScrollbarHelper + content-panel scrollbar style
+- [Phase ?]: Shadow plugin isZip64=true required for Architectury+Cobalt jar exceeding 65535 entries
+- [Phase ?]: CobaltVm source imports use org.squiddev.cobalt (compile-time); shadow relocation to com.mrmysterium.pathmindlua.shadow.cobalt happens at JAR time
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-13T12:18:39.718Z
-Stopped at: Completed 01-12-PLAN.md
+Last session: 2026-06-13T14:30:44.806Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
