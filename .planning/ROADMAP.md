@@ -69,7 +69,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] 01-11-PLAN.md — NEW-CR-02 + WR-05: unconditional base-map init + setAddonUnresolved(false) in AddonNodeDataCopy.restoreAddonFieldsToNode so freshly-placed never-edited Script nodes keep their default script across close-and-reopen; new AddonNodeReloadRegressionTest gates both paths (LUA-05, API-05) [Wave 1]
 - [x] 01-12-PLAN.md — NEW-CR-01: make AddonLoader.failedAddons thread-safe via Collections.synchronizedMap(new LinkedHashMap<>()) preserving insertion order for the D-08 failure-surface UI (API-05) [Wave 1]
-- [ ] 01-13-PLAN.md — NEW-WR-01: replace 6 Java assert JSON-field presence/absence checks in AddonNodePersistenceTest with executable JUnit assertTrue/assertFalse so the API-05/LUA-05 persistence-JSON contract fails the build on regression (API-05, LUA-05) [Wave 1]
+- [x] 01-13-PLAN.md — NEW-WR-01: replace 6 Java assert JSON-field presence/absence checks in AddonNodePersistenceTest with executable JUnit assertTrue/assertFalse so the API-05/LUA-05 persistence-JSON contract fails the build on regression (API-05, LUA-05) [Wave 1]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -112,6 +112,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 12/13 | In Progress|  |
+| 1. API Foundation + Script Node Registration | 13/13 | Complete   | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
