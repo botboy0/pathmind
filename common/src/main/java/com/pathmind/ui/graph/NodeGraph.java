@@ -7400,6 +7400,14 @@ public class NodeGraph {
         AddonNodeBodyRenderer renderer = def != null ? def.getBodyRenderer() : null;
 
         if (!unresolved && renderer != null) {
+            // GAP-4: suppress the live preview when the node body is under the open sidebar
+            // drawer so the renderer's text does not paint over the animated panel.
+            boolean bodyUnderSidebar = x < sidebarWidthForRendering;
+            if (bodyUnderSidebar) {
+                renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
+                return;
+            }
+
             // Build context for the renderer
             AddonNodeContext ctx = new AddonNodeContext();
             ctx.setAddonTypeId(addonTypeId);
@@ -7407,24 +7415,45 @@ public class NodeGraph {
                 Object scriptObj = node.getAddonExtraFields().get("script");
                 ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
             }
+            // GAP-4: scissor-clip the renderer to the node body content rect so the addon's
+            // drawTextWithShadow calls cannot escape the node bounds (T-01-09-01).
+            context.enableScissor(x + 1, y + 18, x + width - 1, y + height - 1);
             try {
                 renderer.render(ctx, context, x + 1, y + 18, width - 2, height - 19);
             } catch (Throwable t) {
                 // T-01-08: renderer threw — log once and fall back to grayed body
                 org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                     .warn("[Pathmind] Addon body renderer threw for {}: {}", addonTypeId, t.getMessage());
-                renderAddonPlaceholderBody(context, x, y, width, height, isOverSidebar);
+                renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
+            } finally {
+                context.disableScissor();
             }
         } else {
             // Unresolved placeholder (D-09): grayed-out body indicating the addon is absent
-            renderAddonPlaceholderBody(context, x, y, width, height, isOverSidebar);
+            renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
         }
     }
 
-    private void renderAddonPlaceholderBody(DrawContext context,
-            int x, int y, int width, int height, boolean isOverSidebar) {
+    /**
+     * Renders the grayed-out placeholder body for an ADDON node whose addon jar is absent
+     * or whose renderer threw. Draws a two-line missing-addon indicator so users can tell
+     * which addon is missing and that the node is a no-op (GAP-5 / API-09).
+     */
+    private void renderAddonPlaceholderBody(DrawContext context, TextRenderer textRenderer,
+            String addonTypeId, int x, int y, int width, int height, boolean isOverSidebar) {
         int bodyColor = isOverSidebar ? UITheme.BACKGROUND_SECONDARY : UITheme.NODE_DIMMED_BG;
         context.fill(x + 1, y + 18, x + width - 1, y + height - 1, bodyColor);
+
+        // GAP-5: draw a legible "missing addon" indicator inside the body
+        int textX = x + 4;
+        int line1Y = y + 21;
+        int line2Y = line1Y + textRenderer.fontHeight + 2;
+        drawNodeText(context, textRenderer, "⚠ addon missing", textX, line1Y, UITheme.TEXT_TERTIARY);
+        String typeLabel = trimTextToWidth(
+                addonTypeId != null ? addonTypeId : "unknown",
+                textRenderer,
+                width - 8);
+        drawNodeText(context, textRenderer, typeLabel, textX, line2Y, UITheme.TEXT_TERTIARY);
     }
 
     private void renderLockedCustomNodeBinding(DrawContext context, TextRenderer textRenderer, Node node, boolean isOverSidebar) {
