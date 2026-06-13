@@ -82,7 +82,28 @@ _TDD flow: regression tests written and committed first (RED, 2 failures confirm
 
 ## Deviations from Plan
 
-None — plan executed exactly as written. TDD order was: RED (test commit `427f8c5`) before GREEN (fix commit `389f7dd`), matching the plan's `tdd="true"` annotations.
+None from original plan execution — plan executed exactly as written. TDD order was: RED (test commit `427f8c5`) before GREEN (fix commit `389f7dd`), matching the plan's `tdd="true"` annotations.
+
+---
+
+### Post-merge gate fix (2026-06-13) — commit `12f69ef`
+
+**Defect found:** After the plan-01-11 merge, `./gradlew.bat :common:test` failed with 2 tests in `AddonNodeReloadRegressionTest` failing (`restoreWithNullExtraFields_seedsNonNullDefaultScript` and `restoreSuccess_clearsAddonUnresolved`), but both passed when the class ran in isolation.
+
+**Root cause — install-once singleton exhausted by first test class:**
+`NodeTypeRegistry.INSTANCE.install()` is install-once (throws `IllegalStateException` on a second call; this is an intentional security property — no weakening applied). All 4 addon test classes had a `@BeforeAll` that tried to register `test_mod:script`, guarded by a `hasType` check with the `IllegalStateException` silently caught. JUnit runs test classes sequentially in one JVM in alphabetical-package order. `AddonNodeAliasingTest` ran first and consumed the install slot with `aliasing_test_mod:script`. Every later class's install attempt for `test_mod:script` hit the slot limit, the `IllegalStateException` was swallowed, and `test_mod:script` was never registered. At runtime, `NodeTypeRegistry.INSTANCE.hasType("test_mod:script")` returned `false`, causing `restoreAddonFieldsToNode` to take the absent-addon branch (sets `addonExtraFields` to null for null-fields input, keeps `addonUnresolved = true`) — exactly the two assertion failures observed.
+
+**Fix — shared registry consolidation:**
+Created `AddonTestRegistry` (test-only utility class in `com.pathmind.data`) that:
+- Registers **both** `test_mod:script` and `aliasing_test_mod:script` in a **single** `NodeTypeRegistrar` install call.
+- Exposes `ensureInstalled()` — idempotent: first call installs, subsequent calls short-circuit on the `hasType` check.
+- The shared serializer for `test_mod:script` seeds `DEFAULT_SCRIPT` on null-fields (NEW-CR-02 requirement).
+- `AddonNodePersistenceTest` retains a class-local `TEST_SERIALIZER` for its `deserialize_toleratesNullFields` test (which calls the serializer directly, not via the registry — the shared null-seeding behavior would break that assertion if used directly).
+All 4 addon test classes' `@BeforeAll` now delegate to `AddonTestRegistry.ensureInstalled()` instead of building inline registrars.
+
+**Production code:** `AddonNodeDataCopy.restoreAddonFieldsToNode` was correct and unchanged. `NodeTypeRegistry` install-once property preserved — no reset or weakening.
+
+**Verified:** `./gradlew.bat :common:test --rerun-tasks` — BUILD SUCCESSFUL, 230 tests completed, 0 failed.
 
 ## Issues Encountered
 
