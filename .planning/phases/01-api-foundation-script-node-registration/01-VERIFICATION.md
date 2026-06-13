@@ -1,9 +1,22 @@
 ---
 phase: 01-api-foundation-script-node-registration
 verified: 2026-06-13T12:45:00Z
-status: human_needed
-score: 5/5 must-haves verified
+status: gaps_found
+score: 5/5 code-verified; in-game UAT (round 5) confirmed the NEW-CR-02 blocker fixed but found 3 editor-render gaps
 overrides_applied: 0
+uat_round_5:
+  date: 2026-06-13
+  source: "in-game UAT — MC 1.21.4, pathmind-fabric 1.1.5 + pathmind-lua 0.1.0"
+  confirmed_pass:
+    - "Item 3 (Truth 4 / NEW-CR-02): freshly-placed never-edited Script node preset round-trips correctly in-game — BLOCKER CONFIRMED FIXED"
+    - "Item 5 (execution pass-through): Script node activates and passes through as a graceful no-op; graph continues"
+    - "Item 6 (standalone / missing-addon on load): Pathmind loads without the addon; orphaned-node behavior correct"
+  not_a_gap:
+    - "Item 4 (typed-text persistence): not testable until the Phase 3 in-game editor exists; underlying persistence already cleared in pre-gap UAT — deferred to Phase 3"
+  gaps_found:
+    - "UAT-GAP-A (scrollbar missing): the sidebar 'Scripting' addon category does not render a visible scrollbar in-game. The round-2 GAP-1 fix (computeAddonContentHeight + getCategoryScrollMetrics + renderCategoryScrollbar, Plan 01-07) does not produce a visible scrollbar for the addon category. Investigate whether the addon-category overflow path computes height/metrics correctly and whether renderCategoryScrollbar is actually invoked for addon categories (vs only built-in categories)."
+    - "UAT-GAP-B (drag-preview title): while dragging a Script node from the palette (BEFORE placement), the drag-box title reads 'Addon Node' instead of the addon display name 'Script'. The GAP-2 fix (Node.getDisplayName() ADDON branch, Plan 01-08) resolves the name for PLACED nodes, but the drag-preview/ghost title render path does not resolve the addon display name. Built-in nodes show their proper title during drag. Fix the drag-preview title path to resolve the addon display name from the registry."
+    - "UAT-GAP-C (false 'addon missing' on invalid drag): dragging a Script node to an INVALID drop location (over the sidebar) renders the missing-addon placeholder '⚠ addon missing pathmind_lua:script' instead of the normal invalid-position discoloration that built-in nodes show. The addon IS installed/registered (the node is palette-visible and placeable), so the missing-addon branch (renderAddonPlaceholderBody / addonUnresolved) is being hit incorrectly during the drag / invalid-position state. Built-ins correctly show discoloration at invalid spots. Ensure a registered addon node uses the standard invalid-drop visual and never the missing-addon placeholder while its addon is present."
 re_verification:
   previous_status: gaps_found
   previous_score: 4/5
@@ -40,8 +53,8 @@ human_verification:
 
 **Phase Goal:** The Pathmind addon API is published as a consumable Maven artifact, addon discovery is wired into mod init, and the sibling addon repo ships a Script node that is palette-visible, placeable, and persistable — both mods load cleanly and Pathmind works standalone without the addon jar.
 **Verified:** 2026-06-13
-**Status:** human_needed
-**Re-verification:** Yes — after round-3 gap-closure Plans 01-11, 01-12, 01-13 plus post-merge test-isolation fix (commit 12f69ef). Previous status: gaps_found (4/5). All automated gaps now closed.
+**Status:** gaps_found (in-game UAT round 5)
+**Re-verification:** Yes — after round-3 gap-closure Plans 01-11, 01-12, 01-13 plus post-merge test-isolation fix (commit 12f69ef). All round-3 automated gaps closed and the NEW-CR-02 blocker was CONFIRMED FIXED in-game (UAT item 3). However, in-game UAT round 5 surfaced 3 editor-render gaps — see `uat_round_5.gaps_found` in frontmatter: UAT-GAP-A (sidebar scrollbar missing), UAT-GAP-B (drag-preview title shows 'Addon Node' not 'Script'), UAT-GAP-C (registered addon node falsely shows 'addon missing' placeholder on invalid drag instead of discoloration). These are the targets for round-4 gap closure.
 
 ---
 
