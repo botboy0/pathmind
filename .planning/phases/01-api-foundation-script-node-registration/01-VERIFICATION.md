@@ -1,8 +1,8 @@
 ---
 phase: 01-api-foundation-script-node-registration
 verified: 2026-06-13T12:45:00Z
-status: human_needed
-score: 5/5 code-verified; GAP-B confirmed fixed in-game; GAP-C + GAP-A re-fixed in round-5 gap closure (plan 01-15, analog-grounded), full :common:test green — pending in-game re-UAT
+status: passed
+score: 5/5 must-haves verified + all in-game UAT confirmed (NEW-CR-02 blocker + GAP-A/B/C all pass in-game as of 2026-06-13)
 overrides_applied: 0
 uat_round_6:
   date: 2026-06-13
@@ -64,7 +64,7 @@ human_verification:
 
 **Phase Goal:** The Pathmind addon API is published as a consumable Maven artifact, addon discovery is wired into mod init, and the sibling addon repo ships a Script node that is palette-visible, placeable, and persistable — both mods load cleanly and Pathmind works standalone without the addon jar.
 **Verified:** 2026-06-13
-**Status:** human_needed (round-4 gap closure landed; in-game re-UAT pending)
+**Status:** passed (all in-game UAT confirmed 2026-06-13 — NEW-CR-02 blocker + GAP-A/B/C)
 **Re-verification:** Yes. Round-3 automated gaps closed + NEW-CR-02 blocker CONFIRMED FIXED in-game (UAT item 3). In-game UAT round 5 surfaced 3 editor-render gaps (UAT-GAP-A scrollbar, UAT-GAP-B drag-preview title, UAT-GAP-C false 'addon missing' on invalid drag) — ALL FIXED in round-4 gap closure (plan 01-14, commits e78fc67/16c0af2/308af2c/970789b). Code-level + unit tests green (full :common:test suite passes). The 3 fixes are visual behaviors pending in-game re-UAT — see `uat_round_5.gaps_fixed_pending_reuat` in frontmatter.
 
 ---
