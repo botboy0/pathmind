@@ -13,7 +13,7 @@ Three phases co-evolve Pathmind and its first external addon. Phase 1 builds the
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: API Foundation + Script Node Registration** - Publish the Pathmind addon API artifact, wire addon discovery into PathmindMod, and ship the Script node as a registered, persistent, palette-visible node in the sibling addon repo (gap closure in progress — verification found 3 BLOCKERs)
+- [x] **Phase 1: API Foundation + Script Node Registration** - Publish the Pathmind addon API artifact, wire addon discovery into PathmindMod, and ship the Script node as a registered, persistent, palette-visible node in the sibling addon repo (gap closure in progress — verification found 3 BLOCKERs) (completed 2026-06-13)
 - [ ] **Phase 2: Lua VM + Core Bindings** - Wire Cobalt VM on a worker thread with per-execution fresh globals, establish the async-sync bridging model, and expose the full Pathmind Lua binding surface (variables, actions, game state, error reporting)
 - [ ] **Phase 3: Script Node Editor + Autosuggestions** - Complete the in-game editor UX: functional multiline editor with line numbers, inline error display co-located with the node, and prefix-match autosuggestions for the pathmind.* API
 
@@ -52,7 +52,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2 (gaps)** *(blocked on 01-04)*
 
-- [ ] 01-06-PLAN.md — ADDON conversion round-trip regression test (createGraphSnapshot + convertToNodes); fix WR-08 doc Fabric API version + WR-10 test scaffolding [Wave 2]
+- [x] 01-06-PLAN.md — ADDON conversion round-trip regression test (createGraphSnapshot + convertToNodes); fix WR-08 doc Fabric API version + WR-10 test scaffolding [Wave 2]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -95,6 +95,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 5/6 | In Progress|  |
+| 1. API Foundation + Script Node Registration | 6/6 | Complete   | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
