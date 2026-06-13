@@ -1,148 +1,300 @@
 ---
 phase: 01-api-foundation-script-node-registration
-reviewed: 2026-06-13T00:19:44Z
+reviewed: 2026-06-13T00:00:00Z
 depth: standard
-files_reviewed: 9
+files_reviewed: 43
 files_reviewed_list:
+  - common/src/main/java/com/pathmind/api/PathmindApiVersion.java
+  - common/src/main/java/com/pathmind/api/addon/AddonNodeBodyRenderer.java
+  - common/src/main/java/com/pathmind/api/addon/AddonNodeCategory.java
+  - common/src/main/java/com/pathmind/api/addon/AddonNodeContext.java
+  - common/src/main/java/com/pathmind/api/addon/AddonNodeDefinition.java
+  - common/src/main/java/com/pathmind/api/addon/AddonNodeExecutor.java
+  - common/src/main/java/com/pathmind/api/addon/AddonNodeSerializer.java
+  - common/src/main/java/com/pathmind/api/addon/NodeResult.java
+  - common/src/main/java/com/pathmind/api/addon/NodeTypeRegistrar.java
+  - common/src/main/java/com/pathmind/api/addon/PathmindAddonEntrypoint.java
   - common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java
+  - common/src/main/java/com/pathmind/data/NodeGraphData.java
+  - common/src/main/java/com/pathmind/data/NodeGraphPersistence.java
+  - common/src/main/java/com/pathmind/execution/AddonLoader.java
+  - common/src/main/java/com/pathmind/execution/ExecutionManager.java
+  - common/src/main/java/com/pathmind/nodes/Node.java
+  - common/src/main/java/com/pathmind/nodes/NodeType.java
+  - common/src/main/java/com/pathmind/nodes/NodeTypeDefinition.java
+  - common/src/main/java/com/pathmind/nodes/NodeTypeRegistry.java
+  - common/src/main/java/com/pathmind/screen/PathmindScreens.java
   - common/src/main/java/com/pathmind/ui/graph/NodeGraph.java
   - common/src/main/java/com/pathmind/ui/graph/NodeGraphClipboardSupport.java
-  - common/src/main/java/com/pathmind/execution/ExecutionManager.java
   - common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java
+  - common/src/main/resources/assets/pathmind/lang/en_us.json
+  - common/src/test/java/com/pathmind/data/AddonNodeAliasingTest.java
   - common/src/test/java/com/pathmind/data/AddonNodeConversionRoundTripTest.java
   - common/src/test/java/com/pathmind/data/AddonNodePersistenceTest.java
+  - common/src/test/java/com/pathmind/nodes/AddonNodeCreationTest.java
+  - common/src/test/java/com/pathmind/nodes/NodeTypeRegistryTest.java
+  - common/src/test/java/com/pathmind/ui/sidebar/AddonSidebarScrollTest.java
   - common/src/test/java/com/pathmind/ui/sidebar/AddonSidebarTest.java
   - docs/addon-api-getting-started.md
+  - fabric/build.gradle.kts
+  - fabric/src/main/java/com/pathmind/PathmindMod.java
+  - pathmind-lua/.gitignore
+  - pathmind-lua/build.gradle.kts
+  - pathmind-lua/docs/dev-loop.md
+  - pathmind-lua/gradle.properties
+  - pathmind-lua/settings.gradle.kts
+  - pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/LuaAddonEntrypoint.java
+  - pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/LuaNodeExecutor.java
+  - pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/LuaNodeSerializer.java
+  - pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/LuaScriptNodeRenderer.java
+  - pathmind-lua/src/main/resources/fabric.mod.json
 findings:
-  critical: 0
-  warning: 6
+  critical: 3
+  warning: 5
   info: 3
-  total: 9
+  total: 11
 status: issues_found
 ---
 
-# Phase 01: Code Review Report (Gap-Closure Pass)
+# Phase 01: Code Review Report
 
-**Reviewed:** 2026-06-13T00:19:44Z
+**Reviewed:** 2026-06-13
 **Depth:** standard
-**Files Reviewed:** 9
+**Files Reviewed:** 43
 **Status:** issues_found
 
 ## Summary
 
-This pass reviews the gap-closure commits (`6eaead9..37211a8` on top of diff base `eea2c3b`) that closed CR-01/CR-02/CR-03 from the prior review: the new `AddonNodeDataCopy` helper and its wiring into `NodeGraph.applyLoadedData`, `NodeGraphClipboardSupport`, and `ExecutionManager.createGraphSnapshot` (plan 01-04), the addon sidebar tab render + hit-test wiring (plan 01-05), and the regression tests plus doc version fix (plan 01-06).
+This round reviews the gap-closure wave (plans 01-07 through 01-10) covering the addon sidebar scrollbar, ADDON node display-name/default-field seeding, scissor-clipped addon body rendering, missing-addon indicator, and defensive-copy/null-skip hardening across `AddonNodeDataCopy`, `NodeGraphPersistence`, `ExecutionManager`, and `NodeGraphClipboardSupport`. The full API surface, Lua addon, and all test files are also reviewed as context.
 
-The core gap closures are real and verified:
-- `restoreAddonFieldsToNode` is invoked at the correct point in both `applyLoadedData` (NodeGraph.java:15701) and clipboard paste (NodeGraphClipboardSupport.java:148), matching the ordering of the canonical `NodeGraphPersistence.convertToNodes` path (restore after `recalculateDimensions()`).
-- `copyAddonFieldsToNodeData` is invoked in `createGraphSnapshot` (ExecutionManager.java:3011) and clipboard copy (NodeGraphClipboardSupport.java:241), and snapshots round-trip correctly through `convertToNodes` (ExecutionManager.java:2825, 2853).
-- The sidebar drag pipeline is complete end-to-end: addon tab render/hit-test -> `selectedAddonCategory` panel -> `hoveredAddonDefinition` -> `mouseClicked` drag signal -> `createNodeFromSidebar` builds an ADDON node via `new Node(addonTypeId, x, y)` (Sidebar.java:1183-1186, Node.java:391).
-- All three test classes were executed during this review (`gradlew :common:test`): AddonNodeConversionRoundTripTest 4/4, AddonSidebarTest 6/6, AddonNodePersistenceTest all green; 0 failures, 0 errors. The two test classes' synthetic serializers are behaviorally identical, so the install-once "whichever class runs first wins" guard is order-independent.
-- The doc fix (`fabric-api 0.119.4+1.21.4`) resolves prior WR-08.
-
-However, the new code introduces six warnings: a documented-but-unfulfilled caller contract for null-`addonTypeId` nodes (divergence from the canonical persistence policy), map aliasing in the placeholder/fallback branches of `AddonNodeDataCopy`, a dead scrollbar for the addon sidebar panel, max-scroll underestimation for wrapped addon names, a test whose name claims coverage it does not provide, and acknowledged-but-already-diverged code duplication between `AddonNodeDataCopy` and `NodeGraphPersistence`.
-
-## Warnings
-
-### WR-01: `AddonNodeDataCopy` javadoc asserts a null-addonTypeId caller contract no caller fulfills; snapshot/clipboard policy diverges from persistence
-
-**File:** `common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java:49-52`, `common/src/main/java/com/pathmind/execution/ExecutionManager.java:3011`, `common/src/main/java/com/pathmind/ui/graph/NodeGraphClipboardSupport.java:241`
-**Issue:** The canonical save path (`NodeGraphPersistence.buildNodeGraphData`) **drops** ADDON nodes with null `addonTypeId` entirely (`continue`, "Pitfall 5" / T-01-09). `copyAddonFieldsToNodeData` cannot drop the record, so its javadoc states: "Callers in ExecutionManager that skip null-addonTypeId nodes must continue to handle that case themselves." No caller does this — `createGraphSnapshot` and the clipboard copy loop both add the degenerate `NodeData` (type ADDON, no addonTypeId, no extraFields) to their collections. The result is three different policies for the same broken node: persistence drops it, snapshot/clipboard keep it, and `restoreAddonFieldsToNode` no-ops on it, producing a live ADDON node with null identity. Execution is safe (`executeAddonNode` at Node.java:3812 skips with a warning), so this is not a crash, but the documented contract is false and the divergence will confuse the next maintainer.
-**Fix:** Either align the policy (skip null-addonTypeId ADDON nodes in `createGraphSnapshot` and clipboard copy, matching persistence):
-```java
-if (node.getType() == NodeType.ADDON && node.getAddonTypeId() == null) {
-    System.err.println("[Pathmind] Skipping ADDON node with null addonTypeId during snapshot (T-01-09)");
-    continue;
-}
-```
-or correct the javadoc to state that callers deliberately retain such nodes and that execution skips them gracefully.
-
-### WR-02: Map aliasing in placeholder/fallback branches — copied nodes can share one mutable `extraFields` map
-
-**File:** `common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java:81,85,127,133`
-**Issue:** Four branches store a shared reference instead of a copy:
-- copy direction: `nodeData.setExtraFields(node.getAddonExtraFields())` (serializer-throws fallback, line 81; addon-absent placeholder, line 85)
-- restore direction: `node.setAddonExtraFields(nodeData.getExtraFields())` (deserializer-throws catch, line 127; addon-absent placeholder, line 133)
-
-Unlike the on-disk persistence path (where the `NodeData` is immediately serialized to JSON and discarded), clipboard `NodeData` and execution snapshots live in memory and are restored multiple times. Copying an unresolved placeholder ADDON node and pasting it twice leaves the original node, the clipboard record, and both pasted nodes all sharing a single mutable `HashMap` — any later mutation of one node's `addonExtraFields` (e.g. the `put("script", ...)` in the restore success path, or a script edit after the addon resolves) silently corrupts the others. Note that the round-trip test's deep-copy assertion (`AddonNodeConversionRoundTripTest.java:233`) only proves the installed-addon path, which goes through `ser.serialize()` / `new HashMap<>()`; the four aliasing branches are untested.
-**Fix:** Defensive-copy in all four branches:
-```java
-nodeData.setExtraFields(node.getAddonExtraFields() != null
-    ? new HashMap<>(node.getAddonExtraFields()) : null);
-// ...and...
-node.setAddonExtraFields(nodeData.getExtraFields() != null
-    ? new HashMap<>(nodeData.getExtraFields()) : null);
-```
-Add a regression test for the placeholder copy->restore path asserting `assertNotSame`.
-
-### WR-03: Addon category panel has no scrollbar — `getCategoryScrollMetrics()` ignores `selectedAddonCategory`
-
-**File:** `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java:1443-1446`
-**Issue:** `getCategoryScrollMetrics()` returns null whenever `selectedCategory == null`. When an addon category is open (`selectedAddonCategory != null`, `selectedCategory == null`) and content overflows, no scrollbar is rendered for the addon panel (the addon content pass at lines 980-1058 never draws one), and the scroll-thumb drag path in `mouseClicked` (line ~1097) and `mouseDragged` (line ~1159) is dead. Only mouse-wheel scrolling works. The built-in panel gets a full scrollbar via the same metrics call; the addon panel was wired into `calculateMaxScroll` and `categoryOpenAnimation` but not into the scrollbar.
-**Fix:**
-```java
-private ScrollbarHelper.Metrics getCategoryScrollMetrics() {
-    if ((selectedCategory == null && selectedAddonCategory == null) || maxScroll <= 0) {
-        return null;
-    }
-    ...
-}
-```
-and render the scrollbar in the addon content pass (mirroring the built-in pass), including the `nodeBackgroundRight = trackLeft() - 2` exclusion so row hover/hit areas do not extend under the track.
-
-### WR-04: `calculateMaxScroll` underestimates addon content height for wrapped display names — bottom rows can become unreachable
-
-**File:** `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java:571-578`
-**Issue:** The addon branch adds a flat `CATEGORY_HEADER_HEIGHT` plus `addonDefs.size() * NODE_HEIGHT`, but the render pass sizes each addon row as `Math.max(NODE_HEIGHT, lines.size() * nodeLineHeight + PADDING)` (line ~1018) and the header as `Math.max(CATEGORY_HEADER_HEIGHT, headerLines.size() * headerLineHeight)` (line ~651). For addon definitions or category names long enough to wrap, total rendered height exceeds the computed `totalHeight`; once the cumulative deficit exceeds the +100px scroll slack, the last rows cannot be scrolled into view. The built-in path avoids this by passing measured `headerHeight` / `NodeRowInfo` heights into `calculateMaxScroll`; the addon branch ignores the `headerHeight` parameter that `render` already computes for it.
-**Fix:** In the addon branch, use the measured header height and wrap-aware row heights (compute `wrapText(def.getDisplayName(), ...)` row heights the same way the render pass does, or precompute `NodeRowInfo`-style records for addon defs and pass them in).
-
-### WR-05: Test name claims null-category handling but never exercises it
-
-**File:** `common/src/test/java/com/pathmind/ui/sidebar/AddonSidebarTest.java:136-148`
-**Issue:** `groupByCategory_nullCategoryDefinition_handledGracefully` and its comments claim to verify that "a definition without a category is excluded from the result rather than causing a NullPointerException (D-06 defensive grouping contract)" — but the test body only builds `buildDef("test_mod:script", SCRIPTING_CATEGORY)` (a definition **with** a category) and asserts it groups. No null-category definition is ever constructed; the defensive contract the test is named after remains completely unverified. This replaced a previous tautological `assertNull(null)` test, so it is an improvement, but it still advertises coverage that does not exist — a future regression in `groupByCategory`'s null handling would pass this suite.
-**Fix:** Add a definition with a null category to the input list and assert the graceful behavior:
-```java
-AddonNodeDefinition defWithoutCategory = buildDef("test_mod:no_category", null);
-Map<AddonNodeCategory, List<AddonNodeDefinition>> grouped =
-    Sidebar.groupByCategory(List.of(defWithCategory, defWithoutCategory));
-assertEquals(1, grouped.size(), "Null-category definition must be excluded, not throw");
-```
-If `AddonNodeDefinition.builder` rejects a null category at construction time, the scenario is unreachable — in that case rename the test to what it actually verifies (e.g. `groupByCategory_singleDefinition_groupsUnderItsCategory`) and delete the misleading comments.
-
-### WR-06: `AddonNodeDataCopy` duplicates `NodeGraphPersistence`'s inline ADDON branches — and the two copies have already diverged
-
-**File:** `common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java:19-21`, `common/src/main/java/com/pathmind/data/NodeGraphPersistence.java:339-369,853-883`
-**Issue:** The class javadoc declares itself "the single canonical encoding" while simultaneously documenting that `NodeGraphPersistence` "keeps its own inline ADDON branches." Two copies of the same non-trivial serialize/deserialize logic now exist, and they already differ behaviorally (the null-`addonTypeId` drop policy, WR-01). Any future change to the addon field schema, the `"script"` key convention, or the D-09 placeholder contract must now be made in two places, and the round-trip tests exercise the helper plus `convertToNodes` but not `buildNodeGraphData` — divergence in the save path would not be caught by the new regression suite.
-**Fix:** Refactor `NodeGraphPersistence.buildNodeGraphData` and `convertToNodes` to call `AddonNodeDataCopy`, keeping only the skip/`continue` decision inline at the persistence call site:
-```java
-if (node.getType() == NodeType.ADDON && node.getAddonTypeId() == null) {
-    System.err.println("[Pathmind] Skipping ADDON node with null addonTypeId during save (T-01-09)");
-    continue;
-}
-AddonNodeDataCopy.copyAddonFieldsToNodeData(node, nodeData);
-```
-
-## Info
-
-### IN-01: Addon tab hover skips the hover animation used by built-in tabs
-
-**File:** `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java:752`
-**Issue:** `AnimationHelper.lerpColor(normalColor, hoverColor, 1f)` hardcodes the lerp factor to 1 — equivalent to using `hoverColor` directly — so addon tabs snap to the hover color instead of animating via a per-tab `AnimatedValue` like built-in tabs (lines 710-713). Visually inconsistent with the rest of the strip.
-**Fix:** Add a `Map<AddonNodeCategory, AnimatedValue> addonTabHoverAnimations` mirroring `tabHoverAnimations`, or drop the no-op `lerpColor` call and use `hoverColor` directly with a comment that animation is intentionally omitted.
-
-### IN-02: Addon tab strip has no overflow handling
-
-**File:** `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java:740-768`
-**Issue:** Addon tabs render at `currentY + visibleTabIndex * (tabSize + tabSpacing)` and keep stacking downward with no clipping or scrolling; with enough addon categories installed they will render past the sidebar bottom (and remain hit-testable there). Built-in tabs share the limitation but have a fixed, known-to-fit count. Low impact for v1 (one addon), but the strip will need clipping or pagination once multiple addons register categories.
-**Fix:** Clamp rendering/hit-testing at `sidebarStartY + sidebarHeight`, or document the supported category budget.
-
-### IN-03: Javadoc cites hardcoded line numbers in another file
-
-**File:** `common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java:25-26,42,94`
-**Issue:** The javadoc references `NodeGraphPersistence` "lines 854-882" and "lines 339-368" three times. These were already off by the time of this review (the actual branches sit at 339-369 / 853-883) and will rot further with any edit to that 1000+ line file.
-**Fix:** Reference method names only (`buildNodeGraphData` / `convertToNodes`), not line numbers. Becomes moot if WR-06 is implemented.
+The implementation is substantially correct and well-thought-out. The defensive copies, null-skip guards, and scissor clipping all work as described. Three correctness issues require attention: a thread-safety hole in `AddonLoader.failedAddons`, a silent state-loss bug in the successful deserialization branch of `AddonNodeDataCopy.restoreAddonFieldsToNode`, and a test-reliability problem where Java `assert` statements are used in JUnit tests instead of JUnit assertions (they are silently disabled at runtime without `-ea`).
 
 ---
 
-_Reviewed: 2026-06-13T00:19:44Z_
+## Critical Issues
+
+### CR-01: `AddonLoader.failedAddons` is a non-thread-safe `LinkedHashMap` shared across threads
+
+**File:** `common/src/main/java/com/pathmind/execution/AddonLoader.java:48`
+
+**Issue:** `failedAddons` is a `static final LinkedHashMap` — a non-synchronized data structure. `markFailed` writes to it during mod initialization; `getFailedAddons` and `getFailure` read from it from the UI thread when the editor opens (D-08 UX). `markFailed` is also `public static`, enabling addon code to call it from arbitrary threads. A `LinkedHashMap` is not thread-safe: concurrent reads and writes can corrupt internal structure and cause `ConcurrentModificationException` when `getFailedAddons` iterates the unmodifiable view while another thread writes. This is a production correctness issue, not just a theoretical race.
+
+**Fix:**
+```java
+// Replace LinkedHashMap with ConcurrentHashMap (loses insertion order,
+// which is irrelevant for error display):
+private static final Map<String, Throwable> failedAddons = new ConcurrentHashMap<>();
+
+// Or preserve insertion order:
+private static final Map<String, Throwable> failedAddons =
+    Collections.synchronizedMap(new LinkedHashMap<>());
+```
+
+`getFailedAddons()` already returns an unmodifiable view, so no callers require changes.
+
+---
+
+### CR-02: Silent state loss in `restoreAddonFieldsToNode` — default-seeded fields discarded when `extraFields` is null
+
+**File:** `common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java:119-126`
+
+**Issue:** In the successful deserialization branch (addon installed, no exception), the code is:
+
+```java
+ser.deserialize(ctx, nodeData.getExtraFields());        // (1) may seed ctx from null-fields path
+if (nodeData.getExtraFields() != null) {               // (2) guard
+    node.setAddonExtraFields(new HashMap<>(nodeData.getExtraFields()));
+}
+if (ctx.getScriptText() != null && node.getAddonExtraFields() != null) { // (3) both conditions
+    node.getAddonExtraFields().put("script", ctx.getScriptText());
+}
+```
+
+When `nodeData.getExtraFields()` is null (a freshly-placed node serialized before any user edit), step (1) still runs and the Lua serializer correctly seeds `DEFAULT_SCRIPT` into `ctx` via its null-fields path. But step (2) is false, so `node.getAddonExtraFields()` remains null. Step (3)'s second condition is then false, so the script value from `ctx` is discarded. The node ends up with `addonExtraFields == null` even though the serializer produced data.
+
+This breaks the GAP-3 guarantee on the close-and-reopen path: after a save/reload cycle of a freshly-placed node, the script field is lost until the user opens the node and triggers a new serialization.
+
+**Fix:** Always initialize `addonExtraFields` from the result of deserialization, regardless of whether `nodeData.getExtraFields()` was null:
+
+```java
+ser.deserialize(ctx, nodeData.getExtraFields());
+// Start from the on-disk blob or empty; always non-null after this
+Map<String, Object> base = nodeData.getExtraFields() != null
+    ? new HashMap<>(nodeData.getExtraFields())
+    : new HashMap<>();
+node.setAddonExtraFields(base);
+node.setAddonUnresolved(false);  // see WR-05 below
+if (ctx.getScriptText() != null) {
+    node.getAddonExtraFields().put("script", ctx.getScriptText());
+}
+```
+
+---
+
+### CR-03: `LuaScriptNodeRenderer.render` calls `MinecraftClient.getInstance()` with no null guard
+
+**File:** `pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/LuaScriptNodeRenderer.java:34`
+
+**Issue:** `MinecraftClient.getInstance()` can return `null` in headless or server-side contexts. Even with `"environment": "client"` in `fabric.mod.json`, deserialization code (triggered by node construction) may be exercised in CI test contexts or early in the loading pipeline before the client is initialized. When `getInstance()` returns null, accessing `.textRenderer` on line 34 throws `NullPointerException`. The `catch (Throwable t)` in `NodeGraph.renderAddonNodeContent` prevents a game crash, but it logs a warning every frame (see WR-04) and permanently shows the placeholder body instead of the renderer output for as long as the error persists.
+
+**Fix:**
+```java
+@Override
+public void render(AddonNodeContext ctx, DrawContext draw, int x, int y, int width, int height) {
+    MinecraftClient client = MinecraftClient.getInstance();
+    if (client == null || client.textRenderer == null) {
+        return;
+    }
+    var textRenderer = client.textRenderer;
+    // ... rest unchanged
+}
+```
+
+---
+
+## Warnings
+
+### WR-01: Java `assert` statements used inside JUnit test methods — silently pass without `-ea`
+
+**File:** `common/src/test/java/com/pathmind/data/AddonNodePersistenceTest.java:56,179-182,221-222`
+
+**Issue:** Multiple critical correctness checks in JUnit tests use Java's `assert` keyword rather than JUnit assertions. Java `assert` statements are disabled by default (unless the JVM is launched with `-ea`, which Gradle test runners do not do). Lines 179-182 verify the serialized JSON contains `"addonTypeId"`, `"_schema_version"`, `"extraFields"`, and the addon ID — if these assertions fail, the test passes silently. Lines 221-222 verify built-in nodes do NOT contain addon fields — also silently pass if the check is false. Line 56 inside the test serializer checks `version >= 1`.
+
+**Fix:** Replace all `assert expr : "msg"` with JUnit assertions:
+
+```java
+// Replace:
+assert json.contains("addonTypeId") : "JSON must contain addonTypeId";
+assert json.contains(TEST_ADDON_ID) : "JSON must contain the addon type id";
+assert json.contains("_schema_version") : "JSON must contain _schema_version";
+assert json.contains("extraFields") : "JSON must contain extraFields";
+
+// With:
+assertTrue(json.contains("addonTypeId"), "JSON must contain addonTypeId");
+assertTrue(json.contains(TEST_ADDON_ID), "JSON must contain the addon type id");
+assertTrue(json.contains("_schema_version"), "JSON must contain _schema_version");
+assertTrue(json.contains("extraFields"), "JSON must contain extraFields");
+
+// Replace:
+assert !json.contains("addonTypeId") : "Built-in node JSON must not contain addonTypeId";
+// With:
+assertFalse(json.contains("addonTypeId"), "Built-in node JSON must not contain addonTypeId");
+```
+
+---
+
+### WR-02: `AddonNodeDefinition.Builder.build()` throws `NullPointerException` for blank values — wrong exception type
+
+**File:** `common/src/main/java/com/pathmind/api/addon/AddonNodeDefinition.java:183-188`
+
+**Issue:** When `id` or `displayName` is blank (not null), `build()` throws `new NullPointerException("id is required")`. The value is not null — it's blank. `NullPointerException` is semantically incorrect for a blank-but-non-null argument; `IllegalArgumentException` is the correct type and what addon developers will expect when validating their registration code. A non-null blank string throwing an NPE is actively misleading.
+
+**Fix:**
+```java
+if (id == null || id.isBlank()) {
+    throw new IllegalArgumentException("id is required and must not be blank");
+}
+if (displayName == null || displayName.isBlank()) {
+    throw new IllegalArgumentException("displayName is required and must not be blank");
+}
+```
+
+---
+
+### WR-03: `Sidebar.calculateMaxScroll` adds a hardcoded magic `+100` that diverges from `computeAddonContentHeight`
+
+**File:** `common/src/main/java/com/pathmind/ui/sidebar/Sidebar.java:586`
+
+**Issue:** `maxScroll = Math.max(0, totalHeight - sidebarHeight + 100)` appends a magic 100-pixel over-scroll buffer. This value is not a named constant and is not justified by any geometry. More importantly, `computeAddonContentHeight` (the pure helper tested in `AddonSidebarScrollTest`) does NOT include this padding, so the scroll range computed in `calculateMaxScroll` for addon content (via `addonRowLineCounts`) is 100px wider than what `computeAddonContentHeight` would compute for the same content. This discrepancy means the scrollbar knob position computed from `maxScroll` does not correspond to the actual content height returned by the pure helper, creating a systematic off-by-100 in scroll indicator accuracy when content fits within the sidebar.
+
+**Fix:** Use a named constant and ensure consistency with `computeAddonContentHeight`:
+```java
+private static final int SCROLL_BOTTOM_BUFFER = 0; // or PADDING*2 if intentional
+// ...
+maxScroll = Math.max(0, totalHeight - sidebarHeight + SCROLL_BOTTOM_BUFFER);
+```
+
+---
+
+### WR-04: `NodeGraph.renderAddonNodeContent` warns unconditionally per frame on renderer failure — no rate limiting
+
+**File:** `common/src/main/java/com/pathmind/ui/graph/NodeGraph.java:7425-7427`
+
+**Issue:** The catch block for a failing body renderer logs at `warn` level without rate limiting. At 60 fps with a visible ADDON node whose renderer is broken, this emits 3,600+ warn-level log lines per minute. This floods `latest.log` and degrades game performance in logging configurations that write synchronously to disk.
+
+**Fix:** Add a per-type warn-once guard using a class-level set:
+```java
+// Field:
+private final Set<String> addonRendererWarnedIds = new HashSet<>();
+
+// In catch block:
+if (addonRendererWarnedIds.add(addonTypeId)) {
+    LOGGER.warn("[Pathmind] Addon body renderer threw for {} (further warnings suppressed): {}",
+        addonTypeId, t.getMessage());
+}
+```
+
+---
+
+### WR-05: `restoreAddonFieldsToNode` never clears `addonUnresolved` in the successful-deserialization branch
+
+**File:** `common/src/main/java/com/pathmind/data/AddonNodeDataCopy.java:112-133`
+
+**Issue:** The successful-deserialization branch (addon installed, no exception) never calls `node.setAddonUnresolved(false)`. If a node object is created, marked unresolved (e.g., missing addon placeholder), and later the same node undergoes a restore (e.g., the addon becomes available and the graph is reloaded), `addonUnresolved` remains `true`. `NodeGraph.renderAddonNodeContent` checks `node.isAddonUnresolved()` at line 7399 and will perpetually show the placeholder body instead of the live renderer.
+
+The only path that clears `addonUnresolved` back to false is `new Node(addonTypeId, x, y)` construction (fresh placement). The restore path used by all save/load, clipboard, and snapshot paths never resets it, meaning any node that was ever loaded while its addon was absent will permanently display as missing even after the addon is later installed.
+
+**Fix:** Add `node.setAddonUnresolved(false)` in the successful-deserialization branch (before or after the script-key injection, but inside the try block):
+```java
+try {
+    ser.deserialize(ctx, nodeData.getExtraFields());
+    node.setAddonUnresolved(false);  // <-- add this
+    // ... rest of success path
+}
+```
+
+---
+
+## Info
+
+### IN-01: `AddonNodeContext` setters are public but contract says "read-only during rendering"
+
+**File:** `common/src/main/java/com/pathmind/api/addon/AddonNodeContext.java:37-62`
+
+**Issue:** The Javadoc on `AddonNodeBodyRenderer` says the context is "read-only during rendering", but `AddonNodeContext` exposes public `setAddonTypeId` and `setScriptText` setters with no visibility restriction or Javadoc warning. Addon renderer implementations can call `ctx.setAddonTypeId("injected")` or `ctx.setScriptText(null)` during `render()`. Since the context object is freshly constructed per render call, this cannot corrupt shared state today, but the contract is misleading for future readers and could become a real issue if the context object is ever cached or reused.
+
+**Fix:** Add Javadoc to the setters: "For Pathmind internal use during context construction — addon implementations must not call this setter." No code change is required unless the API contract is to be enforced at the type level (making the setter package-private or removing it).
+
+---
+
+### IN-02: `AddonNodeCreationTest` uses fragile reflection to bypass install-once registry guard
+
+**File:** `common/src/test/java/com/pathmind/nodes/AddonNodeCreationTest.java:84-118`
+
+**Issue:** `installSyntheticTypeViaReflection` directly accesses the private `definitions`, `executors`, and `serializers` fields of `NodeTypeRegistry.INSTANCE` via `getDeclaredField`. This works today but breaks silently if the field names change or if the maps are wrapped in an unmodifiable view. The comment acknowledges this as intentional, but the approach is more brittle than necessary.
+
+**Fix:** A package-private `@VisibleForTesting` method on `NodeTypeRegistry` that bypasses the `installed` guard (marked clearly as test-only) would be less fragile. Alternatively, since the three sibling test classes all have the same `@BeforeAll` install-once pattern, structuring the tests to use fresh `NodeTypeRegistry` instances (as `NodeTypeRegistryTest` correctly does) would entirely eliminate the problem.
+
+---
+
+### IN-03: `LuaScriptNodeRenderer.LINE_HEIGHT` constant is decoupled from actual `textRenderer.fontHeight`
+
+**File:** `pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/LuaScriptNodeRenderer.java:25`
+
+**Issue:** `LINE_HEIGHT = 10` hard-codes a value that is derived from `textRenderer.fontHeight` (typically 9) plus 1px spacing. Resource packs that alter the default font height will cause line-to-line overlap or excess gaps in the Lua script preview. The `Sidebar` class computes the analogous value dynamically as `textRenderer.fontHeight + NODE_LINE_SPACING`.
+
+**Fix:**
+```java
+// Remove LINE_HEIGHT constant. Inside render():
+int lineHeight = textRenderer.fontHeight + 1;
+for (int i = 0; i < lineCount; i++) {
+    // ...
+    draw.drawTextWithShadow(textRenderer, line, x, y + i * lineHeight, TEXT_COLOR);
+}
+```
+
+---
+
+_Reviewed: 2026-06-13_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
