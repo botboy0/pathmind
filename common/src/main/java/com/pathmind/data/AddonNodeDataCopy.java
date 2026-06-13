@@ -92,8 +92,8 @@ public final class AddonNodeDataCopy {
      * Restores the ADDON identity fields from a {@link NodeGraphData.NodeData} record
      * onto a freshly-constructed {@link Node} (the load direction).
      *
-     * <p>Replicates the ADDON load logic from
-     * {@code NodeGraphPersistence.convertToNodes} lines 339–368, including the
+     * <p>Implements the ADDON load logic used by
+     * {@code NodeGraphPersistence.convertToNodes}, including the
      * deserializer round-trip, the {@code "script"} key injection, the
      * {@code catch(Throwable)} fallback, and the missing-addon placeholder branch.
      *
