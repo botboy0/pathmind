@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A saved preset containing a Script node round-trips through save/load with script text and `_schema_version` intact
   5. Launching Minecraft without the addon jar installed leaves Pathmind fully functional across its existing 1.21–1.21.11 range with no errors or missing behavior
 
-**Plans**: 6 plans (3 + 3 gap-closure)
+**Plans**: 10 plans (3 + 3 code-review gap-closure + 4 UAT gap-closure)
 **Wave 1**
 
 - [x] 01-01-PLAN.md — API contract package (com.pathmind.api.addon), NodeTypeRegistry singleton, AddonLoader entrypoint discovery wired into PathmindMod, registration round-trip/failure unit tests [Wave 1]
@@ -53,6 +53,15 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Wave 2 (gaps)** *(blocked on 01-04)*
 
 - [x] 01-06-PLAN.md — ADDON conversion round-trip regression test (createGraphSnapshot + convertToNodes); fix WR-08 doc Fabric API version + WR-10 test scaffolding [Wave 2]
+
+**UAT gap closure (round 2)** *(in-game UAT found GAP-1..GAP-5 — these plans close them; all parallel, disjoint files)*
+
+**Wave 1 (UAT gaps)**
+
+- [ ] 01-07-PLAN.md — GAP-1: addon-aware scroll metrics + wrap-aware addon content height + addon-pass scrollbar so overflowing addon categories scroll (WR-03/WR-04) [Wave 1]
+- [ ] 01-08-PLAN.md — GAP-2 + GAP-3: ADDON node display name from the registry + default-field (script) seeding in the addon constructor so placed nodes are fully formed at drop time [Wave 1]
+- [ ] 01-09-PLAN.md — GAP-4 + GAP-5: scissor-clip + sidebar-overlap suppression for the addon body preview, and a missing-addon indicator on orphaned ADDON nodes [Wave 1]
+- [ ] 01-10-PLAN.md — WR-01/WR-02/WR-06 hardening: align null-addonTypeId skip policy across snapshot/clipboard, defensive-copy extraFields maps, delegate persistence ADDON branches to AddonNodeDataCopy [Wave 1]
 
 ### Phase 2: Lua VM + Core Bindings
 
