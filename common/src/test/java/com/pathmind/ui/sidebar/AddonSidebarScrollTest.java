@@ -106,4 +106,62 @@ class AddonSidebarScrollTest {
         assertEquals(expectedHeader + expectedRows, result,
                 "Multi-line header (2 lines) must use max(CATEGORY_HEADER_HEIGHT, 2*headerLineHeight)");
     }
+
+    // -----------------------------------------------------------------------
+    // computeAddonMaxScroll tests (UAT-GAP-A / WR-03)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Test 1 (no overflow -> no scroll): a single single-line addon row with a viewport taller
+     * than the content must yield computeAddonMaxScroll == 0.
+     * content = computeAddonContentHeight(1, [1], 11, 10) = 20 + 18 = 38
+     * with PADDING*2 = 8 -> total = 46
+     * sidebarHeight = 200 (much taller) -> maxScroll = max(0, 46 - 200) = 0
+     */
+    @Test
+    void singleEntry_noOverflow_returnsZero() {
+        List<Integer> rowLineCounts = List.of(1);
+        int sidebarHeight = 200;
+
+        int result = Sidebar.computeAddonMaxScroll(1, rowLineCounts, HEADER_LINE_HEIGHT, NODE_LINE_HEIGHT, sidebarHeight);
+
+        assertEquals(0, result,
+                "Single Script entry in tall viewport must yield maxScroll=0 (no scrollbar correct)");
+    }
+
+    /**
+     * Test 2 (overflow -> scroll): many addon rows whose total computeAddonContentHeight
+     * exceeds the viewport must yield computeAddonMaxScroll > 0.
+     * 10 rows, each = 18px; header = 20; content = 200; + PADDING*2=8 = 208
+     * sidebarHeight = 100 -> maxScroll = max(0, 208 - 100) = 108 > 0
+     */
+    @Test
+    void manyEntries_overflow_returnsPositive() {
+        List<Integer> rowLineCounts = List.of(1, 1, 1, 1, 1, 1, 1, 1, 1, 1); // 10 rows
+        int sidebarHeight = 100;
+
+        int result = Sidebar.computeAddonMaxScroll(1, rowLineCounts, HEADER_LINE_HEIGHT, NODE_LINE_HEIGHT, sidebarHeight);
+
+        assertTrue(result > 0,
+                "Ten rows in small viewport must yield maxScroll>0 (scrollbar should show)");
+    }
+
+    /**
+     * Test 3 (consistency / no off-by-100): computeAddonMaxScroll must equal
+     * Math.max(0, computeAddonContentHeight(...) + PADDING*2 - sidebarHeight) exactly.
+     * Verifies no magic +100 divergence from WR-03.
+     */
+    @Test
+    void maxScroll_consistentWithContentHeight_noMagicOffset() {
+        List<Integer> rowLineCounts = List.of(1, 2, 1); // mix of single and wrapped rows
+        int sidebarHeight = 80;
+
+        int contentHeight = Sidebar.computeAddonContentHeight(1, rowLineCounts, HEADER_LINE_HEIGHT, NODE_LINE_HEIGHT);
+        int expected = Math.max(0, contentHeight + PADDING * 2 - sidebarHeight);
+
+        int result = Sidebar.computeAddonMaxScroll(1, rowLineCounts, HEADER_LINE_HEIGHT, NODE_LINE_HEIGHT, sidebarHeight);
+
+        assertEquals(expected, result,
+                "computeAddonMaxScroll must equal max(0, computeAddonContentHeight+PADDING*2-sidebarHeight) with no +100 offset");
+    }
 }
