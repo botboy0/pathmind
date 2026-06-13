@@ -1,7 +1,9 @@
 package com.pathmind.nodes;
 
 import com.pathmind.api.addon.AddonNodeContext;
+import com.pathmind.api.addon.AddonNodeDefinition;
 import com.pathmind.api.addon.AddonNodeExecutor;
+import com.pathmind.api.addon.AddonNodeSerializer;
 import com.pathmind.api.addon.NodeResult;
 import com.pathmind.execution.PathmindNavigator;
 import net.minecraft.text.Text;
@@ -391,6 +393,27 @@ public class Node {
     public Node(String addonTypeId, int x, int y) {
         this(NodeType.ADDON, x, y);
         this.addonTypeId = addonTypeId;
+        // GAP-3: seed default addonExtraFields at construction so the node is fully formed
+        // immediately at drop time, without requiring a save/reopen cycle.
+        // Mirrors the installed-addon branch of AddonNodeDataCopy.restoreAddonFieldsToNode.
+        if (addonTypeId != null && NodeTypeRegistry.INSTANCE.hasType(addonTypeId)) {
+            AddonNodeSerializer ser = NodeTypeRegistry.INSTANCE.serializerFor(addonTypeId);
+            if (ser != null) {
+                AddonNodeContext ctx = new AddonNodeContext();
+                ctx.setAddonTypeId(addonTypeId);
+                try {
+                    ser.deserialize(ctx, null); // null-fields path returns serializer defaults
+                    this.addonExtraFields = new java.util.HashMap<>();
+                    if (ctx.getScriptText() != null) {
+                        addonExtraFields.put("script", ctx.getScriptText());
+                    }
+                } catch (Throwable t) {
+                    System.err.println("[Pathmind] Addon serializer threw during default-field seeding for "
+                        + addonTypeId + ": " + t.getMessage());
+                    // Leave addonExtraFields null on failure — node is still usable
+                }
+            }
+        }
     }
 
     static final class PlacementFailure extends RuntimeException {
@@ -693,6 +716,12 @@ public class Node {
     }
 
     public Text getDisplayName() {
+        if (type == NodeType.ADDON && addonTypeId != null) {
+            AddonNodeDefinition def = NodeTypeRegistry.INSTANCE.definitionFor(addonTypeId);
+            if (def != null) {
+                return Text.literal(def.getDisplayName());
+            }
+        }
         return Text.literal(type.getDisplayName());
     }
 
