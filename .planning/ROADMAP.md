@@ -92,7 +92,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. A script that throws a Lua error surfaces the error message and line number visibly to the user; the graph stops at the Script node rather than silently continuing
   6. UAT checkpoint: human in-game testing required — Lua execution and Baritone integration directly affect game behavior
 
-**Plans**: TBD
+**Plans**: 4 plans (vertical slices S0–S4, sequential waves — each later plan extends the shared PathmindRuntimeImpl + PathmindBindings)
+
+Plans:
+- [ ] 02-01-PLAN.md — Cobalt build wiring + shadow relocation; PathmindRuntime interface + AddonNodeContext.getRuntime(); real worker-thread CobaltVm executor (fresh sandboxed globals, compute-time timeout, Lua error → chat + graph-halt) [Wave 1]
+- [ ] 02-02-PLAN.md — getVar/setVar: real PathmindRuntimeImpl variable marshaling + pathmind.getVar/setVar scalar round-trip (BIND-01) [Wave 2]
+- [ ] 02-03-PLAN.md — moveTo awaitable: PathmindRuntimeImpl.moveTo wraps PathmindNavigator.startGoto + pathmind.moveTo blocks worker with timeout-clock pause (BIND-02) [Wave 3]
+- [ ] 02-04-PLAN.md — game state: getPosition/getInventory/getBlock with main-thread dispatch + bindings + end-of-phase in-game UAT (BIND-03, all six success criteria) [Wave 4]
 
 ### Phase 3: Script Node Editor + Autosuggestions
 
@@ -118,6 +124,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 15/15 | Complete   | 2026-06-13 |
-| 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
+| 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
+| 2. Lua VM + Core Bindings | 0/4 | Planned     | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
