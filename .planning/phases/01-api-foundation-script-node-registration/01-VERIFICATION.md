@@ -2,7 +2,7 @@
 phase: 01-api-foundation-script-node-registration
 verified: 2026-06-13T12:45:00Z
 status: human_needed
-score: 5/5 code-verified; UAT round 6 confirmed GAP-B fixed; GAP-C partially fixed (text gone but body wrongly blanked); GAP-A re-diagnosed (wrong surface in round 4) — both reopened for round-5 gap closure (plan 01-15)
+score: 5/5 code-verified; GAP-B confirmed fixed in-game; GAP-C + GAP-A re-fixed in round-5 gap closure (plan 01-15, analog-grounded), full :common:test green — pending in-game re-UAT
 overrides_applied: 0
 uat_round_6:
   date: 2026-06-13
@@ -12,6 +12,9 @@ uat_round_6:
   reopened:
     - "UAT-GAP-C (refinement): the '⚠ addon missing' text is correctly gone, BUT renderAddonNeutralBody blanks the node's body content when dragged over the sidebar. Built-in nodes keep their content and only DISCOLOR THE FRAME. Correct fix: remove the bodyUnderSidebar→renderAddonNeutralBody suppression (NodeGraph.java:7405-7410) so resolved addon nodes render their normal body via renderer.render (already scissor-clipped); the invalid-drop frame discoloration is already applied by renderNode (lines 3573-3599), matching built-ins. Do NOT blank content."
     - "UAT-GAP-A (re-diagnosed — round-4 fixed the WRONG surface): the overflowing element is the CATEGORY ICON BAR (vertical strip of category icons, Sidebar.java:750-834), NOT the expanded node list. The icon bar has NO scroll state, NO scrollbar, and NO wheel handler — when categories (built-in + the addon 'Scripting' tab) exceed available height, tabs are only down-scaled (Sidebar.java:664-677) and overflow off-screen. The round-4 computeAddonMaxScroll change applied to the node-list panel and is irrelevant to this gap. Correct fix: add vertical scroll for the category icon bar (offset + clamp + scrollbar drawn in the icon column + mouse-wheel handling over the icon-bar region + offset BOTH rendering and click hit-testing), modeled on the existing content-panel scroll (scrollOffset/maxScroll/scrollDragging, Sidebar.java:74-77)."
+  round5_fix_pending_reuat:
+    - "GAP-C: plan 01-15 (commit 1aa3a93) deleted the bodyUnderSidebar early-return and renderAddonNeutralBody; resolved addon nodes now render their real body via renderer.render (scissor-clipped) in all positions, matching built-ins; invalid-drop frame discoloration comes from renderNode. Missing-addon placeholder preserved for unresolved/threw paths (D-09/GAP-5). Full :common:test green. PENDING in-game re-UAT."
+    - "GAP-A: plan 01-15 (commit 15dac7a) added iconBarScrollOffset/iconBarMaxScroll + renderIconBarScrollbar + wheel-over-icon-column handling; tabs stay readable instead of shrinking; render Y and click hit-tests share the scroll offset. Full :common:test green. PENDING in-game re-UAT to confirm scrollbar appears + scrolled categories click correctly."
 uat_round_5:
   date: 2026-06-13
   source: "in-game UAT — MC 1.21.4, pathmind-fabric 1.1.5 + pathmind-lua 0.1.0"
