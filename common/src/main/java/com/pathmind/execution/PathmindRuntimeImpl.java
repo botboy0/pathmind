@@ -8,6 +8,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -295,12 +296,13 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
             BlockPos pos = BlockPos.ofFloored(x, y, z);
             int chunkX = pos.getX() >> 4;
             int chunkZ = pos.getZ() >> 4;
-            if (!client.world.isChunkLoaded(chunkX, chunkZ)) {
+            WorldChunk chunk = client.world.getChunk(chunkX, chunkZ);
+            if (chunk == null || chunk.isEmpty()) {
                 result.complete(null);
                 return;
             }
             String blockId = Registries.BLOCK.getId(
-                client.world.getBlockState(pos).getBlock()).toString();
+                chunk.getBlockState(pos).getBlock()).toString();
             result.complete(blockId);
         });
         try {
