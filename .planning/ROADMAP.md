@@ -75,7 +75,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1 (UAT round-5 gaps)**
 
-- [ ] 01-14-PLAN.md — UAT-GAP-B (drag-preview title routed through Node.getDisplayName in 3 compat layers) + UAT-GAP-C (resolved addon nodes under the sidebar use a neutral dimmed body, never the missing-addon placeholder) + UAT-GAP-A (addon scroll range via computeAddonContentHeight, magic +100 removed; tests for no-overflow→no-scrollbar and overflow→scrollbar) (LUA-01, API-07) [Wave 1]
+- [x] 01-14-PLAN.md — UAT-GAP-B (drag-preview title routed through Node.getDisplayName in 3 compat layers) + UAT-GAP-C (resolved addon nodes under the sidebar use a neutral dimmed body, never the missing-addon placeholder) + UAT-GAP-A (addon scroll range via computeAddonContentHeight, magic +100 removed; tests for no-overflow→no-scrollbar and overflow→scrollbar) (LUA-01, API-07) [Wave 1]
 
 ### Phase 2: Lua VM + Core Bindings
 
@@ -118,6 +118,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. API Foundation + Script Node Registration | 13/14 | Gap closure (UAT round 5) | 2026-06-13 |
+| 1. API Foundation + Script Node Registration | 14/14 | Complete   | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 0/TBD | Not started | - |
 | 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |

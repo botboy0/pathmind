@@ -15,14 +15,14 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **API-04**: Lifecycle ordering is guaranteed and addon registration is safe regardless of Fabric entrypoint init order (deferred-registration guard or ready event)
 - [x] **API-05**: Addon nodes persist addon-declared data inside Pathmind's JSON presets as an opaque, schema-versioned blob — Pathmind validates and integrates without knowing the schema
 - [ ] **API-06**: Addon node executors run asynchronously (`CompletableFuture` polled per tick by ExecutionManager) and never block the game thread
-- [ ] **API-07**: Addon nodes can render custom content in the node body via a minimal UI widget hook
+- [x] **API-07**: Addon nodes can render custom content in the node body via a minimal UI widget hook
 - [ ] **API-08**: A separate API artifact (only `com.pathmind.api` types) is published to local Maven and the sibling addon repo compiles against it with zero impl classes on its classpath
 - [ ] **API-09**: Pathmind runs completely unchanged when no addons are installed, across its existing MC 1.21–1.21.11 range
 - [ ] **API-10**: The addon API is documented (javadoc + getting-started guide) well enough for a third party to build a different addon
 
 ### Lua Addon — Node & Execution
 
-- [ ] **LUA-01**: User can grab a Script node from the editor palette and place it like any other node (node provided by the separate addon jar)
+- [x] **LUA-01**: User can grab a Script node from the editor palette and place it like any other node (node provided by the separate addon jar)
 - [ ] **LUA-02**: When the Script node executes, its Lua script runs on a worker thread and the node tree continues only after the script finishes
 - [ ] **LUA-03**: Each execution gets a fresh, sandboxed Lua environment (manually-built globals — no `luajava`, no `standardGlobals()`)
 - [ ] **LUA-04**: A runaway script cannot hang the game — wall-clock timeout with thread interrupt as a safety net
@@ -83,11 +83,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | API-04 | Phase 1 | Pending |
 | API-05 | Phase 1 | Complete |
 | API-06 | Phase 1 | Pending |
-| API-07 | Phase 1 | Pending |
+| API-07 | Phase 1 | Complete |
 | API-08 | Phase 1 | Pending |
 | API-09 | Phase 1 | Pending |
 | API-10 | Phase 1 | Pending |
-| LUA-01 | Phase 1 | Pending |
+| LUA-01 | Phase 1 | Complete |
 | LUA-05 | Phase 1 | Complete |
 | LUA-02 | Phase 2 | Pending |
 | LUA-03 | Phase 2 | Pending |
