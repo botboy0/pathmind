@@ -93,11 +93,21 @@ Decimal phases appear between their surrounding integers in numeric order.
   6. UAT checkpoint: human in-game testing required — Lua execution and Baritone integration directly affect game behavior
 
 **Plans**: 4 plans (vertical slices S0–S4, sequential waves — each later plan extends the shared PathmindRuntimeImpl + PathmindBindings)
+Plans:
+**Wave 1**
 
-Plans:
 - [ ] 02-01-PLAN.md — Cobalt build wiring + shadow relocation; PathmindRuntime interface + AddonNodeContext.getRuntime(); real worker-thread CobaltVm executor (fresh sandboxed globals, compute-time timeout, Lua error → chat + graph-halt) [Wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 02-02-PLAN.md — getVar/setVar: real PathmindRuntimeImpl variable marshaling + pathmind.getVar/setVar scalar round-trip (BIND-01) [Wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 02-03-PLAN.md — moveTo awaitable: PathmindRuntimeImpl.moveTo wraps PathmindNavigator.startGoto + pathmind.moveTo blocks worker with timeout-clock pause (BIND-02) [Wave 3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 02-04-PLAN.md — game state: getPosition/getInventory/getBlock with main-thread dispatch + bindings + end-of-phase in-game UAT (BIND-03, all six success criteria) [Wave 4]
 
 ### Phase 3: Script Node Editor + Autosuggestions
