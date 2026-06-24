@@ -1,5 +1,7 @@
 package com.pathmind.nodes;
 
+import com.pathmind.api.addon.AddonNodeDefinition;
+
 /**
  * Editor sizing rules for nodes.
  *
@@ -24,6 +26,17 @@ final class NodeDimensionCalculator {
         }
         if (type == NodeType.TEMPLATE || type == NodeType.CUSTOM_NODE) {
             layoutState.setSize(Node.TEMPLATE_NODE_WIDTH, Node.TEMPLATE_NODE_HEIGHT);
+            return false;
+        }
+        if (type == NodeType.ADDON) {
+            String addonTypeId = node.getAddonTypeId();
+            AddonNodeDefinition def = addonTypeId != null
+                ? NodeTypeRegistry.INSTANCE.definitionFor(addonTypeId)
+                : null;
+            int bh = (def != null && def.getBodyHeight() > 0)
+                ? def.getBodyHeight()
+                : Node.TEMPLATE_NODE_HEIGHT; // 108 px fallback
+            layoutState.setSize(Node.TEMPLATE_NODE_WIDTH, bh);
             return false;
         }
 

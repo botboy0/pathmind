@@ -3,6 +3,7 @@ package com.pathmind.ui.graph;
 import com.pathmind.api.addon.AddonNodeBodyRenderer;
 import com.pathmind.api.addon.AddonNodeContext;
 import com.pathmind.api.addon.AddonNodeDefinition;
+import com.pathmind.api.addon.AddonNodeInputHandler;
 import com.pathmind.nodes.NodeTypeRegistry;
 import com.pathmind.data.AddonNodeDataCopy;
 import com.pathmind.data.NodeGraphData;
@@ -62,6 +63,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -289,6 +291,7 @@ public class NodeGraph {
     private int parameterSelectionStart = -1;
     private int parameterSelectionEnd = -1;
     private int parameterSelectionAnchor = -1;
+    private Node focusedAddonNode = null;
     private Node stopTargetEditingNode = null;
     private String stopTargetEditBuffer = "";
     private String stopTargetEditOriginalValue = "";
@@ -7407,13 +7410,10 @@ public class NodeGraph {
             // The scissor clip below keeps the renderer's output inside the node bounds, so it
             // cannot bleed over the open sidebar drawer.
 
-            // Build context for the renderer
-            AddonNodeContext ctx = new AddonNodeContext();
-            ctx.setAddonTypeId(addonTypeId);
-            if (node.getAddonExtraFields() != null && node.getAddonExtraFields().containsKey("script")) {
-                Object scriptObj = node.getAddonExtraFields().get("script");
-                ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
-            }
+            // Build context for the renderer (Phase 3: uses shared helper that populates
+            // nodeId, lastError, lastErrorLine from extraFields)
+            AddonNodeContext ctx = buildAddonContext(node);
+
             // GAP-4: scissor-clip the renderer to the node body content rect so the addon's
             // drawTextWithShadow calls cannot escape the node bounds (T-01-09-01).
             context.enableScissor(x + 1, y + 18, x + width - 1, y + height - 1);
@@ -7426,6 +7426,25 @@ public class NodeGraph {
                 renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
             } finally {
                 context.disableScissor();
+            }
+
+            // Phase 3 (Pitfall 4 / open-question #3): second render pass AFTER disableScissor
+            // so that popups / overlays declared by the renderer can escape the node body clip.
+            AddonNodeInputHandler handler = def != null ? def.getInputHandler() : null;
+            if (handler != null) {
+                try {
+                    handler.renderOverlay(ctx, context, x + 1, y + 18, width - 2, height - 19);
+                } catch (Throwable t) {
+                    org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                        .warn("[Pathmind] Addon overlay render threw for {}: {}", addonTypeId, t.getMessage());
+                }
+            }
+            // Also call renderOverlay on the body renderer if it implements it (default no-op is safe)
+            try {
+                renderer.renderOverlay(ctx, context, x + 1, y + 18, width - 2, height - 19);
+            } catch (Throwable t) {
+                org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                    .warn("[Pathmind] Addon body renderOverlay threw for {}: {}", addonTypeId, t.getMessage());
             }
         } else {
             // Unresolved placeholder (D-09): grayed-out body indicating the addon is absent
@@ -9365,6 +9384,230 @@ public class NodeGraph {
             stopTargetEditOriginalValue
         );
         stopTargetEditingNode.recalculateDimensions();
+    }
+
+    // -------------------------------------------------------------------------
+    // Addon node focus tracking and input forwarding (Phase 3 API extension)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns whether the given node currently holds addon editor focus.
+     *
+     * @param node the node to test
+     * @return true if {@code node} is the currently focused addon node
+     */
+    public boolean isFocusedAddonNode(Node node) {
+        return node == focusedAddonNode;
+    }
+
+    /**
+     * Focuses the given addon node, blurring any previously focused addon node first.
+     * Fires {@link AddonNodeInputHandler#onFocusGained} on the new node's handler.
+     *
+     * @param node the ADDON node to focus
+     */
+    public void focusAddonNode(Node node) {
+        blurFocusedAddonNode();
+        this.focusedAddonNode = node;
+        AddonNodeInputHandler handler = resolveInputHandler(node);
+        if (handler != null) {
+            AddonNodeContext ctx = buildAddonContext(node);
+            try {
+                handler.onFocusGained(ctx);
+            } catch (Throwable t) {
+                org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                    .warn("[Pathmind] Addon onFocusGained threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Blurs the currently focused addon node (if any), firing
+     * {@link AddonNodeInputHandler#onFocusLost} on its handler.
+     */
+    public void blurFocusedAddonNode() {
+        if (focusedAddonNode == null) {
+            return;
+        }
+        Node node = focusedAddonNode;
+        focusedAddonNode = null;
+        AddonNodeInputHandler handler = resolveInputHandler(node);
+        if (handler != null) {
+            AddonNodeContext ctx = buildAddonContext(node);
+            try {
+                handler.onFocusLost(ctx);
+            } catch (Throwable t) {
+                org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                    .warn("[Pathmind] Addon onFocusLost threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Forwards a key-press event to the focused addon node's input handler.
+     *
+     * <p>The handler is responsible for returning {@code true} for ALL keys while focused,
+     * including Backspace, Delete, arrows, and Esc — returning verbatim prevents NodeGraph
+     * graph shortcuts from leaking (T-03-02-01).
+     *
+     * @param keyCode   GLFW key code
+     * @param modifiers bitmask of active modifier keys
+     * @return true if the event was consumed by the addon handler
+     */
+    public boolean handleAddonInputKeyPressed(int keyCode, int modifiers) {
+        if (focusedAddonNode == null) {
+            return false;
+        }
+        AddonNodeInputHandler handler = resolveInputHandler(focusedAddonNode);
+        if (handler == null) {
+            return false;
+        }
+        AddonNodeContext ctx = buildAddonContext(focusedAddonNode);
+        try {
+            return handler.keyPressed(ctx, keyCode, -1, modifiers);
+        } catch (Throwable t) {
+            org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                .warn("[Pathmind] Addon keyPressed threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Forwards a character-typed event to the focused addon node's input handler.
+     *
+     * @param chr       the character typed
+     * @param modifiers bitmask of active modifier keys
+     * @return true if the event was consumed by the addon handler
+     */
+    public boolean handleAddonInputCharTyped(char chr, int modifiers) {
+        if (focusedAddonNode == null) {
+            return false;
+        }
+        AddonNodeInputHandler handler = resolveInputHandler(focusedAddonNode);
+        if (handler == null) {
+            return false;
+        }
+        AddonNodeContext ctx = buildAddonContext(focusedAddonNode);
+        try {
+            return handler.charTyped(ctx, chr, modifiers);
+        } catch (Throwable t) {
+            org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                .warn("[Pathmind] Addon charTyped threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Forwards a scroll event to the focused addon node's input handler.
+     *
+     * @param mouseX           mouse X position in screen coordinates
+     * @param mouseY           mouse Y position in screen coordinates
+     * @param horizontalAmount horizontal scroll delta
+     * @param verticalAmount   vertical scroll delta
+     * @return true if the event was consumed by the addon handler
+     */
+    public boolean handleAddonInputMouseScrolled(double mouseX, double mouseY,
+                                                  double horizontalAmount, double verticalAmount) {
+        if (focusedAddonNode == null) {
+            return false;
+        }
+        AddonNodeInputHandler handler = resolveInputHandler(focusedAddonNode);
+        if (handler == null) {
+            return false;
+        }
+        AddonNodeContext ctx = buildAddonContext(focusedAddonNode);
+        try {
+            return handler.mouseScrolled(ctx, mouseX, mouseY, horizontalAmount, verticalAmount);
+        } catch (Throwable t) {
+            org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                .warn("[Pathmind] Addon mouseScrolled threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Forwards a mouse-click event to the given ADDON node's input handler.
+     * The caller should already have determined the click landed on this node.
+     *
+     * @param node   the ADDON node that was clicked
+     * @param mouseX mouse X position in screen coordinates
+     * @param mouseY mouse Y position in screen coordinates
+     * @param button mouse button index
+     * @return true if the event was consumed by the addon handler
+     */
+    public boolean handleAddonNodeMouseClicked(Node node, double mouseX, double mouseY, int button) {
+        AddonNodeInputHandler handler = resolveInputHandler(node);
+        if (handler == null) {
+            return false;
+        }
+        AddonNodeContext ctx = buildAddonContext(node);
+        try {
+            return handler.mouseClicked(ctx, mouseX, mouseY, button);
+        } catch (Throwable t) {
+            org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                .warn("[Pathmind] Addon mouseClicked threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Resolves the {@link AddonNodeInputHandler} registered for the given node, or
+     * {@code null} if the node has no registered definition or no input handler.
+     */
+    private AddonNodeInputHandler resolveInputHandler(Node node) {
+        if (node == null) {
+            return null;
+        }
+        String addonTypeId = node.getAddonTypeId();
+        if (addonTypeId == null) {
+            return null;
+        }
+        AddonNodeDefinition def = NodeTypeRegistry.INSTANCE.definitionFor(addonTypeId);
+        return def != null ? def.getInputHandler() : null;
+    }
+
+    /**
+     * Builds an {@link AddonNodeContext} for the given ADDON node, populating all
+     * Phase-3 fields: {@code addonTypeId}, {@code scriptText}, {@code nodeId},
+     * {@code lastError}, and {@code lastErrorLine}.
+     *
+     * <p>The stable node-id is generated once (UUID) and persisted in
+     * {@code node.getAddonExtraFields()} under key {@code "_node_id"}. Subsequent
+     * calls read it back, ensuring the renderer's per-node state map stays stable
+     * across frames (Phase 3 open-question #2).
+     */
+    private AddonNodeContext buildAddonContext(Node node) {
+        AddonNodeContext ctx = new AddonNodeContext();
+        String addonTypeId = node.getAddonTypeId();
+        ctx.setAddonTypeId(addonTypeId);
+
+        Map<String, Object> extra = node.getAddonExtraFields();
+
+        if (extra != null) {
+            // Script text
+            Object scriptObj = extra.get("script");
+            ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
+
+            // Stable node identity (generate once, persist in extra-fields)
+            Object rawId = extra.get("_node_id");
+            String nodeId;
+            if (rawId instanceof String s && !s.isBlank()) {
+                nodeId = s;
+            } else {
+                nodeId = UUID.randomUUID().toString();
+                extra.put("_node_id", nodeId);
+            }
+            ctx.setNodeId(nodeId);
+
+            // Last error (T-03-02-04: read defensively)
+            Object rawError = extra.get("lastError");
+            ctx.setLastError(rawError instanceof String s ? s : null);
+
+            Object rawLine = extra.get("lastErrorLine");
+            ctx.setLastErrorLine(rawLine instanceof Number n ? n.intValue() : 0);
+        }
+
+        return ctx;
     }
 
     public boolean handleStopTargetKeyPressed(int keyCode, int modifiers) {
