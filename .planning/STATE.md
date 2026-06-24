@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Script Node Editor + Autosuggestions
 status: executing
-stopped_at: Completed 03-04 gutter + error strip
+stopped_at: Completed 03-05 SuggestionEngine + popup (EDIT-04); SC#5 in-game UAT pending end-of-phase
 last_updated: "2026-06-25T00:00:00.000Z"
 last_activity: 2026-06-25
-last_activity_desc: Phase 3 Plan 04 executed — gutter + error strip (EDIT-02/03)
+last_activity_desc: Phase 3 Plan 05 executed — EDIT-04 SuggestionEngine + popup wiring; SC#5 deferred to end-of-phase UAT gate
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 24
-  completed_plans: 23
-  percent: 71
+  completed_plans: 24
+  percent: 96
 ---
 
 # Project State
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 3 (Script Node Editor + Autosuggestions) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-06-25 -- Completed Plan 04 (gutter + error strip EDIT-02/03)
+Plan: 5 of 5 — COMPLETE (code tasks done; SC#5 in-game UAT pending end-of-phase gate)
+Status: Phase 3 code complete; SC#5 UAT gate pending
+Last activity: 2026-06-25 -- Completed Plan 05 (EDIT-04 SuggestionEngine + popup wiring)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P02 | 35min | 3 tasks | 7 files |
 | Phase 03-script-node-editor-autosuggestions P03 | 30 | 2 tasks | 3 files |
 | Phase 03-script-node-editor-autosuggestions P04 | 35min | 2 tasks | 8 files |
+| Phase 03-script-node-editor-autosuggestions P05 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [03-04]: LuaLastError thread-local chosen to carry CobaltVm error message to LuaNodeExecutor.whenComplete (avoids modifying NodeResult enum or AddonNodeContext callback)
 - [03-04]: getScrollY() confirmed public on ScrollableWidget MC 1.21.4 Yarn (Assumption A1 verified via javap bytecode); returns double, divided by LINE_HEIGHT for gutter scroll sync
 - [03-04]: TooltipRenderer replicated inline in LuaScriptNodeRenderer (Pathmind internal not on addon API surface); uses UITheme.TOOLTIP_BG + TOOLTIP_BORDER
+- [03-05]: EditBoxWidget has no getCursor() in MC 1.21.4 (parent is ScrollableTextFieldWidget not TextFieldWidget); last-line approximation used for getLineBeforeCursor()
+- [03-05]: popup-priority keyPressed branch handles Enter/Esc/Up/Down BEFORE Esc-blur path (T-03-05-01 ordering)
+- [03-05]: Popup anchor coordinates stored per-frame in EditorState; consumed post-scissor in renderOverlay
 
 ### Pending Todos
 
@@ -121,5 +125,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-25T00:00:00.000Z
-Stopped at: Completed 03-04-PLAN.md (gutter + error strip)
-Resume file: .planning/phases/03-script-node-editor-autosuggestions/03-05-PLAN.md
+Stopped at: Completed 03-05-PLAN.md (EDIT-04 SuggestionEngine + popup); SC#5 in-game UAT pending end-of-phase
+Resume file: None (all code tasks complete; SC#5 UAT gate is end-of-phase human verification)

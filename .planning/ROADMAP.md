@@ -143,7 +143,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-05-PLAN.md — Wave 4: EDIT-04 autosuggestions — in-process SuggestionEngine + popup wiring (both triggers, accept/close consumption, overlay render) + end-of-phase in-game UAT (SC#5) [pathmind-lua]
+- [x] 03-05-PLAN.md — Wave 4: EDIT-04 autosuggestions — in-process SuggestionEngine + popup wiring (both triggers, accept/close consumption, overlay render) + end-of-phase in-game UAT (SC#5) [pathmind-lua] (code complete; SC#5 UAT pending end-of-phase gate)
 
 ## Progress
 
@@ -154,4 +154,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 4/4 | Complete   | 2026-06-13 |
-| 3. Script Node Editor + Autosuggestions | 4/5 | In Progress|  |
+| 3. Script Node Editor + Autosuggestions | 5/5 | Code Complete (SC#5 UAT pending) |  |
