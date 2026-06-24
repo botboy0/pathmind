@@ -26,6 +26,8 @@ public final class AddonNodeDefinition {
     private final int color;
     private final String provenanceLabel;
     private final AddonNodeBodyRenderer bodyRenderer;
+    private final AddonNodeInputHandler inputHandler;
+    private final int bodyHeight;
 
     private AddonNodeDefinition(Builder b) {
         this.id = b.id;
@@ -34,6 +36,8 @@ public final class AddonNodeDefinition {
         this.color = b.color;
         this.provenanceLabel = b.provenanceLabel;
         this.bodyRenderer = b.bodyRenderer;
+        this.inputHandler = b.inputHandler;
+        this.bodyHeight = b.bodyHeight;
     }
 
     /**
@@ -93,6 +97,27 @@ public final class AddonNodeDefinition {
     }
 
     /**
+     * Returns the optional input handler for interactive addon node bodies (Phase 3 API extension).
+     * May be null if the node body is render-only (no interactive input).
+     *
+     * @return input handler, or null
+     */
+    public AddonNodeInputHandler getInputHandler() {
+        return inputHandler;
+    }
+
+    /**
+     * Returns the declared body height for this node in pixels, or {@code -1} if no override
+     * is specified (Phase 3 API extension). When {@code -1}, NodeDimensionCalculator uses the
+     * default TEMPLATE_NODE_HEIGHT (108 px).
+     *
+     * @return body height in pixels, or -1 for default
+     */
+    public int getBodyHeight() {
+        return bodyHeight;
+    }
+
+    /**
      * Creates a new builder for an addon node definition with the given type id.
      *
      * @param id the namespaced type id (e.g. {@code "pathmind_lua:script"})
@@ -113,6 +138,8 @@ public final class AddonNodeDefinition {
         private int color = 0xFF888888;
         private String provenanceLabel = "";
         private AddonNodeBodyRenderer bodyRenderer = null;
+        private AddonNodeInputHandler inputHandler = null;
+        private int bodyHeight = -1; // -1 = let NodeDimensionCalculator use default field logic
 
         private Builder(String id) {
             this.id = id;
@@ -170,6 +197,31 @@ public final class AddonNodeDefinition {
          */
         public Builder bodyRenderer(AddonNodeBodyRenderer v) {
             this.bodyRenderer = v;
+            return this;
+        }
+
+        /**
+         * Sets the input handler for interactive addon node bodies (Phase 3 API extension).
+         *
+         * @param v input handler, or null for render-only nodes
+         * @return this builder
+         */
+        public Builder inputHandler(AddonNodeInputHandler v) {
+            this.inputHandler = v;
+            return this;
+        }
+
+        /**
+         * Sets the fixed body height for this node type in pixels (Phase 3 API extension).
+         *
+         * <p>Use {@code -1} (the default) to let NodeDimensionCalculator determine height
+         * using its normal field-based logic. Positive values override the dimension.
+         *
+         * @param px body height in pixels; use -1 for the default (108 px)
+         * @return this builder
+         */
+        public Builder bodyHeight(int px) {
+            this.bodyHeight = px;
             return this;
         }
 

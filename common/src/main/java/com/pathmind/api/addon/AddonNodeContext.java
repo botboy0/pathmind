@@ -18,6 +18,9 @@ public final class AddonNodeContext {
     private String addonTypeId;
     private String scriptText;
     private PathmindRuntime runtime;
+    private String nodeId;
+    private String lastError;
+    private int lastErrorLine;
 
     /**
      * Constructs an empty addon node context.
@@ -79,5 +82,68 @@ public final class AddonNodeContext {
      */
     public void setRuntime(PathmindRuntime runtime) {
         this.runtime = runtime;
+    }
+
+    /**
+     * Returns the stable per-node identity string used by addon renderers and input handlers
+     * to key their per-node state maps (Phase 3 API extension, open-question #2).
+     *
+     * <p>Pathmind generates a stable UUID once per ADDON node and persists it in the node's
+     * extra-fields blob under key {@code "_node_id"}. Guaranteed non-null when called from
+     * a render or input callback; may be {@code null} in executor contexts.
+     *
+     * @return node identity string, or null if not yet populated
+     */
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    /**
+     * Sets the stable per-node identity string.
+     *
+     * @param nodeId the identity string (typically a UUID)
+     */
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    /**
+     * Returns the most recent Lua error message for this node, or {@code null} if none.
+     *
+     * <p>Persisted in the node's extra-fields blob so that the error strip survives
+     * preset save and reload.
+     *
+     * @return last error message, or null if no error
+     */
+    public String getLastError() {
+        return lastError;
+    }
+
+    /**
+     * Sets the most recent error message for this node.
+     *
+     * @param lastError error message string, or null to clear
+     */
+    public void setLastError(String lastError) {
+        this.lastError = lastError;
+    }
+
+    /**
+     * Returns the 1-based source line number associated with {@link #getLastError()},
+     * or {@code 0} if no error or the line is unknown.
+     *
+     * @return 1-based error line, or 0
+     */
+    public int getLastErrorLine() {
+        return lastErrorLine;
+    }
+
+    /**
+     * Sets the 1-based source line number for the last error.
+     *
+     * @param lastErrorLine 1-based line number, or 0 if unknown
+     */
+    public void setLastErrorLine(int lastErrorLine) {
+        this.lastErrorLine = lastErrorLine;
     }
 }

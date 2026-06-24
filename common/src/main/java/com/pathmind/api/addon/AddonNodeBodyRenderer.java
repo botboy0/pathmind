@@ -28,4 +28,22 @@ public interface AddonNodeBodyRenderer {
      * @param height available height in pixels
      */
     void render(AddonNodeContext ctx, DrawContext draw, int x, int y, int width, int height);
+
+    /**
+     * Called by NodeGraph after the scissor clip has been disabled, allowing the addon to
+     * render popups or overlays that must escape the node body clip region (Phase 3 API extension).
+     *
+     * <p>Default no-op — existing body renderers that do not require an unclipped overlay
+     * pass do not need to implement this method. Backward compatible.
+     *
+     * @param ctx    the addon node's runtime context
+     * @param draw   Minecraft DrawContext for immediate-mode rendering
+     * @param x      left edge of the node body content area in screen coordinates
+     * @param y      top edge of the node body content area in screen coordinates
+     * @param width  available width in pixels
+     * @param height available height in pixels
+     */
+    default void renderOverlay(AddonNodeContext ctx, DrawContext draw,
+                               int x, int y, int width, int height) {
+    }
 }
