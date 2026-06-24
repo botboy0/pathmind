@@ -93,7 +93,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   6. UAT checkpoint: human in-game testing required — Lua execution and Baritone integration directly affect game behavior
 
 **Plans**: 4 plans (vertical slices S0–S4, sequential waves — each later plan extends the shared PathmindRuntimeImpl + PathmindBindings)
-Plans:
+
+Plans:
 **Wave 1**
 
 - [x] 02-01-PLAN.md — Cobalt build wiring + shadow relocation; PathmindRuntime interface + AddonNodeContext.getRuntime(); real worker-thread CobaltVm executor (fresh sandboxed globals, compute-time timeout, Lua error → chat + graph-halt) [Wave 1]
@@ -124,8 +125,15 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Typing `pathmind.` in the editor triggers a prefix-match suggestion list of `pathmind.*` API names that can be selected to complete the token
   5. UAT checkpoint: human in-game testing required — editor keyboard routing and EditBoxWidget shortcut behavior need in-game verification
 
-**Plans**: TBD
+**Plans**: 5 plans (vertical slices across 5 waves; Wave 0 = test scaffold, Wave 1 = Pathmind enabling API, Waves 2-4 = addon editor slices)
 **UI hint**: yes
+
+Plans:
+- [ ] 03-01-PLAN.md — Wave 0: addon-side unit-test scaffold for SuggestionEngine (EDIT-04), gutter-width formula (EDIT-02), and lastError round-trip (EDIT-03) [pathmind-lua]
+- [ ] 03-02-PLAN.md — Wave 1: Pathmind enabling API — AddonNodeInputHandler + bodyHeight + NodeDimensionCalculator ADDON branch + NodeGraph focus/input/overlay wiring + screen dispatch + mavenLocal republish [pathmind]
+- [ ] 03-03-PLAN.md — Wave 2: EDIT-01 interactive EditBoxWidget editor — EditorState + LuaScriptNodeRenderer rewrite (focus, key/char/mouse/scroll, leak-proof) + Script-node registration (inputHandler, bodyHeight) [pathmind-lua]
+- [ ] 03-04-PLAN.md — Wave 3: EDIT-02 line-number gutter + EDIT-03 co-located error strip — gutter/error draw passes + serializer schema v2 + executor error write-back [pathmind-lua]
+- [ ] 03-05-PLAN.md — Wave 4: EDIT-04 autosuggestions — in-process SuggestionEngine + popup wiring (both triggers, accept/close consumption, overlay render) + end-of-phase in-game UAT (SC#5) [pathmind-lua]
 
 ## Progress
 
@@ -136,4 +144,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 4/4 | Complete   | 2026-06-13 |
-| 3. Script Node Editor + Autosuggestions | 0/TBD | Not started | - |
+| 3. Script Node Editor + Autosuggestions | 0/5 | Planned | - |
