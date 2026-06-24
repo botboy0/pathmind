@@ -1707,6 +1707,15 @@ public class PathmindVisualEditorScreen extends Screen {
                     return true;
                 }
 
+                // Phase 3: route ADDON node body clicks to the registered input handler.
+                if (clickedNode.getType() == NodeType.ADDON) {
+                    if (nodeGraph.handleAddonNodeMouseClicked(clickedNode, mouseX, mouseY, button)) {
+                        nodeGraph.focusAddonNode(clickedNode);
+                        nodeGraph.selectNode(clickedNode);
+                        return true;
+                    }
+                }
+
                 nodeGraph.stopAmountEditing(true);
                 nodeGraph.stopCoordinateEditing(true);
                 nodeGraph.stopStopTargetEditing(true);
@@ -1774,8 +1783,9 @@ public class PathmindVisualEditorScreen extends Screen {
                 return true;
             }
             
-            // Clicked on empty space - deselect and stop dragging
+            // Clicked on empty space - deselect and stop dragging; blur any focused addon node.
             nodeGraph.selectNode(null);
+            nodeGraph.blurFocusedAddonNode();
             nodeGraph.stopDraggingConnection();
                 if (button == 0) {
                     nodeGraph.stopCoordinateEditing(true);
@@ -2311,6 +2321,12 @@ public class PathmindVisualEditorScreen extends Screen {
             return true;
         }
 
+        // Phase 3: forward to focused addon node BEFORE any graph shortcuts (T-03-02-01: leak-proofing).
+        // This gate must precede handleStopTargetKeyPressed, the Esc-close, and Delete/Backspace node-delete.
+        if (nodeGraph.handleAddonInputKeyPressed(keyCode, modifiers)) {
+            return true;
+        }
+
         if (nodeGraph.handleStopTargetKeyPressed(keyCode, modifiers)) {
             return true;
         }
@@ -2439,6 +2455,11 @@ public class PathmindVisualEditorScreen extends Screen {
         // Handle book text editor overlay character typing
         if (bookTextEditorOverlay != null && bookTextEditorOverlay.isVisible()) {
             bookTextEditorOverlay.handleCharInput(chr);
+            return true;
+        }
+
+        // Phase 3: forward to focused addon node as first graph-level gate (T-03-02-01).
+        if (nodeGraph.handleAddonInputCharTyped(chr, modifiers)) {
             return true;
         }
 
@@ -2586,6 +2607,11 @@ public class PathmindVisualEditorScreen extends Screen {
         }
 
         if (nodeGraph.handleContextMenuScroll((int) mouseX, (int) mouseY, verticalAmount)) {
+            return true;
+        }
+
+        // Phase 3: forward to focused addon node before graph zoom (T-03-02-01).
+        if (nodeGraph.handleAddonInputMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
             return true;
         }
 
