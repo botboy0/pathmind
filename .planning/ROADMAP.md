@@ -127,12 +127,22 @@ Plans:
 
 **Plans**: 5 plans (vertical slices across 5 waves; Wave 0 = test scaffold, Wave 1 = Pathmind enabling API, Waves 2-4 = addon editor slices)
 **UI hint**: yes
+Plans:
+**Wave 1**
 
-Plans:
 - [ ] 03-01-PLAN.md — Wave 0: addon-side unit-test scaffold for SuggestionEngine (EDIT-04), gutter-width formula (EDIT-02), and lastError round-trip (EDIT-03) [pathmind-lua]
 - [ ] 03-02-PLAN.md — Wave 1: Pathmind enabling API — AddonNodeInputHandler + bodyHeight + NodeDimensionCalculator ADDON branch + NodeGraph focus/input/overlay wiring + screen dispatch + mavenLocal republish [pathmind]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 03-03-PLAN.md — Wave 2: EDIT-01 interactive EditBoxWidget editor — EditorState + LuaScriptNodeRenderer rewrite (focus, key/char/mouse/scroll, leak-proof) + Script-node registration (inputHandler, bodyHeight) [pathmind-lua]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 03-04-PLAN.md — Wave 3: EDIT-02 line-number gutter + EDIT-03 co-located error strip — gutter/error draw passes + serializer schema v2 + executor error write-back [pathmind-lua]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 03-05-PLAN.md — Wave 4: EDIT-04 autosuggestions — in-process SuggestionEngine + popup wiring (both triggers, accept/close consumption, overlay render) + end-of-phase in-game UAT (SC#5) [pathmind-lua]
 
 ## Progress
