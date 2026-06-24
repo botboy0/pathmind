@@ -6,14 +6,14 @@ current_phase: 3
 current_phase_name: Script Node Editor + Autosuggestions
 status: executing
 stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-06-24T22:57:17.144Z"
+last_updated: "2026-06-24T23:13:31.381Z"
 last_activity: 2026-06-24
 last_activity_desc: Phase 3 execution started
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 21
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 3 (Script Node Editor + Autosuggestions) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-06-24 -- Phase 3 execution started
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02-lua-vm-core-bindings P03 | 7min | 2 tasks | 4 files |
 | Phase 02-lua-vm-core-bindings P04 | 10min | 2 tasks | 3 files |
 | Phase 03-script-node-editor-autosuggestions P01 | 4min | 2 tasks | 5 files |
+| Phase 03 P02 | 35min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase ?]: CobaltVm source imports use org.squiddev.cobalt (compile-time); shadow relocation to com.mrmysterium.pathmindlua.shadow.cobalt happens at JAR time
 - [Phase ?]: Compute-time timeout clock pause via computeMs accumulator in CobaltVm
 - [Phase ?]: Inventory iteration: inventory.getStack(i) avoids private .main field; player position: getX/Y/Z not getPos() (Yarn mappings); carrier shape: Object[3] positional array for version-agnostic addon contract
+- [Phase ?]: renderOverlay added as default no-op to both AddonNodeBodyRenderer and AddonNodeInputHandler; NodeGraph calls both after disableScissor
 
 ### Pending Todos
 
@@ -112,6 +114,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-24T22:57:17.138Z
+Last session: 2026-06-24T23:13:23.948Z
 Stopped at: Phase 3 UI-SPEC approved
 Resume file: .planning/phases/03-script-node-editor-autosuggestions/03-UI-SPEC.md

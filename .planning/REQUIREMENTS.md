@@ -37,7 +37,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### In-Node Editor
 
-- [ ] **EDIT-01**: Script node body contains a functional plain-text multiline editor (cursor movement, selection, scrolling, copy/paste)
+- [x] **EDIT-01**: Script node body contains a functional plain-text multiline editor (cursor movement, selection, scrolling, copy/paste)
 - [x] **EDIT-02**: Editor shows line numbers in a gutter
 - [x] **EDIT-03**: Last-run error (message + line) is displayed co-located with the node
 - [x] **EDIT-04**: Editor offers simple prefix-match autosuggestions for the `pathmind.*` Lua API (list generated from binding annotations or a static registry)
@@ -96,7 +96,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BIND-02 | Phase 2 | Complete |
 | BIND-03 | Phase 2 | Complete |
 | BIND-04 | Phase 2 | Complete |
-| EDIT-01 | Phase 3 | Pending |
+| EDIT-01 | Phase 3 | Complete |
 | EDIT-02 | Phase 3 | Complete |
 | EDIT-03 | Phase 3 | Complete |
 | EDIT-04 | Phase 3 | Complete |
