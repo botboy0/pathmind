@@ -125,12 +125,12 @@ Plans:
   4. Typing `pathmind.` in the editor triggers a prefix-match suggestion list of `pathmind.*` API names that can be selected to complete the token
   5. UAT checkpoint: human in-game testing required — editor keyboard routing and EditBoxWidget shortcut behavior need in-game verification
 
-**Plans**: 5 plans (vertical slices across 5 waves; Wave 0 = test scaffold, Wave 1 = Pathmind enabling API, Waves 2-4 = addon editor slices)
+**Plans**: 1/5 plans executed
 **UI hint**: yes
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Wave 0: addon-side unit-test scaffold for SuggestionEngine (EDIT-04), gutter-width formula (EDIT-02), and lastError round-trip (EDIT-03) [pathmind-lua]
+- [x] 03-01-PLAN.md — Wave 0: addon-side unit-test scaffold for SuggestionEngine (EDIT-04), gutter-width formula (EDIT-02), and lastError round-trip (EDIT-03) [pathmind-lua]
 - [ ] 03-02-PLAN.md — Wave 1: Pathmind enabling API — AddonNodeInputHandler + bodyHeight + NodeDimensionCalculator ADDON branch + NodeGraph focus/input/overlay wiring + screen dispatch + mavenLocal republish [pathmind]
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -154,4 +154,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 4/4 | Complete   | 2026-06-13 |
-| 3. Script Node Editor + Autosuggestions | 0/5 | Planned | - |
+| 3. Script Node Editor + Autosuggestions | 1/5 | In Progress|  |
