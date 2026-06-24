@@ -125,7 +125,7 @@ Plans:
   4. Typing `pathmind.` in the editor triggers a prefix-match suggestion list of `pathmind.*` API names that can be selected to complete the token
   5. UAT checkpoint: human in-game testing required — editor keyboard routing and EditBoxWidget shortcut behavior need in-game verification
 
-**Plans**: 2/5 plans executed
+**Plans**: 3/5 plans executed
 **UI hint**: yes
 Plans:
 **Wave 1**
@@ -135,7 +135,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-03-PLAN.md — Wave 2: EDIT-01 interactive EditBoxWidget editor — EditorState + LuaScriptNodeRenderer rewrite (focus, key/char/mouse/scroll, leak-proof) + Script-node registration (inputHandler, bodyHeight) [pathmind-lua]
+- [x] 03-03-PLAN.md — Wave 2: EDIT-01 interactive EditBoxWidget editor — EditorState + LuaScriptNodeRenderer rewrite (focus, key/char/mouse/scroll, leak-proof) + Script-node registration (inputHandler, bodyHeight) [pathmind-lua]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -154,4 +154,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. API Foundation + Script Node Registration | 15/15 | Complete    | 2026-06-13 |
 | 2. Lua VM + Core Bindings | 4/4 | Complete   | 2026-06-13 |
-| 3. Script Node Editor + Autosuggestions | 2/5 | In Progress|  |
+| 3. Script Node Editor + Autosuggestions | 3/5 | In Progress|  |
