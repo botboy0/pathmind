@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Script Node Editor + Autosuggestions
 status: executing
-stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-06-24T23:22:41.686Z"
-last_activity: 2026-06-24
-last_activity_desc: Phase 3 execution started
+stopped_at: Completed 03-04 gutter + error strip
+last_updated: "2026-06-25T00:00:00.000Z"
+last_activity: 2026-06-25
+last_activity_desc: Phase 3 Plan 04 executed — gutter + error strip (EDIT-02/03)
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 24
-  completed_plans: 22
-  percent: 67
+  completed_plans: 23
+  percent: 71
 ---
 
 # Project State
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 3 (Script Node Editor + Autosuggestions) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
-Last activity: 2026-06-24 -- Phase 3 execution started
+Last activity: 2026-06-25 -- Completed Plan 04 (gutter + error strip EDIT-02/03)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03-script-node-editor-autosuggestions P01 | 4min | 2 tasks | 5 files |
 | Phase 03 P02 | 35min | 3 tasks | 7 files |
 | Phase 03-script-node-editor-autosuggestions P03 | 30 | 2 tasks | 3 files |
+| Phase 03-script-node-editor-autosuggestions P04 | 35min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Inventory iteration: inventory.getStack(i) avoids private .main field; player position: getX/Y/Z not getPos() (Yarn mappings); carrier shape: Object[3] positional array for version-agnostic addon contract
 - [Phase ?]: renderOverlay added as default no-op to both AddonNodeBodyRenderer and AddonNodeInputHandler; NodeGraph calls both after disableScissor
 - [Phase ?]: renderOverlay explicit override in LuaScriptNodeRenderer
+- [03-04]: LuaLastError thread-local chosen to carry CobaltVm error message to LuaNodeExecutor.whenComplete (avoids modifying NodeResult enum or AddonNodeContext callback)
+- [03-04]: getScrollY() confirmed public on ScrollableWidget MC 1.21.4 Yarn (Assumption A1 verified via javap bytecode); returns double, divided by LINE_HEIGHT for gutter scroll sync
+- [03-04]: TooltipRenderer replicated inline in LuaScriptNodeRenderer (Pathmind internal not on addon API surface); uses UITheme.TOOLTIP_BG + TOOLTIP_BORDER
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-24T23:22:33.499Z
-Stopped at: Phase 3 UI-SPEC approved
-Resume file: .planning/phases/03-script-node-editor-autosuggestions/03-UI-SPEC.md
+Last session: 2026-06-25T00:00:00.000Z
+Stopped at: Completed 03-04-PLAN.md (gutter + error strip)
+Resume file: .planning/phases/03-script-node-editor-autosuggestions/03-05-PLAN.md
