@@ -1710,10 +1710,20 @@ public class PathmindVisualEditorScreen extends Screen {
                 // Phase 3: route ADDON node body clicks to the registered input handler.
                 if (clickedNode.getType() == NodeType.ADDON) {
                     if (nodeGraph.handleAddonNodeMouseClicked(clickedNode, mouseX, mouseY, button)) {
-                        nodeGraph.focusAddonNode(clickedNode);
+                        // WR-01 fix: only call focusAddonNode when a different node is being
+                        // focused — avoid spurious blur+refocus (and cursor blink reset) on every
+                        // click inside the already-focused editor.
+                        if (!nodeGraph.isFocusedAddonNode(clickedNode)) {
+                            nodeGraph.focusAddonNode(clickedNode);
+                        }
                         nodeGraph.selectNode(clickedNode);
                         return true;
                     }
+                } else {
+                    // CR-03 fix: clicking any non-ADDON node must release Lua editor keyboard
+                    // focus.  Without this, the focused Lua editor swallows Delete/Backspace/
+                    // arrow keys on the newly-selected node indefinitely.
+                    nodeGraph.blurFocusedAddonNode();
                 }
 
                 nodeGraph.stopAmountEditing(true);
@@ -2323,7 +2333,9 @@ public class PathmindVisualEditorScreen extends Screen {
 
         // Phase 3: forward to focused addon node BEFORE any graph shortcuts (T-03-02-01: leak-proofing).
         // This gate must precede handleStopTargetKeyPressed, the Esc-close, and Delete/Backspace node-delete.
-        if (nodeGraph.handleAddonInputKeyPressed(keyCode, modifiers)) {
+        // WR-02 fix: pass the real scanCode rather than a hardcoded -1 so platform-specific key
+        // disambiguation (non-QWERTY layouts, EditBoxWidget internal scan-code usage) works correctly.
+        if (nodeGraph.handleAddonInputKeyPressed(keyCode, scanCode, modifiers)) {
             return true;
         }
 
