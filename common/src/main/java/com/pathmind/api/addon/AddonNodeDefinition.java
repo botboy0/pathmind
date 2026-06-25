@@ -229,17 +229,19 @@ public final class AddonNodeDefinition {
          * Builds the {@link AddonNodeDefinition}.
          *
          * @return the built definition
-         * @throws NullPointerException if id, displayName, or category is missing
+         * @throws IllegalArgumentException if id, displayName, or category is missing or blank
+         *   (IN-01: IllegalArgumentException is the conventional Java choice for builder validation;
+         *   NullPointerException was incorrect and misleading for a user-triggered omission)
          */
         public AddonNodeDefinition build() {
             if (id == null || id.isBlank()) {
-                throw new NullPointerException("id is required");
+                throw new IllegalArgumentException("id is required");
             }
             if (displayName == null || displayName.isBlank()) {
-                throw new NullPointerException("displayName is required");
+                throw new IllegalArgumentException("displayName is required");
             }
             if (category == null) {
-                throw new NullPointerException("category is required");
+                throw new IllegalArgumentException("category is required");
             }
             return new AddonNodeDefinition(this);
         }
