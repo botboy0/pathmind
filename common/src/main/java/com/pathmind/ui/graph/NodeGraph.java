@@ -9451,10 +9451,11 @@ public class NodeGraph {
      * graph shortcuts from leaking (T-03-02-01).
      *
      * @param keyCode   GLFW key code
+     * @param scanCode  platform scan code (WR-02: propagated from Screen.keyPressed, not hardcoded -1)
      * @param modifiers bitmask of active modifier keys
      * @return true if the event was consumed by the addon handler
      */
-    public boolean handleAddonInputKeyPressed(int keyCode, int modifiers) {
+    public boolean handleAddonInputKeyPressed(int keyCode, int scanCode, int modifiers) {
         if (focusedAddonNode == null) {
             return false;
         }
@@ -9464,7 +9465,7 @@ public class NodeGraph {
         }
         AddonNodeContext ctx = buildAddonContext(focusedAddonNode);
         try {
-            return handler.keyPressed(ctx, keyCode, -1, modifiers);
+            return handler.keyPressed(ctx, keyCode, scanCode, modifiers);
         } catch (Throwable t) {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon keyPressed threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
@@ -9583,29 +9584,37 @@ public class NodeGraph {
 
         Map<String, Object> extra = node.getAddonExtraFields();
 
-        if (extra != null) {
-            // Script text
-            Object scriptObj = extra.get("script");
-            ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
-
-            // Stable node identity (generate once, persist in extra-fields)
-            Object rawId = extra.get("_node_id");
-            String nodeId;
-            if (rawId instanceof String s && !s.isBlank()) {
-                nodeId = s;
-            } else {
-                nodeId = UUID.randomUUID().toString();
-                extra.put("_node_id", nodeId);
-            }
-            ctx.setNodeId(nodeId);
-
-            // Last error (T-03-02-04: read defensively)
-            Object rawError = extra.get("lastError");
-            ctx.setLastError(rawError instanceof String s ? s : null);
-
-            Object rawLine = extra.get("lastErrorLine");
-            ctx.setLastErrorLine(rawLine instanceof Number n ? n.intValue() : 0);
+        // CR-02 fix: ensure extraFields is always initialised for ADDON nodes so the stable
+        // _node_id UUID is generated and persisted unconditionally (even before the first
+        // save/load cycle).  Without this, fresh ADDON nodes return null here and fall through
+        // to the null branch, leaving ctx.getNodeId() == null — causing all unsaved nodes to
+        // share the renderer's "default" EditorState and corrupting each other's text.
+        if (extra == null) {
+            extra = new java.util.LinkedHashMap<>();
+            node.setAddonExtraFields(extra);
         }
+
+        // Script text
+        Object scriptObj = extra.get("script");
+        ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
+
+        // Stable node identity (generate once, persist in extra-fields)
+        Object rawId = extra.get("_node_id");
+        String nodeId;
+        if (rawId instanceof String s && !s.isBlank()) {
+            nodeId = s;
+        } else {
+            nodeId = UUID.randomUUID().toString();
+            extra.put("_node_id", nodeId);
+        }
+        ctx.setNodeId(nodeId);
+
+        // Last error (T-03-02-04: read defensively)
+        Object rawError = extra.get("lastError");
+        ctx.setLastError(rawError instanceof String s ? s : null);
+
+        Object rawLine = extra.get("lastErrorLine");
+        ctx.setLastErrorLine(rawLine instanceof Number n ? n.intValue() : 0);
 
         return ctx;
     }
