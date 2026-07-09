@@ -13,6 +13,7 @@ final class NodeExecutionCompletion {
 
     static void fail(Node owner, MinecraftClient client, CompletableFuture<Void> future, String message) {
         if (owner != null && client != null && message != null && !message.isEmpty()) {
+            com.pathmind.execution.ExecutionManager.getInstance().recordNodeFailure(message);
             owner.sendNodeErrorMessage(client, message);
         }
         complete(future);

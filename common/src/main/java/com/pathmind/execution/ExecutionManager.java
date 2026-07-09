@@ -335,6 +335,29 @@ public class ExecutionManager {
         return result;
     }
 
+    // Node-failure observability: node failures complete their futures normally and only
+    // surface as a notification, so external observers (e.g. the test harness) need a
+    // queryable record that a node reported an error during an interval.
+    private final java.util.concurrent.atomic.AtomicLong nodeFailureCount =
+        new java.util.concurrent.atomic.AtomicLong();
+    private volatile String lastNodeFailureMessage;
+
+    /** Records a node failure surfaced through the fail path. Called by NodeExecutionCompletion. */
+    public void recordNodeFailure(String message) {
+        lastNodeFailureMessage = message;
+        nodeFailureCount.incrementAndGet();
+    }
+
+    /** Monotonic count of node failures this session. */
+    public long getNodeFailureCount() {
+        return nodeFailureCount.get();
+    }
+
+    /** Message of the most recent node failure, or null if none occurred yet. */
+    public String getLastNodeFailureMessage() {
+        return lastNodeFailureMessage;
+    }
+
     public boolean setRuntimeVariable(Node startNode, String name, RuntimeVariable value) {
         if (startNode == null || name == null || name.trim().isEmpty() || value == null) {
             return false;
