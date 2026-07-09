@@ -132,9 +132,11 @@ No new threat surface beyond what the threat model covers.
 
 ## Self-Check: PASSED
 
-- EditorState.java: FOUND (C:/Users/Trynda/Desktop/Dev/sidequests/pathmind-lua/src/main/java/com/mrmysterium/pathmindlua/EditorState.java)
+- EditorState.java: FOUND
 - LuaScriptNodeRenderer.java: FOUND (rewritten)
 - LuaAddonEntrypoint.java: FOUND (updated)
-- Addon repo commits: 6a3919f, f4ef117 — both present
-- Build: `./gradlew build` SUCCESSFUL (pathmind-lua, MC 1.21.4)
+- 03-03-SUMMARY.md: FOUND
+- Addon repo commits: 6a3919f, f4ef117 — verified in `git log --oneline`
+- Pathmind repo commit: 37ced24 — docs commit with SUMMARY, STATE, ROADMAP
+- Build: `./gradlew build` SUCCESSFUL (pathmind-lua, MC 1.21.4, 10 tasks)
 - Pathmind API version: com.pathmind:pathmind-fabric:1.1.5+mc1.21.4 (mavenLocal, no version bump needed)
