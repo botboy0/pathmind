@@ -9517,8 +9517,10 @@ public class NodeGraph {
             return false;
         }
         AddonNodeContext ctx = buildAddonContext(focusedAddonNode);
+        // Same render-space contract as handleAddonNodeMouseClicked.
+        float scale = getZoomScale() <= 0.0f ? 1.0f : getZoomScale();
         try {
-            return handler.mouseScrolled(ctx, mouseX, mouseY, horizontalAmount, verticalAmount);
+            return handler.mouseScrolled(ctx, mouseX / scale, mouseY / scale, horizontalAmount, verticalAmount);
         } catch (Throwable t) {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon mouseScrolled threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
@@ -9542,8 +9544,13 @@ public class NodeGraph {
             return false;
         }
         AddonNodeContext ctx = buildAddonContext(node);
+        // Contract: input handlers receive coordinates in the same space as
+        // AddonNodeBodyRenderer.render(). The graph renders under a scale(zoomScale)
+        // matrix, so render-space = screen-space / zoomScale — convert before forwarding
+        // or the addon's hit-tests only line up at 100% zoom.
+        float scale = getZoomScale() <= 0.0f ? 1.0f : getZoomScale();
         try {
-            return handler.mouseClicked(ctx, mouseX, mouseY, button);
+            return handler.mouseClicked(ctx, mouseX / scale, mouseY / scale, button);
         } catch (Throwable t) {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon mouseClicked threw for {}: {}", node.getAddonTypeId(), t.getMessage());
