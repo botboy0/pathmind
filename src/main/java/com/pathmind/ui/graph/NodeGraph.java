@@ -162,14 +162,7 @@ public class NodeGraph {
     private final Map<Node, AnimatedValue> amountToggleAnimations = new WeakHashMap<>();
     private final Map<Node, AnimatedValue> randomRoundingToggleAnimations = new WeakHashMap<>();
 
-    // Context menu state
-    private com.pathmind.ui.menu.ContextMenu contextMenu = null;
-    private com.pathmind.ui.menu.NodeContextMenu nodeContextMenu = null;
-    private int contextMenuWorldX = 0;
-    private int contextMenuWorldY = 0;
-    private int nodeContextMenuWorldX = 0;
-    private int nodeContextMenuWorldY = 0;
-    private Node nodeContextMenuTarget = null;
+    private final NodeGraphContextMenuSupport contextMenuSupport = new NodeGraphContextMenuSupport(this);
 
     // Double-click detection
     private long lastClickTime = 0;
@@ -2325,152 +2318,66 @@ public class NodeGraph {
      * Shows the context menu at the specified screen position.
      */
     public void showContextMenu(int screenX, int screenY, com.pathmind.ui.sidebar.Sidebar sidebar, int screenWidth, int screenHeight) {
-        closeNodeContextMenu();
-        if (contextMenu == null) {
-            contextMenu = new com.pathmind.ui.menu.ContextMenu(sidebar);
-        }
-        contextMenu.setScale(getZoomScale());
-        // Store the world coordinates where nodes should be created
-        contextMenuWorldX = screenToWorldX(screenX);
-        contextMenuWorldY = screenToWorldY(screenY);
-        contextMenu.setAnchorScreen(screenX, screenY);
-        contextMenu.showAt(screenX, screenY, screenWidth, screenHeight);
+        contextMenuSupport.showContextMenu(screenX, screenY, sidebar, screenWidth, screenHeight);
     }
 
     public void showNodeContextMenu(int screenX, int screenY, Node targetNode, int screenWidth, int screenHeight) {
-        closeContextMenu();
-        if (nodeContextMenu == null) {
-            nodeContextMenu = new com.pathmind.ui.menu.NodeContextMenu();
-        }
-        nodeContextMenuTarget = targetNode;
-        nodeContextMenuWorldX = screenToWorldX(screenX);
-        nodeContextMenuWorldY = screenToWorldY(screenY);
-        nodeContextMenu.setScale(getZoomScale());
-        nodeContextMenu.setAnchorScreen(screenX, screenY);
-        nodeContextMenu.showAt(screenX, screenY, screenWidth, screenHeight);
+        contextMenuSupport.showNodeContextMenu(screenX, screenY, targetNode, screenWidth, screenHeight);
     }
 
     /**
      * Closes the context menu if it's open.
      */
     public void closeContextMenu() {
-        if (contextMenu != null) {
-            contextMenu.close();
-        }
+        contextMenuSupport.closeContextMenu();
     }
 
     public void closeNodeContextMenu() {
-        if (nodeContextMenu != null) {
-            nodeContextMenu.close();
-        }
-        nodeContextMenuTarget = null;
+        contextMenuSupport.closeNodeContextMenu();
     }
 
     /**
      * Returns true if the context menu is open.
      */
     public boolean isContextMenuOpen() {
-        return contextMenu != null && contextMenu.isOpen();
+        return contextMenuSupport.isContextMenuOpen();
     }
 
     public boolean isNodeContextMenuOpen() {
-        return nodeContextMenu != null && nodeContextMenu.isOpen();
+        return contextMenuSupport.isNodeContextMenuOpen();
     }
 
     /**
      * Updates the context menu hover state.
      */
     public void updateContextMenuHover(int mouseX, int mouseY) {
-        if (contextMenu != null && contextMenu.isOpen()) {
-            int anchorScreenX = worldToScreenX(contextMenuWorldX);
-            int anchorScreenY = worldToScreenY(contextMenuWorldY);
-            contextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-            contextMenu.setScale(getZoomScale());
-            contextMenu.updateHover(mouseX, mouseY);
-        }
+        contextMenuSupport.updateContextMenuHover(mouseX, mouseY);
     }
 
     public void updateNodeContextMenuHover(int mouseX, int mouseY) {
-        if (nodeContextMenu != null && nodeContextMenu.isOpen()) {
-            int anchorScreenX = worldToScreenX(nodeContextMenuWorldX);
-            int anchorScreenY = worldToScreenY(nodeContextMenuWorldY);
-            nodeContextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-            nodeContextMenu.setScale(getZoomScale());
-            nodeContextMenu.updateHover(mouseX, mouseY);
-        }
+        contextMenuSupport.updateNodeContextMenuHover(mouseX, mouseY);
     }
 
     /**
      * Handles a click on the context menu. Returns the selected NodeType, or null.
      */
     public ContextMenuSelection handleContextMenuClick(int mouseX, int mouseY) {
-        if (contextMenu != null && contextMenu.isOpen()) {
-            int anchorScreenX = worldToScreenX(contextMenuWorldX);
-            int anchorScreenY = worldToScreenY(contextMenuWorldY);
-            contextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-            contextMenu.setScale(getZoomScale());
-            return contextMenu.handleClick(mouseX, mouseY);
-        }
-        return null;
+        return contextMenuSupport.handleContextMenuClick(mouseX, mouseY);
     }
 
     public boolean handleNodeContextMenuClick(int mouseX, int mouseY) {
-        if (nodeContextMenu == null || !nodeContextMenu.isOpen()) {
-            return false;
-        }
-        int anchorScreenX = worldToScreenX(nodeContextMenuWorldX);
-        int anchorScreenY = worldToScreenY(nodeContextMenuWorldY);
-        nodeContextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-        nodeContextMenu.setScale(getZoomScale());
-        com.pathmind.ui.menu.NodeContextMenuAction action = nodeContextMenu.handleClick(mouseX, mouseY);
-        if (action == null) {
-            closeNodeContextMenu();
-            return true;
-        }
-
-        if (nodeContextMenuTarget != null && !isNodeSelected(nodeContextMenuTarget)) {
-            selectNode(nodeContextMenuTarget);
-        }
-
-        switch (action) {
-            case COPY:
-                copySelectedNodeToClipboard();
-                break;
-            case DUPLICATE:
-                duplicateSelectedNode();
-                break;
-            case PASTE:
-                pasteClipboardNode();
-                break;
-            case DELETE:
-                deleteSelectedNode();
-                break;
-        }
-        closeNodeContextMenu();
-        return true;
+        return contextMenuSupport.handleNodeContextMenuClick(mouseX, mouseY);
     }
 
     /**
      * Renders the context menu.
      */
     public void renderContextMenu(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY) {
-        if (contextMenu != null && contextMenu.isOpen()) {
-            int anchorScreenX = worldToScreenX(contextMenuWorldX);
-            int anchorScreenY = worldToScreenY(contextMenuWorldY);
-            contextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-            contextMenu.setScale(getZoomScale());
-            contextMenu.render(context, textRenderer, mouseX, mouseY);
-        }
+        contextMenuSupport.renderContextMenu(context, textRenderer, mouseX, mouseY);
     }
 
     public void renderNodeContextMenu(DrawContext context, TextRenderer textRenderer) {
-        if (nodeContextMenu != null && nodeContextMenu.isOpen()) {
-            int anchorScreenX = worldToScreenX(nodeContextMenuWorldX);
-            int anchorScreenY = worldToScreenY(nodeContextMenuWorldY);
-            nodeContextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-            nodeContextMenu.setScale(getZoomScale());
-            nodeContextMenu.render(context, textRenderer);
-        }
+        contextMenuSupport.renderNodeContextMenu(context, textRenderer);
     }
 
     /**
@@ -2488,7 +2395,7 @@ public class NodeGraph {
      * Adds a node from the context menu at the stored right-click position.
      */
     public Node addNodeFromContextMenu(NodeType type) {
-        return addNodeAtPosition(type, contextMenuWorldX, contextMenuWorldY);
+        return contextMenuSupport.addNodeFromContextMenu(type);
     }
 
     private void positionNewNode(Node node, int worldMouseX, int worldMouseY) {
@@ -2510,18 +2417,7 @@ public class NodeGraph {
      * Returns true if the context menu handled the scroll.
      */
     public boolean handleContextMenuScroll(int mouseX, int mouseY, double amount) {
-        if (contextMenu != null && contextMenu.isOpen()) {
-            int anchorScreenX = worldToScreenX(contextMenuWorldX);
-            int anchorScreenY = worldToScreenY(contextMenuWorldY);
-            contextMenu.setAnchorScreen(anchorScreenX, anchorScreenY);
-            contextMenu.setScale(getZoomScale());
-            // Check if mouse is over the menu and handle scroll
-            if (contextMenu.isMouseOver(mouseX, mouseY)) {
-                contextMenu.handleScroll(amount);
-                return true;
-            }
-        }
-        return false;
+        return contextMenuSupport.handleContextMenuScroll(mouseX, mouseY, amount);
     }
 
     public void updatePanning(int mouseX, int mouseY) {
@@ -2621,7 +2517,7 @@ public class NodeGraph {
     }
 
     public boolean focusBestMatchingNode(String query, int screenWidth, int screenHeight, int sidebarWidth, int titleBarHeight) {
-        Node match = findBestMatchingNode(query);
+        Node match = NodeGraphSearchSupport.findBestMatchingNode(nodes, query);
         if (match == null) {
             return false;
         }
@@ -2630,89 +2526,11 @@ public class NodeGraph {
     }
 
     public String getBestMatchingNodeLabel(String query) {
-        Node match = findBestMatchingNode(query);
+        Node match = NodeGraphSearchSupport.findBestMatchingNode(nodes, query);
         if (match == null || match.getType() == null) {
             return null;
         }
         return match.getType().getDisplayName();
-    }
-
-    private Node findBestMatchingNode(String query) {
-        if (query == null) {
-            return null;
-        }
-        String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
-        if (normalizedQuery.isEmpty()) {
-            return null;
-        }
-
-        Node bestNode = null;
-        int bestScore = 0;
-        for (Node node : nodes) {
-            if (node == null || node.getType() == null) {
-                continue;
-            }
-            int score = scoreNodeSearch(node, normalizedQuery);
-            if (score > bestScore) {
-                bestScore = score;
-                bestNode = node;
-            }
-        }
-        return bestNode;
-    }
-
-    private int scoreNodeSearch(Node node, String query) {
-        int bestScore = 0;
-        bestScore = Math.max(bestScore, scoreSearchCandidate(node.getType().getDisplayName(), query));
-        if (node.getMode() != null) {
-            bestScore = Math.max(bestScore, scoreSearchCandidate(node.getMode().getDisplayName(), query) - 20);
-        }
-        if (node.getId() != null) {
-            bestScore = Math.max(bestScore, scoreSearchCandidate(node.getId(), query) - 40);
-        }
-        return bestScore;
-    }
-
-    private int scoreSearchCandidate(String candidate, String query) {
-        if (candidate == null || query == null) {
-            return 0;
-        }
-        String normalizedCandidate = candidate.trim().toLowerCase(Locale.ROOT);
-        if (normalizedCandidate.isEmpty() || query.isEmpty()) {
-            return 0;
-        }
-        if (normalizedCandidate.equals(query)) {
-            return 1000;
-        }
-        if (normalizedCandidate.startsWith(query)) {
-            return 800 - Math.max(0, normalizedCandidate.length() - query.length());
-        }
-        int containsIndex = normalizedCandidate.indexOf(query);
-        if (containsIndex >= 0) {
-            return 650 - containsIndex * 6;
-        }
-
-        int fuzzyScore = fuzzySubsequenceScore(normalizedCandidate, query);
-        return fuzzyScore > 0 ? 300 + fuzzyScore : 0;
-    }
-
-    private int fuzzySubsequenceScore(String candidate, String query) {
-        int score = 0;
-        int streak = 0;
-        int queryIndex = 0;
-        for (int i = 0; i < candidate.length() && queryIndex < query.length(); i++) {
-            if (candidate.charAt(i) == query.charAt(queryIndex)) {
-                score += 8 + streak * 4;
-                streak++;
-                queryIndex++;
-            } else {
-                streak = 0;
-            }
-        }
-        if (queryIndex != query.length()) {
-            return 0;
-        }
-        return Math.max(1, score - Math.max(0, candidate.length() - query.length()));
     }
     
     // Convert screen coordinates to world coordinates
