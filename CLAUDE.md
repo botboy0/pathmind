@@ -385,3 +385,11 @@ No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skill
 ## Documentation
 
 Project documentation lives in the Docusaurus site at `website/` (docs in `website/docs/`). The former GSD planning artifacts were migrated there: project overview/requirements/roadmap under `website/docs/project/`, codebase and research docs under `website/docs/codebase/` and `website/docs/research/`, and historical GSD phase plans/summaries under `website/docs/archive/`. Run the site with `cd website && npm start`; build with `npm run build`. Keep durable docs in the site rather than creating new `.planning/` artifacts.
+
+**Documentation policy — every major addition gets documented in the Docusaurus site, in the same session that lands it.** "Major" means: new infrastructure or tooling, new API surface or contracts, new subsystems, or behavior changes a user or addon developer would notice. Requirements:
+
+- **Human-readable prose** written for a reader who wasn't there — what it is, why it exists, how to use it; not command dumps or commit-message summaries.
+- **Diagrams where they genuinely help** (flows, state machines, architectures): Mermaid is enabled site-wide — use ```` ```mermaid ```` code blocks (`flowchart`, `stateDiagram-v2`, `sequenceDiagram`). Screenshots/images go in `website/static/img/`.
+- **Right home:** how-to material in `docs/guides/`, architecture in `docs/codebase/`, and a dated one-line entry in `docs/project/roadmap.md` whenever a milestone item or infrastructure piece lands.
+- **Update, don't duplicate:** if an existing page covers the area (e.g. the addon getting-started guide), extend it rather than creating a parallel page.
+- Verify the site still builds after doc changes: `cd website && npm run build`.

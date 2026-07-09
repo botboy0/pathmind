@@ -298,6 +298,33 @@ public class MyNodeRenderer implements AddonNodeBodyRenderer {
 
 Pass the renderer to the builder: `.bodyRenderer(new MyNodeRenderer())`.
 
+### Coordinate space and input handling
+
+The `(x, y, width, height)` passed to `render()` is the node **body content area**
+(already below the node header), in **render space**: the node graph draws under a
+`scale(zoomScale)` matrix, so these are *not* raw screen pixels.
+
+If your addon also implements `AddonNodeInputHandler` (keyboard/mouse for interactive
+node bodies, like the Lua editor), the mouse coordinates you receive in `mouseClicked`
+and `mouseScrolled` are converted to that **same render space** before they reach you —
+hit-testing against the positions you computed in `render()` works at every zoom level.
+
+```mermaid
+flowchart LR
+    S[screen pixels] -->|/ zoomScale| R[render space]
+    R --> render["render(ctx, draw, x, y, w, h)"]
+    R --> click["mouseClicked(ctx, mouseX, mouseY, button)"]
+```
+
+Input-handler contract for interactive bodies:
+
+- **Only consume clicks that land inside your interactive area** (return `false`
+  otherwise). Consuming every click makes the node impossible to select or drag —
+  header clicks must fall through to the graph.
+- While your editor holds keyboard focus, return `true` from `keyPressed`/`charTyped`
+  for **every** key, or keystrokes leak into graph shortcuts (Delete-node, arrow-pan).
+- Release focus when a click lands outside your interactive area.
+
 ---
 
 ## 9. Build and test
@@ -351,3 +378,11 @@ appears in the node editor when the user opens it.
 Presets containing your nodes continue to load — your nodes appear as grayed-out
 placeholders that preserve all stored data (D-09). When your addon is re-installed,
 the placeholders become live nodes with data intact.
+
+### How `NodeResult.FAILURE` surfaces
+
+Returning `FAILURE` from your executor stops the graph at your node, shows an error
+notification overlay, and — important for tooling — **completes the execution future
+normally**, not exceptionally. External observers (test harnesses, other mods) can
+detect node failures via `ExecutionManager.getNodeFailureCount()` and
+`getLastNodeFailureMessage()`, which record every failure routed through the fail path.

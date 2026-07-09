@@ -26,10 +26,13 @@ const config: Config = {
   markdown: {
     // .md files (migrated GSD planning docs) parse as CommonMark, .mdx as MDX.
     format: 'detect',
+    mermaid: true,
     hooks: {
       onBrokenMarkdownLinks: 'warn',
     },
   },
+
+  themes: ['@docusaurus/theme-mermaid'],
 
   i18n: {
     defaultLocale: 'en',
