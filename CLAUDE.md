@@ -382,25 +382,6 @@ Two co-developed pieces of work: (1) refactoring Pathmind — a visual node-base
 No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
 <!-- GSD:skills-end -->
 
-<!-- GSD:workflow-start source:GSD defaults -->
+## Documentation
 
-## GSD Workflow Enforcement
-
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
-
-<!-- GSD:profile-start -->
-
-## Developer Profile
-
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+Project documentation lives in the Docusaurus site at `website/` (docs in `website/docs/`). The former GSD planning artifacts were migrated there: project overview/requirements/roadmap under `website/docs/project/`, codebase and research docs under `website/docs/codebase/` and `website/docs/research/`, and historical GSD phase plans/summaries under `website/docs/archive/`. Run the site with `cd website && npm start`; build with `npm run build`. Keep durable docs in the site rather than creating new `.planning/` artifacts.
