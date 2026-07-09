@@ -34,3 +34,7 @@ logs/
 **/logs/
 **/crash-reports/
 *.log
+
+# Local Claude workspace and generated knowledge graph
+.claude/
+graphify-out/
