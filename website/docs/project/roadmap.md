@@ -55,10 +55,13 @@ Carried over from explicit deferrals and accepted limitations in v1. Roughly gro
 - [ ] Real instruction-budget sandboxing beyond the compute-time timeout.
 - [x] Re-arm the timeout timer after awaitable actions (2026-07-10) — `CobaltVm` now runs a periodic compute-aware watchdog with a `blocked` flag raised around action futures; also fixes the safety-net `Thread.interrupt()` killing legitimate `moveTo` waits longer than ~5.5s wall-clock.
 - [ ] Fix the off-thread `whenComplete` touching Minecraft client state (latent race flagged in Phase 1 review).
-- [ ] Provide a `print` binding in the Lua sandbox (routed to chat or log) — Cobalt's `print` lives in the excluded `SystemBaseLib`, so scripts calling it today get `attempt to call global 'print' (a nil value)`.
+- [x] Provide a `print` binding in the Lua sandbox (2026-07-10) — sandbox-safe global `print` in `CobaltVm`/`PathmindBindings.buildPrint`, tab-joins arguments via Cobalt's `toStringDirect` and routes the line to player chat; the serializer default script now runs cleanly on a fresh node (unit-tested in `CobaltVmSmokeTest`).
 - [ ] Navigator: short `moveTo` hops (≲6 blocks) can be rejected as "very short partial path" (`MIN_PARTIAL_PATH_LENGTH` floor) even on flat ground — seen intermittently in headless test runs.
 
 ### Editor
+
+_The four items closed on 2026-07-10 (print binding, strip first-line, strip dimming, focus re-gain) are verified in-game by the new mc-testkit spec `specs/lua-v2-print-dim.yaml` (passing run `20260710-180204`), alongside the unit tests in `CobaltVmSmokeTest` / `LuaScriptNodeRendererTextTest`._
+
 - [ ] Cursor-aware suggestion acceptance via an `EditBoxWidget` cursor-accessor mixin (mid-script completion currently jumps the cursor to end).
 - [ ] Evict stale entries from the per-node editor-state map.
 - [ ] Syntax highlighting.
@@ -66,8 +69,9 @@ Carried over from explicit deferrals and accepted limitations in v1. Roughly gro
 - [ ] Handle `\n` in error tooltips (Lua stack traces wrap incorrectly).
 - [ ] Suggestion popup anchors one row too high: its first entry overlaps the current editor line's text (reported consistently by vision-run commentary, e.g. mc-testkit run `20260710-100816` steps 15/16).
 - [ ] Editor text rendering artifact around the `=` glyph / cursor on active lines ("crossed box" between variable and value; multiple independent commentary reports across runs) — verify whether the editor font atlas or caret rendering corrupts the glyph.
-- [ ] Error strip renders the raw multi-line Lua message on one line — the newline before `stack traceback` shows as a box glyph (commentary, run `20260710-090058` step 23). Truncate at the first line / sanitize control chars.
-- [ ] Error strip persists while the script is edited (by design: last-run state until the next run) — but the line number can then point at code that no longer exists (commentary, run `20260710-090058` step 28). Consider clearing or dimming the strip on edit.
+- [x] Error strip multi-line message → box glyph (2026-07-10) — the strip now renders only the first line of the error (`LuaScriptNodeRenderer.firstLine`, unit-tested); the full traceback stays available in the hover tooltip.
+- [x] Editor focus lost after Esc-blur (2026-07-10, found by the new `lua-v2-print-dim` vision spec) — after blurring the editor with Esc, clicking back into it never re-focused: NodeGraph's WR-01 guard skips `focusAddonNode` when it still considers the node focused, and the addon's Esc self-blur is invisible to NodeGraph, so `onFocusGained` never re-fired and keystrokes leaked to the graph (Esc closed the whole screen). The addon now takes focus directly in its `mouseClicked` handler (idempotent with `onFocusGained`).
+- [x] Error strip stale after editing (2026-07-10) — the strip now dims (subtle border + tertiary text) once the script differs from the snapshot taken when the error was recorded (`EditorState.isErrorStale`); it stays red while the script matches the failing run. Known limit: a re-run of an edited script producing a byte-identical error message keeps the strip dimmed (errors arrive value-only via the context, so a new run with the same message is indistinguishable).
 
 ---
 
