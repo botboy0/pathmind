@@ -873,6 +873,13 @@ public class NodeGraph {
         // Let the owning addon evict per-node state (and blur if this node held focus)
         // before the node leaves the graph. All discrete deletion paths funnel here.
         notifyAddonNodeRemoved(node);
+        // Hot-reload channel eviction belongs ONLY to discrete deletion — NOT to
+        // notifyAddonNodeRemoved, which also fires on graph-replacement paths (screen
+        // reopen, preset load, undo/redo) where the same node comes right back and a
+        // running chain must keep resolving its live script (found by lua-editor-v2:
+        // closing the editor mid-run evicted the entry and hot-reload fell back to
+        // the frozen snapshot).
+        evictAddonLiveScript(node);
 
         boolean removedStartNode = node.getType() == NodeType.START;
         connections.removeIf(conn ->
@@ -7422,15 +7429,25 @@ public class NodeGraph {
 
             // GAP-4: scissor-clip the renderer to the node body content rect so the addon's
             // drawTextWithShadow calls cannot escape the node bounds (T-01-09-01).
-            context.enableScissor(x + 1, y + 18, x + width - 1, y + height - 1);
+            // Body rect starts at y+15: the header bar is 14 px (y+1..y+14, drawn by
+            // renderNode) plus its 1 px bottom edge — the previous y+18 left a 3 px strip
+            // of node-body background between the header and the addon's panel.
+            context.enableScissor(x + 1, y + 15, x + width - 1, y + height - 1);
             try {
-                renderer.render(ctx, context, x + 1, y + 18, width - 2, height - 19);
+                renderer.render(ctx, context, x + 1, y + 15, width - 2, height - 16);
             } catch (Throwable t) {
                 // T-01-08: renderer threw — log once and fall back to grayed body
                 org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                     .warn("[Pathmind] Addon body renderer threw for {}: {}", addonTypeId, t.getMessage());
                 renderAddonPlaceholderBody(context, textRenderer, node.getAddonTypeId(), x, y, width, height, isOverSidebar);
             } finally {
+                // Z-order: text goes into fixed buffers that only flush at end-of-frame,
+                // while fills flush on every layer switch — without this flush the addon's
+                // (text-heavy) body would paint its glyphs OVER any node rendered later
+                // in the frame, e.g. a node dragged across the script editor. Flushing
+                // inside the scissor emits the text now, at this node's place in the
+                // paint order (and keeps it clipped to the body rect).
+                DrawContextBridge.flush(context);
                 context.disableScissor();
             }
 
@@ -7439,7 +7456,7 @@ public class NodeGraph {
             AddonNodeInputHandler handler = def != null ? def.getInputHandler() : null;
             if (handler != null) {
                 try {
-                    handler.renderOverlay(ctx, context, x + 1, y + 18, width - 2, height - 19);
+                    handler.renderOverlay(ctx, context, x + 1, y + 15, width - 2, height - 16);
                 } catch (Throwable t) {
                     org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                         .warn("[Pathmind] Addon overlay render threw for {}: {}", addonTypeId, t.getMessage());
@@ -7447,7 +7464,7 @@ public class NodeGraph {
             }
             // Also call renderOverlay on the body renderer if it implements it (default no-op is safe)
             try {
-                renderer.renderOverlay(ctx, context, x + 1, y + 18, width - 2, height - 19);
+                renderer.renderOverlay(ctx, context, x + 1, y + 15, width - 2, height - 16);
             } catch (Throwable t) {
                 org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                     .warn("[Pathmind] Addon body renderOverlay threw for {}: {}", addonTypeId, t.getMessage());
@@ -7466,7 +7483,7 @@ public class NodeGraph {
     private void renderAddonPlaceholderBody(DrawContext context, TextRenderer textRenderer,
             String addonTypeId, int x, int y, int width, int height, boolean isOverSidebar) {
         int bodyColor = isOverSidebar ? UITheme.BACKGROUND_SECONDARY : UITheme.NODE_DIMMED_BG;
-        context.fill(x + 1, y + 18, x + width - 1, y + height - 1, bodyColor);
+        context.fill(x + 1, y + 15, x + width - 1, y + height - 1, bodyColor);
 
         // GAP-5: draw a legible "missing addon" indicator inside the body
         int textX = x + 4;
@@ -9449,13 +9466,13 @@ public class NodeGraph {
         if (node == focusedAddonNode) {
             blurFocusedAddonNode();
         }
-        AddonNodeInputHandler handler = resolveInputHandler(node);
-        if (handler == null) {
-            return;
-        }
         Map<String, Object> extra = node.getAddonExtraFields();
         Object rawId = extra != null ? extra.get("_node_id") : null;
         if (!(rawId instanceof String nodeId) || nodeId.isBlank()) {
+            return;
+        }
+        AddonNodeInputHandler handler = resolveInputHandler(node);
+        if (handler == null) {
             return;
         }
         try {
@@ -9463,6 +9480,26 @@ public class NodeGraph {
         } catch (Throwable t) {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon onNodeRemoved threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+        }
+    }
+
+    /**
+     * Evicts a discretely-deleted ADDON node's hot-reload entry. Deliberately NOT part
+     * of {@link #notifyAddonNodeRemoved}: that hook also fires on graph-replacement
+     * paths (screen reopen, preset load, undo/redo restore) where the same
+     * {@code _node_id} returns immediately and a chain running mid-replacement must
+     * keep resolving the live script. {@code buildAddonContext} republishes every
+     * editor frame, so any entry that survives a replacement self-corrects on the
+     * next frame.
+     */
+    private static void evictAddonLiveScript(Node node) {
+        if (node == null || node.getType() != NodeType.ADDON) {
+            return;
+        }
+        Map<String, Object> extra = node.getAddonExtraFields();
+        Object rawId = extra != null ? extra.get("_node_id") : null;
+        if (rawId instanceof String nodeId && !nodeId.isBlank()) {
+            com.pathmind.execution.AddonLiveScripts.remove(nodeId);
         }
     }
 
@@ -9700,6 +9737,14 @@ public class NodeGraph {
         Object rawLine = extra.get("lastErrorLine");
         ctx.setLastErrorLine(rawLine instanceof Number n ? n.intValue() : 0);
 
+        // Keep the hot-reload channel mirroring the workspace every frame: this runs
+        // per rendered frame and per input event, so after ANY graph restore (screen
+        // reopen, preset load, undo/redo) the bridge converges to exactly what the
+        // editor shows — a running chain's next execution picks that up.
+        if (ctx.getScriptText() != null) {
+            com.pathmind.execution.AddonLiveScripts.publish(nodeId, ctx.getScriptText());
+        }
+
         return ctx;
     }
 
@@ -9725,6 +9770,10 @@ public class NodeGraph {
         }
         if (ctx.getScriptText() != null) {
             extra.put("script", ctx.getScriptText());
+            // Hot-reload channel: execution runs on branch clones frozen at chain start,
+            // so also publish the live text under the stable _node_id — executeAddonNode
+            // prefers it over the clone's frozen field on the next execution.
+            com.pathmind.execution.AddonLiveScripts.publish(ctx.getNodeId(), ctx.getScriptText());
         }
         extra.put("lastError", ctx.getLastError());
         extra.put("lastErrorLine", ctx.getLastErrorLine());

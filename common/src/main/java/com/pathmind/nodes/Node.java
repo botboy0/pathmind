@@ -3846,8 +3846,17 @@ public class Node {
 
         AddonNodeContext ctx = new AddonNodeContext();
         ctx.setAddonTypeId(addonTypeId);
-        // Pass script text from retained extra fields if present (set by serializer round-trip)
-        if (addonExtraFields != null && addonExtraFields.containsKey("script")) {
+        Object rawNodeId = addonExtraFields != null ? addonExtraFields.get("_node_id") : null;
+        String stableNodeId = (rawNodeId instanceof String s && !s.isBlank()) ? s : null;
+        // Script text: prefer the live editor text published under the stable _node_id
+        // (hot-reload — this node instance is a branch CLONE whose extra fields were
+        // frozen at chain start), falling back to the frozen "script" field for nodes
+        // never edited this session.
+        String liveScript = stableNodeId != null
+            ? com.pathmind.execution.AddonLiveScripts.get(stableNodeId) : null;
+        if (liveScript != null) {
+            ctx.setScriptText(liveScript);
+        } else if (addonExtraFields != null && addonExtraFields.containsKey("script")) {
             Object scriptObj = addonExtraFields.get("script");
             ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
         }
@@ -3855,11 +3864,10 @@ public class Node {
         // branch CLONE, so ctx mutations die with it — publish them under the stable
         // _node_id instead; NodeGraph.buildAddonContext consumes them into the
         // workspace node's extra fields on the next editor frame.
-        Object rawNodeId = addonExtraFields != null ? addonExtraFields.get("_node_id") : null;
-        if (rawNodeId instanceof String stableId && !stableId.isBlank()) {
-            ctx.setNodeId(stableId);
+        if (stableNodeId != null) {
+            ctx.setNodeId(stableNodeId);
             ctx.setOnErrorChanged(() -> com.pathmind.execution.AddonRuntimeErrors.put(
-                stableId, ctx.getLastError(), ctx.getLastErrorLine()));
+                stableNodeId, ctx.getLastError(), ctx.getLastErrorLine()));
         }
         // Wire runtime services (Phase 2 — PathmindRuntime bridge)
         ctx.setRuntime(new PathmindRuntimeImpl(ExecutionManager.getInstance()));

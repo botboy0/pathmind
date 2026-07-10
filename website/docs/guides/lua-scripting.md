@@ -116,4 +116,26 @@ end
 
 ## Editor
 
-The Script node body is an inline editor with a line-number gutter and autosuggestions: typing `pathmind.` (or pressing **Ctrl+Space**) opens a popup with the function list — Up/Down to select, Enter to accept, Esc to close. Esc with no popup open blurs the editor; a second Esc closes the node editor screen.
+The Script node body is an inline editor with a line-number gutter, syntax highlighting, and autosuggestions: typing `pathmind.` (or pressing **Ctrl+Space**) opens a popup with the function list — Up/Down to select, Enter to accept, Esc to close. Esc with no popup open blurs the editor; a second Esc closes the node editor screen.
+
+### Syntax highlighting
+
+Lua code is colored as you type: keywords in amber, strings in green, comments in gray, numbers in light blue, and the `pathmind.*` API (plus `print`) in sky blue. Multi-line constructs — long strings (`[[…]]`, `[=[…]=]`) and long comments (`--[[…]]`) — are colored across all the lines they span. An unterminated string is colored to the end of its line (short strings) or to the end of the script (long brackets), which makes runaway literals easy to spot before running.
+
+### Script hot-reload
+
+Script edits take effect **without restarting the graph**. When a graph starts, Pathmind executes a frozen snapshot of the nodes — but Script nodes always read the *live* editor text at the moment they execute. So if a running chain reaches (or loops back to) a Script node after you've edited it, the new code runs.
+
+The granularity is per-execution: an edit never interrupts a script that is already mid-run; it applies from the next execution of that node onward.
+
+```mermaid
+sequenceDiagram
+    participant E as Editor (workspace node)
+    participant B as Live-script channel
+    participant C as Running chain (frozen clone)
+    Note over C: Graph started — clone frozen with script v1
+    E->>B: edit script → publish v2 (keyed by node id)
+    C->>B: next execution of the Script node: latest text?
+    B-->>C: v2
+    Note over C: v2 runs — no restart needed
+```
