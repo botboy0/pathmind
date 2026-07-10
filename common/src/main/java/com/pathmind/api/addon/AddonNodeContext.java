@@ -21,6 +21,7 @@ public final class AddonNodeContext {
     private String nodeId;
     private String lastError;
     private int lastErrorLine;
+    private Runnable onErrorChanged;
 
     /**
      * Constructs an empty addon node context.
@@ -126,6 +127,7 @@ public final class AddonNodeContext {
      */
     public void setLastError(String lastError) {
         this.lastError = lastError;
+        fireErrorChanged();
     }
 
     /**
@@ -145,5 +147,27 @@ public final class AddonNodeContext {
      */
     public void setLastErrorLine(int lastErrorLine) {
         this.lastErrorLine = lastErrorLine;
+        fireErrorChanged();
+    }
+
+    /**
+     * Registers an observer invoked whenever {@link #setLastError} or
+     * {@link #setLastErrorLine} is called.
+     *
+     * <p>Execution runs on cloned nodes, so error state an executor writes to this
+     * context would otherwise never reach the workspace node the editor renders.
+     * Pathmind sets this listener before invoking an executor to route error
+     * write-backs to the stable {@code _node_id}; addons never need to call it.
+     *
+     * @param onErrorChanged observer to invoke on error mutations, or null to clear
+     */
+    public void setOnErrorChanged(Runnable onErrorChanged) {
+        this.onErrorChanged = onErrorChanged;
+    }
+
+    private void fireErrorChanged() {
+        if (onErrorChanged != null) {
+            onErrorChanged.run();
+        }
     }
 }

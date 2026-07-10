@@ -325,6 +325,26 @@ Input-handler contract for interactive bodies:
   for **every** key, or keystrokes leak into graph shortcuts (Delete-node, arrow-pan).
 - Release focus when a click lands outside your interactive area.
 
+### Persisting edits: write them back to the context
+
+The `AddonNodeContext` you receive in render and input callbacks is a **per-event
+snapshot** of the node's stored fields — mutating your own widget state is not enough.
+After every edit, commit the current value back with `ctx.setScriptText(...)`:
+Pathmind syncs context mutations into the node's persisted fields after each input
+dispatch. Skip this and your edits exist only in your widget — saving the preset or
+running the graph will use the stale stored value.
+
+Two related guarantees Pathmind provides (you don't need to do anything for these):
+
+- **Error state round-trip.** Graphs execute on cloned nodes, so `setLastError` /
+  `setLastErrorLine` calls made during execution are routed back to the workspace
+  node you render (keyed by the node's stable identity) — read them from the context
+  each frame rather than caching them once.
+- **Reserved keys survive your serializer.** Keys starting with `_` (e.g. the
+  Pathmind-managed `_node_id`) are preserved across save/load/clone even though your
+  `AddonNodeSerializer.serialize` doesn't emit them. Don't write your own data under
+  a leading underscore.
+
 ---
 
 ## 9. Build and test
@@ -356,7 +376,7 @@ sidebar under your category.
 | `AddonNodeCategory` | Runtime sidebar category POJO |
 | `AddonNodeExecutor` | Async execution contract (`CompletableFuture<NodeResult>`) |
 | `AddonNodeSerializer` | Persist/restore node state; must write `_schema_version` |
-| `AddonNodeContext` | Runtime context (addonTypeId, scriptText) |
+| `AddonNodeContext` | Runtime context (addonTypeId, scriptText, nodeId, lastError/-Line) |
 | `AddonNodeBodyRenderer` | Per-frame render hook for custom node body content |
 | `NodeResult` | `SUCCESS`, `FAILURE`, `SKIPPED` |
 | `PathmindApiVersion` | API semver constants (`VERSION`, `MIN_COMPATIBLE`) |

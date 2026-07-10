@@ -9417,6 +9417,8 @@ public class NodeGraph {
             } catch (Throwable t) {
                 org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                     .warn("[Pathmind] Addon onFocusGained threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+            } finally {
+                syncAddonContextToNode(node, ctx);
             }
         }
     }
@@ -9439,6 +9441,8 @@ public class NodeGraph {
             } catch (Throwable t) {
                 org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                     .warn("[Pathmind] Addon onFocusLost threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+            } finally {
+                syncAddonContextToNode(node, ctx);
             }
         }
     }
@@ -9470,6 +9474,8 @@ public class NodeGraph {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon keyPressed threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
             return false;
+        } finally {
+            syncAddonContextToNode(focusedAddonNode, ctx);
         }
     }
 
@@ -9495,6 +9501,8 @@ public class NodeGraph {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon charTyped threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
             return false;
+        } finally {
+            syncAddonContextToNode(focusedAddonNode, ctx);
         }
     }
 
@@ -9525,6 +9533,8 @@ public class NodeGraph {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon mouseScrolled threw for {}: {}", focusedAddonNode.getAddonTypeId(), t.getMessage());
             return false;
+        } finally {
+            syncAddonContextToNode(focusedAddonNode, ctx);
         }
     }
 
@@ -9555,6 +9565,8 @@ public class NodeGraph {
             org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
                 .warn("[Pathmind] Addon mouseClicked threw for {}: {}", node.getAddonTypeId(), t.getMessage());
             return false;
+        } finally {
+            syncAddonContextToNode(node, ctx);
         }
     }
 
@@ -9616,6 +9628,17 @@ public class NodeGraph {
         }
         ctx.setNodeId(nodeId);
 
+        // Consume any pending runtime error write-back for this node. Execution runs
+        // on branch clones, so executor errors arrive via AddonRuntimeErrors keyed by
+        // the stable _node_id — fold them into the workspace node's extra fields here
+        // so the error strip renders them and preset persistence keeps them.
+        com.pathmind.execution.AddonRuntimeErrors.Entry pendingError =
+            com.pathmind.execution.AddonRuntimeErrors.consume(nodeId);
+        if (pendingError != null) {
+            extra.put("lastError", pendingError.message());
+            extra.put("lastErrorLine", pendingError.line());
+        }
+
         // Last error (T-03-02-04: read defensively)
         Object rawError = extra.get("lastError");
         ctx.setLastError(rawError instanceof String s ? s : null);
@@ -9624,6 +9647,33 @@ public class NodeGraph {
         ctx.setLastErrorLine(rawLine instanceof Number n ? n.intValue() : 0);
 
         return ctx;
+    }
+
+    /**
+     * Writes context mutations made by an addon input handler back onto the node's
+     * extra-fields blob. {@link #buildAddonContext} hands handlers a throwaway snapshot;
+     * without this sync, script edits live only in the addon's widget state and are
+     * silently dropped by persistence and execution snapshots (found by the Phase 3
+     * error-strip UAT: typed scripts executed as the serializer default).
+     *
+     * <p>Call after every input-handler dispatch that may mutate the context
+     * (key/char/click/scroll/focus events).
+     */
+    private static void syncAddonContextToNode(Node node, AddonNodeContext ctx) {
+        if (node == null || ctx == null) {
+            return;
+        }
+        Map<String, Object> extra = node.getAddonExtraFields();
+        if (extra == null) {
+            // buildAddonContext initialises this for ADDON nodes; guard anyway.
+            extra = new java.util.LinkedHashMap<>();
+            node.setAddonExtraFields(extra);
+        }
+        if (ctx.getScriptText() != null) {
+            extra.put("script", ctx.getScriptText());
+        }
+        extra.put("lastError", ctx.getLastError());
+        extra.put("lastErrorLine", ctx.getLastErrorLine());
     }
 
     public boolean handleStopTargetKeyPressed(int keyCode, int modifiers) {

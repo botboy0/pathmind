@@ -3851,6 +3851,16 @@ public class Node {
             Object scriptObj = addonExtraFields.get("script");
             ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
         }
+        // Route executor error write-backs to the workspace node: execution runs on a
+        // branch CLONE, so ctx mutations die with it — publish them under the stable
+        // _node_id instead; NodeGraph.buildAddonContext consumes them into the
+        // workspace node's extra fields on the next editor frame.
+        Object rawNodeId = addonExtraFields != null ? addonExtraFields.get("_node_id") : null;
+        if (rawNodeId instanceof String stableId && !stableId.isBlank()) {
+            ctx.setNodeId(stableId);
+            ctx.setOnErrorChanged(() -> com.pathmind.execution.AddonRuntimeErrors.put(
+                stableId, ctx.getLastError(), ctx.getLastErrorLine()));
+        }
         // Wire runtime services (Phase 2 — PathmindRuntime bridge)
         ctx.setRuntime(new PathmindRuntimeImpl(ExecutionManager.getInstance()));
 

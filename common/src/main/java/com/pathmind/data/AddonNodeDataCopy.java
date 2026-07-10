@@ -70,12 +70,31 @@ public final class AddonNodeDataCopy {
             // Addon is installed — serialize current state
             AddonNodeContext ctx = new AddonNodeContext();
             ctx.setAddonTypeId(addonTypeId);
-            if (node.getAddonExtraFields() != null && node.getAddonExtraFields().containsKey("script")) {
-                Object scriptObj = node.getAddonExtraFields().get("script");
+            java.util.Map<String, Object> extra = node.getAddonExtraFields();
+            if (extra != null && extra.containsKey("script")) {
+                Object scriptObj = extra.get("script");
                 ctx.setScriptText(scriptObj != null ? scriptObj.toString() : null);
             }
+            // Seed error state so serializers persist the current strip, not null
+            // (schema v2 lastError/lastErrorLine round-trip).
+            if (extra != null) {
+                ctx.setLastError(extra.get("lastError") instanceof String s ? s : null);
+                ctx.setLastErrorLine(extra.get("lastErrorLine") instanceof Number n ? n.intValue() : 0);
+            }
             try {
-                nodeData.setExtraFields(ser.serialize(ctx));
+                java.util.Map<String, Object> serialized =
+                    new java.util.LinkedHashMap<>(ser.serialize(ctx));
+                // Preserve Pathmind-managed keys (e.g. the stable "_node_id") that addon
+                // serializers don't know about — dropping them on every save/snapshot/clone
+                // resets per-node editor state and breaks runtime error routing.
+                if (extra != null) {
+                    for (java.util.Map.Entry<String, Object> e : extra.entrySet()) {
+                        if (e.getKey().startsWith("_") && !serialized.containsKey(e.getKey())) {
+                            serialized.put(e.getKey(), e.getValue());
+                        }
+                    }
+                }
+                nodeData.setExtraFields(serialized);
             } catch (Throwable t) {
                 System.err.println("[Pathmind] Addon serializer threw for " + addonTypeId + ": " + t.getMessage());
                 // Fall back to retained blob if any — defensive copy (WR-02)

@@ -13,18 +13,18 @@ _Last updated: 2026-07-10_
 
 | Milestone | Status |
 |---|---|
-| **v1 — Addon API + Lua Script node** | Code complete (24/24 plans). Phase 2 UAT closed with automated evidence. One open gate: Phase 3 in-game UAT. |
+| **v1 — Addon API + Lua Script node** | ✅ **Complete (2026-07-10).** 24/24 plans, both UAT gates closed with automated evidence. |
 | **v2 — Hardening + richer API/editor** | Backlog below, not yet scheduled. |
 
 ## v1 milestone
 
 - ✅ **Phase 1 — API Foundation + Script Node Registration** (2026-06-13): addon API published as a Maven artifact, entrypoint discovery, `NodeType.ADDON` persistence, sidebar palette; Script node placeable, persistent, graceful no-op. Verified + in-game UAT 5/5.
 - ✅ **Phase 2 — Lua VM + Core Bindings** (2026-06-13): sandboxed Cobalt 0.7.3 on a worker thread, compute-time timeout, `pathmind.*` bindings (variables, awaitable `moveTo`, position/inventory/block queries), errors to chat with line numbers.
-- 🟡 **Phase 3 — Script Node Editor + Autosuggestions** (code complete 2026-06-25): inline `EditBoxWidget` editor with leak-proof focus, synced line-number gutter, persisted error strip, prefix-match autosuggestions. Deep review criticals fixed.
+- ✅ **Phase 3 — Script Node Editor + Autosuggestions** (code complete 2026-06-25, in-game UAT 6/6 2026-07-10): inline `EditBoxWidget` editor with leak-proof focus, synced line-number gutter, persisted error strip, prefix-match autosuggestions. Deep review criticals fixed; the UAT found and fixed three more cross-repo blockers (script write-back, runtime-error routing, widget content seeding — see [Planning History](./history.md)).
 
 ### Open gates before calling v1 done
 
-- [ ] **Phase 3 in-game UAT (SC#5)** — the 6-point editor checklist. **5/6 automated & passing** (2026-07-10) via the vision-testkit spec `specs/lua-editor-uat.yaml` (mc-testkit, run `20260710-100816`, ~$0.009/run): typing without key leaks, gutter sync, `pathmind.` + Ctrl+Space suggestion triggers, suggestion accept, Esc closes popup / second Esc blurs (verified via typed-text-goes-nowhere). Remaining: **error strip on failure + cleared on success** — needs port wiring (drag) and a graph run (`K`) in the spec; the driver's drag support exists.
+- [x] **Phase 3 in-game UAT (SC#5)** — the 6-point editor checklist, **6/6 automated & passing** (2026-07-10). Points 1–5 via `specs/lua-editor-uat.yaml` (run `20260710-095656`); point 6 — error strip on failure, cleared on success — via the new `specs/lua-error-strip.yaml` (run `20260710-090058`, 35 steps: place node, replace default script with one failing on line 2, wire start→node by port drag, run with `K`, assert chat `Lua error: script:2:` + red `⚠ Line 2` strip, fix script, rerun, assert strip cleared). The spec exposed **three real cross-repo blockers**, all fixed same-day: (1) editor input handlers got a throwaway context and nothing wrote script edits back to the node — typed scripts were silently dropped and execution ran the serializer default; (2) execution runs on branch clones, so executor error write-backs never reached the workspace node — errors now route via a `_node_id`-keyed `AddonRuntimeErrors` bridge; (3) `EditBoxWidget`'s constructor `message` param is narration, not content — loaded scripts rendered as an empty editor (plus the serializer round-trip dropped Pathmind-managed `_node_id`). Two testkit robustness fixes fell out too (drag-coordinate parsing, held keypresses for tick-polled keybinds).
 - [x] **Phase 2 UAT formally confirmed** (2026-07-10) — full `pathmind.*` surface exercised in-game via the automated harness (`testing/testruns/20260710-001707/`, RESULT: PASS, 7/7 presets): variable round-trips for number/string/boolean + absent→nil + table rejection (`uat-lua-vars`), `getPosition`/`getBlock` loaded + unloaded→nil/`getInventory` shape (`uat-lua-gamestate`), awaitable `moveTo` with exact arrival 12 blocks out (`uat-lua-moveto`), uncaught error stops the graph with `script:3:` line number in chat (`uat-lua-error-expectfail`), and runaway loop killed by the 5s compute budget with `script:2:` in chat (`uat-lua-timeout-expectfail`).
 
 ## Infrastructure
@@ -66,6 +66,8 @@ Carried over from explicit deferrals and accepted limitations in v1. Roughly gro
 - [ ] Handle `\n` in error tooltips (Lua stack traces wrap incorrectly).
 - [ ] Suggestion popup anchors one row too high: its first entry overlaps the current editor line's text (reported consistently by vision-run commentary, e.g. mc-testkit run `20260710-100816` steps 15/16).
 - [ ] Editor text rendering artifact around the `=` glyph / cursor on active lines ("crossed box" between variable and value; multiple independent commentary reports across runs) — verify whether the editor font atlas or caret rendering corrupts the glyph.
+- [ ] Error strip renders the raw multi-line Lua message on one line — the newline before `stack traceback` shows as a box glyph (commentary, run `20260710-090058` step 23). Truncate at the first line / sanitize control chars.
+- [ ] Error strip persists while the script is edited (by design: last-run state until the next run) — but the line number can then point at code that no longer exists (commentary, run `20260710-090058` step 28). Consider clearing or dimming the strip on edit.
 
 ---
 

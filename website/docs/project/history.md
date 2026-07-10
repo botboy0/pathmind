@@ -48,9 +48,9 @@ A condensed, human-readable trace of everything planned and shipped so far, dist
 
 ---
 
-## Phase 3 — Script Node Editor + Autosuggestions 🟡
+## Phase 3 — Script Node Editor + Autosuggestions ✅
 
-**Code complete 2026-06-25 · 5 plans · deep code review "fixes applied" (4 criticals fixed) · ⚠ the SC#5 in-game UAT gate was deferred and is not recorded as done**
+**Code complete 2026-06-25 · 5 plans · deep code review "fixes applied" (4 criticals fixed) · SC#5 in-game UAT closed 6/6 on 2026-07-10**
 
 **Goal:** a functional in-game code editor inline in the node body — multiline editing with cursor/selection/scroll/copy-paste, a synchronized line-number gutter, a persisted co-located error strip, and prefix-match autosuggestions for Lua + `pathmind.*`. This phase co-evolved both repos: Pathmind's render-only addon API grew **input routing** (focus lifecycle + key/char/mouse/scroll forwarding), and the addon built the editor on top of it.
 
@@ -64,8 +64,16 @@ A condensed, human-readable trace of everything planned and shipped so far, dist
 
 **Known v1 limitations:** `EditBoxWidget` exposes no cursor API in 1.21.4, so mid-script completion moves the cursor to the end (a mixin accessor is the tracked v2 fix); the per-node editor-state map is never evicted.
 
+**In-game UAT rounds (2026-07-10, mc-testkit vision specs):** the checklist's first five points passed via `specs/lua-editor-uat.yaml`; automating point 6 (error strip) with `specs/lua-error-strip.yaml` — the first spec to close the editor, run the graph, and reopen — exposed **three cross-repo blockers the unit tests and prior UAT flows couldn't see**, all fixed same-day:
+
+- **Script edits were never written back to the node.** `NodeGraph` hands input handlers a per-event throwaway `AddonNodeContext`, the addon never committed the widget text into it, and nothing synced the context back. Typed scripts lived only in the widget; persistence and execution snapshots ran the serializer default (whose `print(...)` call coincidentally errors on line 2 — the smoking gun in chat). Fixed on both sides: the renderer commits widget text to the context after every mutation, and `NodeGraph.syncAddonContextToNode` folds context mutations into `addonExtraFields` after every input dispatch.
+- **Runtime errors never reached the editor.** Execution runs on cloned branch nodes, so the executor's `lastError` write-back died with the clone's context. New `AddonRuntimeErrors` bridge: `AddonNodeContext` grew an internal `onErrorChanged` listener, `Node.executeAddonNode` routes error mutations into the store keyed by the stable `_node_id`, and `NodeGraph.buildAddonContext` consumes pending entries into the workspace node's fields — from where the strip renders (now refreshed from the context every frame) and persistence keeps them.
+- **The editor widget was never seeded and `_node_id` didn't survive round-trips.** `EditBoxWidget`'s constructor `message` parameter is the narration text, not content — loaded scripts rendered as an empty editor; fixed with an explicit `setText`. And `AddonNodeDataCopy` replaced `extraFields` wholesale with the addon serializer's map, dropping the Pathmind-managed `_node_id` (breaking editor-state continuity and error routing) and serializing `lastError` as null; it now seeds error state into the serialize context and preserves `_`-prefixed keys across the round-trip.
+
+Two mc-testkit robustness fixes fell out of the same rounds: tolerant drag-coordinate decoding (the grounder sometimes returns the full `[x, y]` pair under every key — naive flattening made a zero-length drag) and held keypresses (`keydown`/120 ms/`keyup`), since Pathmind's play/stop keybinds are tick-polled via `isPressed()` and never saw `xdotool key`'s instantaneous tap.
+
 ---
 
 ## Where that leaves v1
 
-All 24 plans across 3 phases are code complete with the review findings addressed. The one genuinely open v1 item is the **Phase 3 end-of-phase in-game UAT** (and Phase 2's UAT checkpoint was likewise never formally logged — in practice the Phase 2 surface has since been exercised, e.g. the `getBlock` quick fix came from real use). Everything else outstanding is tracked as v2 backlog on the [Roadmap](./roadmap.md).
+**v1 is complete (2026-07-10).** All 24 plans across 3 phases are code complete, review findings addressed, and both UAT gates closed with automated evidence (Phase 2: harness presets 7/7; Phase 3: vision-testkit editor checklist 6/6). Everything else outstanding is tracked as v2 backlog on the [Roadmap](./roadmap.md).
