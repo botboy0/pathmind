@@ -42,7 +42,7 @@ _Last updated: 2026-07-10_
 Carried over from explicit deferrals and accepted limitations in v1. Roughly grouped; nothing here is committed or ordered yet.
 
 ### API hardening
-- [ ] `AddonNodeDefinition.Builder.build()` — throw `IllegalArgumentException` with a useful message instead of NPE on blank fields (flagged in both Phase 1 and Phase 3 reviews, never fixed).
+- [x] `AddonNodeDefinition.Builder.build()` — `IllegalArgumentException` instead of NPE (closed 2026-07-10; the core switch had in fact already landed in Phase 3 commit `cd295c3` — the roadmap entry was stale). Follow-through: messages now name the offending definition id, a null `provenanceLabel` is normalized to `""` (the last remaining path that could violate a never-null getter contract), and the whole validation contract is unit-tested in `AddonNodeDefinitionBuilderTest`.
 - [ ] Restrict path-traversal characters in the node-id regex name segment.
 - [ ] Make one failed addon unable to block subsequent addon loading (public `seal()` issue).
 - [ ] Rate-limit the per-frame warn log when an addon renderer throws.

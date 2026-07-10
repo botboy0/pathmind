@@ -228,6 +228,10 @@ public final class AddonNodeDefinition {
         /**
          * Builds the {@link AddonNodeDefinition}.
          *
+         * <p>A null {@code provenanceLabel} is normalized to the empty string so
+         * {@link AddonNodeDefinition#getProvenanceLabel()} keeps its never-null contract
+         * even when an addon passes null explicitly.
+         *
          * @return the built definition
          * @throws IllegalArgumentException if id, displayName, or category is missing or blank
          *   (IN-01: IllegalArgumentException is the conventional Java choice for builder validation;
@@ -235,13 +239,19 @@ public final class AddonNodeDefinition {
          */
         public AddonNodeDefinition build() {
             if (id == null || id.isBlank()) {
-                throw new IllegalArgumentException("id is required");
+                throw new IllegalArgumentException(
+                    "Addon node definition requires a non-blank id (e.g. \"mymod:my_node\")");
             }
             if (displayName == null || displayName.isBlank()) {
-                throw new IllegalArgumentException("displayName is required");
+                throw new IllegalArgumentException(
+                    "Addon node definition '" + id + "' requires a non-blank displayName");
             }
             if (category == null) {
-                throw new IllegalArgumentException("category is required");
+                throw new IllegalArgumentException(
+                    "Addon node definition '" + id + "' requires a category");
+            }
+            if (provenanceLabel == null) {
+                provenanceLabel = "";
             }
             return new AddonNodeDefinition(this);
         }
