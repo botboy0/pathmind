@@ -60,15 +60,15 @@ Carried over from explicit deferrals and accepted limitations in v1. Roughly gro
 
 ### Editor
 
-_The four items closed on 2026-07-10 (print binding, strip first-line, strip dimming, focus re-gain) are verified in-game by the new mc-testkit spec `specs/lua-v2-print-dim.yaml` (passing run `20260710-180204`), alongside the unit tests in `CobaltVmSmokeTest` / `LuaScriptNodeRendererTextTest`._
+_The items closed on 2026-07-10 (print binding, strip first-line, strip dimming, focus re-gain, popup anchor) are verified in-game by the mc-testkit specs `lua-v2-print-dim.yaml` (run `20260710-180204`) and `lua-editor-uat.yaml` (run `20260710-183026`), alongside the unit tests in `CobaltVmSmokeTest` / `LuaScriptNodeRendererTextTest` / `PopupAnchorTest`._
 
 - [ ] Cursor-aware suggestion acceptance via an `EditBoxWidget` cursor-accessor mixin (mid-script completion currently jumps the cursor to end).
 - [ ] Evict stale entries from the per-node editor-state map.
 - [ ] Syntax highlighting.
 - [ ] Script hot-reload without graph restart.
 - [ ] Handle `\n` in error tooltips (Lua stack traces wrap incorrectly).
-- [ ] Suggestion popup anchors one row too high: its first entry overlaps the current editor line's text (reported consistently by vision-run commentary, e.g. mc-testkit run `20260710-100816` steps 15/16).
-- [ ] Editor text rendering artifact around the `=` glyph / cursor on active lines ("crossed box" between variable and value; multiple independent commentary reports across runs) — verify whether the editor font atlas or caret rendering corrupts the glyph.
+- [x] Suggestion popup anchored one row too high (2026-07-10) — the anchor was a fixed offset from the editor top; it now sits one row below the line being typed using the gutter's pixel model (last line × 9 px, scroll-corrected; `computePopupAnchorY`, unit-tested in `PopupAnchorTest`). Verified in-game: `lua-editor-uat` run `20260710-183026`, `suggestions-dot.png` shows all three script lines clear of the popup.
+- [x] ~~Editor `=` glyph rendering artifact~~ resolved as **not a bug** (2026-07-10) — the "crossed box" is the X11 mouse pointer captured in the container screenshots, parked wherever the vision model last clicked (usually mid-line, next to `=`). Cross-run evidence: the identical glyph appears between `local` and `x` (no `=` nearby) in run `20260710-175701` step 34, and run `20260710-183026` `suggestions-dot.png` shows crisp `=` glyphs with the pointer visible beside them. Vision-commentary reports of this shape can be disregarded.
 - [x] Error strip multi-line message → box glyph (2026-07-10) — the strip now renders only the first line of the error (`LuaScriptNodeRenderer.firstLine`, unit-tested); the full traceback stays available in the hover tooltip.
 - [x] Editor focus lost after Esc-blur (2026-07-10, found by the new `lua-v2-print-dim` vision spec) — after blurring the editor with Esc, clicking back into it never re-focused: NodeGraph's WR-01 guard skips `focusAddonNode` when it still considers the node focused, and the addon's Esc self-blur is invisible to NodeGraph, so `onFocusGained` never re-fired and keystrokes leaked to the graph (Esc closed the whole screen). The addon now takes focus directly in its `mouseClicked` handler (idempotent with `onFocusGained`).
 - [x] Error strip stale after editing (2026-07-10) — the strip now dims (subtle border + tertiary text) once the script differs from the snapshot taken when the error was recorded (`EditorState.isErrorStale`); it stays red while the script matches the failing run. Known limit: a re-run of an edited script producing a byte-identical error message keeps the strip dimmed (errors arrive value-only via the context, so a new run with the same message is indistinguishable).
