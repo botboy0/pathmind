@@ -3504,7 +3504,15 @@ public final class PathmindNavigator {
                             continue;
                         }
                     }
-                    if (candidatePath.size() < MIN_PARTIAL_PATH_LENGTH + 2) {
+                    // The short-partial floor exists to discard stub paths on long journeys.
+                    // It must not apply when the partial already ends near the goal — for
+                    // short hops (<~6 blocks) every legitimate path is short, and
+                    // findPathToGoal deliberately returns such near-goal partials (its
+                    // size-or-proximity acceptance). Rejecting them here made short moveTo
+                    // hops fail intermittently with "very short partial path".
+                    BlockPos shortPartialEnd = candidatePath.get(candidatePath.size() - 1);
+                    boolean endsNearGoal = horizontalDistanceSq(shortPartialEnd, candidateGoal) <= 36.0D;
+                    if (!endsNearGoal && candidatePath.size() < MIN_PARTIAL_PATH_LENGTH + 2) {
                         lastFailure = FailureReason.NO_ROUTE;
                         lastFailureDetail = "Only a very short partial path was found toward " + formatDebugPos(candidateGoal) + ".";
                         continue;

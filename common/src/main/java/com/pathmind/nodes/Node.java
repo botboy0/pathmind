@@ -3873,14 +3873,31 @@ public class Node {
         CompletableFuture<Void> future = new CompletableFuture<>();
         try {
             exec.execute(ctx).whenComplete((result, throwable) -> {
-                if (throwable != null) {
-                    NodeExecutionCompletion.completeExceptionally(future, throwable);
-                } else if (result == NodeResult.FAILURE) {
-                    // Route through the existing fail path so the graph stops at this node
-                    NodeExecutionCompletion.fail(this, net.minecraft.client.MinecraftClient.getInstance(), future,
-                        "Addon node '" + addonTypeId + "' reported FAILURE.");
+                // The executor's future completes on the addon's worker thread (e.g. the
+                // Lua VM thread). Completing the chain future there would run every
+                // downstream continuation — graph advance, execution-state mutation,
+                // client access — on that worker thread, while all other node types
+                // complete on the client tick thread (NodeCommandDispatcher runs inside
+                // client.execute). Hop to the client thread first so addon nodes follow
+                // the same threading model (latent race flagged in the Phase 1 review).
+                net.minecraft.client.MinecraftClient client =
+                    net.minecraft.client.MinecraftClient.getInstance();
+                Runnable completion = () -> {
+                    if (throwable != null) {
+                        NodeExecutionCompletion.completeExceptionally(future, throwable);
+                    } else if (result == NodeResult.FAILURE) {
+                        // Route through the existing fail path so the graph stops at this node
+                        NodeExecutionCompletion.fail(this, client, future,
+                            "Addon node '" + addonTypeId + "' reported FAILURE.");
+                    } else {
+                        future.complete(null);
+                    }
+                };
+                if (client != null) {
+                    client.execute(completion);
                 } else {
-                    future.complete(null);
+                    // Headless context (tests): no client thread to hop to.
+                    completion.run();
                 }
             });
         } catch (Throwable t) {
