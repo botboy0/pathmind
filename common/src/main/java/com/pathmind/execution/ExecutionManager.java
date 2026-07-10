@@ -494,6 +494,41 @@ public class ExecutionManager {
         return resolveRuntimeList(controller, name.trim());
     }
 
+    public boolean setRuntimeListForAnyActiveChain(String name, RuntimeList list) {
+        if (name == null || name.trim().isEmpty() || list == null) {
+            return false;
+        }
+        ChainController currentController = resolveCurrentChainController();
+        if (currentController != null) {
+            return storeRuntimeList(currentController, name.trim(), list, true);
+        }
+        for (ChainController controller : activeChains.values()) {
+            return storeRuntimeList(controller, name.trim(), list, true);
+        }
+        globalRuntimeLists.put(name.trim(), list);
+        return false;
+    }
+
+    public RuntimeList getRuntimeListFromAnyActiveChain(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return null;
+        }
+        ChainController currentController = resolveCurrentChainController();
+        if (currentController != null) {
+            RuntimeList currentValue = resolveRuntimeList(currentController, name.trim());
+            if (currentValue != null) {
+                return currentValue;
+            }
+        }
+        for (ChainController controller : activeChains.values()) {
+            RuntimeList value = resolveRuntimeList(controller, name.trim());
+            if (value != null) {
+                return value;
+            }
+        }
+        return globalRuntimeLists.get(name.trim());
+    }
+
     public List<RuntimeVariableEntry> getRuntimeVariableEntries() {
         if (activeChains.isEmpty()) {
             return Collections.emptyList();

@@ -18,27 +18,47 @@ import java.util.concurrent.CompletableFuture;
 public interface PathmindRuntime {
 
     /**
-     * Reads a node-tree variable by name.
+     * Reads a node-tree variable (or runtime list) by name.
      *
-     * <p>Supported return types: {@link Double}, {@link Boolean}, {@link String}.
-     * Returns {@code null} if the variable does not exist or its type cannot be
-     * marshaled to a supported type.
+     * <p>Supported return types:
+     * <ul>
+     *   <li>{@link Double} — numeric and distance variables</li>
+     *   <li>{@link Boolean} — boolean variables</li>
+     *   <li>{@link String} — text variables</li>
+     *   <li>{@code Map<String, Object>} — coordinate variables, with keys
+     *       {@code "x"}, {@code "y"}, {@code "z"} and Double values</li>
+     *   <li>{@code List<Object>} — when the name refers to a runtime list (the
+     *       namespace used by the Create List / Add to List / List Item nodes).
+     *       Elements are Doubles, Booleans, Strings, coordinate maps as above,
+     *       plain Strings for opaque entries (entity UUIDs, item ids, GUI slot
+     *       tokens), or {@code Map<String, String>} for other structured entries.</li>
+     * </ul>
+     * Variables shadow lists: the variable namespace is checked first. Returns
+     * {@code null} if neither exists or the value cannot be marshaled.
      *
-     * @param name the variable name
-     * @return the variable value, or null if not found
+     * @param name the variable or list name
+     * @return the marshaled value, or null if not found
      */
     Object getVariable(String name);
 
     /**
-     * Writes a node-tree variable.
+     * Writes a node-tree variable (or runtime list).
      *
-     * <p>Supported value types: {@link Double}, {@link Boolean}, {@link String}.
-     * Throws {@link IllegalArgumentException} if the value is an unsupported type
-     * (e.g. Lua tables or userdata — not marshaled in v1).
+     * <p>Supported value types:
+     * <ul>
+     *   <li>{@link Double}, {@link Boolean}, {@link String} — scalar variables</li>
+     *   <li>{@code Map} with exactly the keys {@code x}, {@code y}, {@code z}
+     *       (case-insensitive) and {@link Number} values — stored as a coordinate
+     *       variable</li>
+     *   <li>{@code List} — stored as a runtime list consumable by the node-side
+     *       list operations. Elements must be uniformly Numbers, Strings, Booleans,
+     *       or coordinate maps; mixed or empty lists are rejected.</li>
+     * </ul>
      *
-     * @param name  the variable name
-     * @param value the value to store; must be Double, Boolean, or String
-     * @throws IllegalArgumentException if value type is unsupported or null
+     * @param name  the variable or list name
+     * @param value the value to store
+     * @throws IllegalArgumentException if the value (or a list element / map shape)
+     *         is unsupported or null
      */
     void setVariable(String name, Object value);
 

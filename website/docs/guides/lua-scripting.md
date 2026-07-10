@@ -36,8 +36,29 @@ local runs = pathmind.getVar("runs") or 0
 pathmind.setVar("runs", runs + 1)
 ```
 
-- Supported value types: **number, string, boolean** (scalars only in v1 — tables are rejected).
+- Scalar value types: **number, string, boolean**.
 - `getVar` returns `nil` when the variable does not exist.
+
+**Tables** marshal to Pathmind's structured values:
+
+```lua
+-- Coordinate table ↔ coordinate variable (usable by any node taking a coordinate)
+pathmind.setVar("home", { x = 100, y = 64, z = -20 })
+local home = pathmind.getVar("home")   -- { x=, y=, z= }
+
+-- Array table ↔ runtime list (the same lists Create List / Add to List /
+-- List Item / Remove from List work with)
+pathmind.setVar("waypoints", { {x=0,y=64,z=0}, {x=50,y=64,z=10} })
+local ores = pathmind.getVar("ore_positions")  -- e.g. built by a Create List node
+for i = 1, #ores do
+  pathmind.moveTo(ores[i].x, ores[i].y, ores[i].z)
+end
+```
+
+- A table with exactly the keys `x`, `y`, `z` (numbers) stores a **coordinate variable**.
+- An array table stores a **runtime list**; elements must be uniformly numbers, strings, booleans, or coordinate tables. Empty tables, sparse arrays, mixed keys, and deeper nesting are errors.
+- Reading a list built by graph nodes: coordinate entries arrive as `{x=, y=, z=}` tables; scalar entries as their Lua types; opaque entries (entity UUIDs, item ids, GUI slot tokens) as strings.
+- Names are shared per namespace: variables and lists live in separate namespaces, and `getVar` checks variables first.
 
 ### Navigation — `moveTo(x, y, z)`
 

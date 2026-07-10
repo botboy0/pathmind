@@ -1,6 +1,7 @@
 package com.pathmind.execution;
 
 import com.pathmind.api.addon.PathmindRuntime;
+import com.pathmind.nodes.AddonListEntryCodec;
 import com.pathmind.nodes.NodeType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
@@ -11,11 +12,15 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Pathmind-side implementation of the {@link PathmindRuntime} services interface.
@@ -63,31 +68,32 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
     /**
      * {@inheritDoc}
      *
-     * <p>Reads from the active chain scope first, then falls back to global variables.
-     * Unmarshals {@code PARAM_AMOUNT} → Double, {@code PARAM_BOOLEAN} → Boolean,
-     * {@code PARAM_MESSAGE} → String.
+     * <p>Reads from the active chain scope first, then falls back to global variables,
+     * then to the runtime-list namespace. Unmarshals {@code PARAM_AMOUNT} /
+     * {@code PARAM_DISTANCE} → Double, {@code PARAM_BOOLEAN} → Boolean,
+     * {@code PARAM_MESSAGE} → String, {@code PARAM_COORDINATE} →
+     * {@code Map{"x","y","z"}} (Doubles), and runtime lists → {@code List<Object>}
+     * (element marshaling described on {@link #marshalRuntimeList}).
      */
     @Override
     public Object getVariable(String name) {
         ExecutionManager.RuntimeVariable rv =
             executionManager.getRuntimeVariableFromAnyActiveChain(name);
-        if (rv == null) return null;
+        if (rv == null) {
+            // Not a variable — the name may refer to a runtime list (separate namespace,
+            // shared with the Create List / Add to List / List Item nodes).
+            return marshalRuntimeList(executionManager.getRuntimeListFromAnyActiveChain(name));
+        }
         Map<String, String> values = rv.getValues();
         return switch (rv.getType()) {
-            case PARAM_AMOUNT -> {
-                String raw = values.get("Amount");
-                if (raw == null) yield null;
-                try {
-                    yield Double.parseDouble(raw);
-                } catch (NumberFormatException e) {
-                    yield null;
-                }
-            }
+            case PARAM_AMOUNT -> parseDoubleOrNull(getValueIgnoreCase(values, "Amount"));
             case PARAM_BOOLEAN -> {
-                String raw = values.get("Toggle");
+                String raw = getValueIgnoreCase(values, "Toggle");
                 yield raw != null ? Boolean.parseBoolean(raw) : null;
             }
-            case PARAM_MESSAGE -> values.get("Text");
+            case PARAM_MESSAGE -> getValueIgnoreCase(values, "Text");
+            case PARAM_DISTANCE -> parseDoubleOrNull(getValueIgnoreCase(values, "Distance"));
+            case PARAM_COORDINATE -> marshalCoordinateValues(values);
             default -> null;
         };
     }
@@ -97,13 +103,25 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
      *
      * <p>Marshals Double → {@code PARAM_AMOUNT} (key "Amount"),
      * Boolean → {@code PARAM_BOOLEAN} (keys "Mode"/"Toggle"/"Variable"),
-     * String → {@code PARAM_MESSAGE} (key "Text").
+     * String → {@code PARAM_MESSAGE} (key "Text"),
+     * coordinate-shaped {@code Map{"x","y","z"}} → {@code PARAM_COORDINATE}
+     * (keys "X"/"Y"/"Z"), and {@code List} → a runtime list (separate namespace,
+     * consumable by the List Item / Remove from List / … nodes). List elements must
+     * be uniformly numbers, strings, booleans, or coordinate maps.
      */
     @Override
     public void setVariable(String name, Object value) {
         if (value == null) {
             throw new IllegalArgumentException(
                 "Unsupported variable value: null (use an explicit Double, Boolean, or String)");
+        }
+        if (value instanceof Map<?, ?> map) {
+            setCoordinateVariable(name, map);
+            return;
+        }
+        if (value instanceof List<?> list) {
+            setListVariable(name, list);
+            return;
         }
         Map<String, String> vals = new HashMap<>();
         NodeType type;
@@ -121,10 +139,267 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
         } else {
             throw new IllegalArgumentException(
                 "Unsupported variable type: " + value.getClass().getSimpleName()
-                    + " — only Double, Boolean, and String are supported in v1");
+                    + " — only Double, Boolean, String, coordinate Map{x,y,z}, and List are supported");
         }
         executionManager.setRuntimeVariableForAnyActiveChain(
             name, new ExecutionManager.RuntimeVariable(type, vals));
+    }
+
+    // -------------------------------------------------------------------------
+    // Table marshaling — coordinate maps and runtime lists (v2)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Stores a coordinate-shaped map as a {@code PARAM_COORDINATE} variable.
+     * The map must contain exactly the keys x, y, z (case-insensitive) with
+     * {@link Number} values — anything else is rejected so typos surface instead
+     * of silently dropping data.
+     */
+    private void setCoordinateVariable(String name, Map<?, ?> map) {
+        Double x = null, y = null, z = null;
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (!(entry.getKey() instanceof String key)) {
+                throw new IllegalArgumentException(
+                    "Unsupported map variable: keys must be strings");
+            }
+            if (!(entry.getValue() instanceof Number n)) {
+                throw new IllegalArgumentException(
+                    "Unsupported map variable: value for '" + key + "' must be a number"
+                        + " (only coordinate maps {x, y, z} are supported)");
+            }
+            switch (key.toLowerCase(Locale.ROOT)) {
+                case "x" -> x = n.doubleValue();
+                case "y" -> y = n.doubleValue();
+                case "z" -> z = n.doubleValue();
+                default -> throw new IllegalArgumentException(
+                    "Unsupported map variable: unknown key '" + key
+                        + "' (only coordinate maps {x, y, z} are supported)");
+            }
+        }
+        if (x == null || y == null || z == null) {
+            throw new IllegalArgumentException(
+                "Unsupported map variable: coordinate maps need all of x, y, z");
+        }
+        executionManager.setRuntimeVariableForAnyActiveChain(name,
+            new ExecutionManager.RuntimeVariable(NodeType.PARAM_COORDINATE, coordinateValues(x, y, z)));
+    }
+
+    /**
+     * Stores a list as a runtime list. Elements must be uniformly one of:
+     * {@link Number} (→ {@code PARAM_AMOUNT} entries), {@link String} (→
+     * {@code PARAM_MESSAGE}), {@link Boolean} (→ {@code PARAM_BOOLEAN}), or
+     * coordinate maps (→ {@code PARAM_COORDINATE}). Mixed or empty lists are
+     * rejected — the element type is part of the runtime list and the node-side
+     * list operations enforce it.
+     */
+    private void setListVariable(String name, List<?> list) {
+        if (list.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot store an empty list as variable '" + name
+                    + "' — the element type cannot be inferred");
+        }
+        NodeType elementType = null;
+        List<String> entries = new ArrayList<>(list.size());
+        for (Object element : list) {
+            NodeType entryType;
+            Map<String, String> vals = new HashMap<>();
+            if (element instanceof Number n) {
+                entryType = NodeType.PARAM_AMOUNT;
+                vals.put("Amount", stringifyNumber(n.doubleValue()));
+            } else if (element instanceof String s) {
+                entryType = NodeType.PARAM_MESSAGE;
+                vals.put("Text", s);
+            } else if (element instanceof Boolean b) {
+                entryType = NodeType.PARAM_BOOLEAN;
+                vals.put("Mode", "literal");
+                vals.put("Toggle", b.toString());
+                vals.put("Variable", "");
+            } else if (element instanceof Map<?, ?> map) {
+                entryType = NodeType.PARAM_COORDINATE;
+                Double[] xyz = requireCoordinateMap(name, map);
+                vals.putAll(coordinateValues(xyz[0], xyz[1], xyz[2]));
+            } else {
+                throw new IllegalArgumentException(
+                    "Unsupported list element for variable '" + name + "': "
+                        + (element == null ? "null" : element.getClass().getSimpleName())
+                        + " — only numbers, strings, booleans, and coordinate maps are supported");
+            }
+            if (elementType == null) {
+                elementType = entryType;
+            } else if (elementType != entryType) {
+                throw new IllegalArgumentException(
+                    "Mixed list for variable '" + name + "' — all elements must have the same type");
+            }
+            entries.add(AddonListEntryCodec.serialize(vals));
+        }
+        executionManager.setRuntimeListForAnyActiveChain(
+            name, new ExecutionManager.RuntimeList(elementType, entries));
+    }
+
+    /** Validates a list element as a coordinate map and returns {x, y, z}. */
+    private static Double[] requireCoordinateMap(String name, Map<?, ?> map) {
+        Double x = null, y = null, z = null;
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (entry.getKey() instanceof String key && entry.getValue() instanceof Number n) {
+                switch (key.toLowerCase(Locale.ROOT)) {
+                    case "x" -> x = n.doubleValue();
+                    case "y" -> y = n.doubleValue();
+                    case "z" -> z = n.doubleValue();
+                    default -> throw new IllegalArgumentException(
+                        "Unsupported list element for variable '" + name
+                            + "': map key '" + key + "' (only coordinate maps {x, y, z} are supported)");
+                }
+            } else {
+                throw new IllegalArgumentException(
+                    "Unsupported list element for variable '" + name
+                        + "': maps must have string keys and number values");
+            }
+        }
+        if (x == null || y == null || z == null) {
+            throw new IllegalArgumentException(
+                "Unsupported list element for variable '" + name
+                    + "': coordinate maps need all of x, y, z");
+        }
+        return new Double[]{x, y, z};
+    }
+
+    /**
+     * Builds the {@code PARAM_COORDINATE} values-map for the given coordinates.
+     * Both key cases are written, matching what the node-side list executors emit
+     * (e.g. Create List block scans).
+     */
+    private static Map<String, String> coordinateValues(double x, double y, double z) {
+        Map<String, String> vals = new HashMap<>();
+        vals.put("X", stringifyNumber(x));
+        vals.put("Y", stringifyNumber(y));
+        vals.put("Z", stringifyNumber(z));
+        vals.put("x", stringifyNumber(x));
+        vals.put("y", stringifyNumber(y));
+        vals.put("z", stringifyNumber(z));
+        return vals;
+    }
+
+    /**
+     * Marshals a runtime list into the plain-Java list form of the API contract,
+     * or returns null when the list does not exist. Serialized entries unmarshal
+     * by element type ({@code PARAM_COORDINATE} → {@code Map{x,y,z}} of Doubles,
+     * {@code PARAM_AMOUNT} → Double, {@code PARAM_BOOLEAN} → Boolean,
+     * {@code PARAM_MESSAGE} → String, anything else → {@code Map<String,String>}
+     * of its raw values); raw entries (entity UUIDs, item ids, GUI slot tokens)
+     * stay strings. Unmarshalable entries are skipped rather than erroring.
+     */
+    private Object marshalRuntimeList(ExecutionManager.RuntimeList list) {
+        if (list == null) {
+            return null;
+        }
+        List<Object> result = new ArrayList<>(list.size());
+        for (String entry : list.getEntries()) {
+            Object marshaled = marshalListEntry(list.getElementType(), entry);
+            if (marshaled != null) {
+                result.add(marshaled);
+            }
+        }
+        return result;
+    }
+
+    /** Marshals a single runtime-list entry; returns null for unmarshalable entries. */
+    private Object marshalListEntry(NodeType elementType, String entry) {
+        if (entry == null || entry.isEmpty()) {
+            return null;
+        }
+        if (!AddonListEntryCodec.isSerialized(entry)) {
+            return entry;
+        }
+        Map<String, String> values = AddonListEntryCodec.deserialize(entry);
+        if (values.isEmpty()) {
+            return null;
+        }
+        if (elementType == null) {
+            return dedupeValuesMap(values);
+        }
+        return switch (elementType) {
+            case PARAM_COORDINATE -> marshalCoordinateValues(values);
+            case PARAM_AMOUNT -> parseDoubleOrNull(getValueIgnoreCase(values, "Amount"));
+            case PARAM_BOOLEAN -> {
+                String raw = getValueIgnoreCase(values, "Toggle");
+                yield raw != null ? Boolean.parseBoolean(raw) : null;
+            }
+            case PARAM_MESSAGE -> getValueIgnoreCase(values, "Text");
+            default -> dedupeValuesMap(values);
+        };
+    }
+
+    /**
+     * Marshals a coordinate values-map to {@code Map{"x","y","z"}} of Doubles,
+     * or null when any component is missing/unparsable.
+     */
+    private static Object marshalCoordinateValues(Map<String, String> values) {
+        Double x = parseDoubleOrNull(getValueIgnoreCase(values, "X"));
+        Double y = parseDoubleOrNull(getValueIgnoreCase(values, "Y"));
+        Double z = parseDoubleOrNull(getValueIgnoreCase(values, "Z"));
+        if (x == null || y == null || z == null) {
+            return null;
+        }
+        Map<String, Object> coord = new HashMap<>();
+        coord.put("x", x);
+        coord.put("y", y);
+        coord.put("z", z);
+        return coord;
+    }
+
+    /**
+     * Generic fallback for unrecognized serialized entries: the raw values-map with
+     * case-duplicate keys collapsed (values maps often carry both "X" and "x") and
+     * internal {@code __pathmind} metadata keys dropped.
+     */
+    private static Object dedupeValuesMap(Map<String, String> values) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        Set<String> seen = new HashSet<>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.startsWith("__pathmind") || entry.getValue() == null) {
+                continue;
+            }
+            if (seen.add(key.toLowerCase(Locale.ROOT))) {
+                result.put(key, entry.getValue());
+            }
+        }
+        return result.isEmpty() ? null : result;
+    }
+
+    private static String getValueIgnoreCase(Map<String, String> values, String key) {
+        String direct = values.get(key);
+        if (direct != null) {
+            return direct;
+        }
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static Double parseDoubleOrNull(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(raw);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Stringifies a double for node-parameter storage: integral values lose the
+     * trailing {@code .0} so integer-typed parameters (e.g. coordinates) parse.
+     */
+    private static String stringifyNumber(double d) {
+        if (d == Math.floor(d) && !Double.isInfinite(d)) {
+            return Long.toString((long) d);
+        }
+        return Double.toString(d);
     }
 
     // -------------------------------------------------------------------------
