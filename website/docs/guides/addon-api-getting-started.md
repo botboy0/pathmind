@@ -345,6 +345,28 @@ Two related guarantees Pathmind provides (you don't need to do anything for thes
   `AddonNodeSerializer.serialize` doesn't emit them. Don't write your own data under
   a leading underscore.
 
+### Node lifecycle: evict per-node state on removal
+
+If your addon keeps per-node state keyed by `ctx.getNodeId()` — editor widgets, caches,
+anything in a session-lifetime map — implement `AddonNodeInputHandler.onNodeRemoved(String nodeId)`
+and evict that state there. Pathmind fires it whenever a node leaves the graph:
+
+- discrete deletions: Delete key, context menu, cut, cascade delete, drag-to-sidebar;
+- wholesale graph replacements: preset load/import, undo/redo restore, workspace clear.
+
+Only the stable node id is passed (the node no longer exists, so there is no live
+context to expose), and nodes that were never rendered produce no callback — they never
+got an id, so there is nothing keyed on them. The method is a `default` no-op; addons
+without per-node state can ignore it. If the removed node held keyboard focus, Pathmind
+blurs it first, so an `onFocusLost` may arrive immediately before the removal callback.
+
+```java
+@Override
+public void onNodeRemoved(String nodeId) {
+    editorStates.remove(nodeId); // free the widget + suggestion state for this node
+}
+```
+
 ---
 
 ## 9. Build and test

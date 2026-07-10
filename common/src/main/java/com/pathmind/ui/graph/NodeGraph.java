@@ -657,7 +657,9 @@ public class NodeGraph {
     }
     
     public void initializeWithScreenDimensions(int screenWidth, int screenHeight, int sidebarWidth, int titleBarHeight) {
-        // Clear any existing nodes
+        // Clear any existing nodes — bulk clear bypasses removeNodeInternal, so evict
+        // addon per-node state explicitly.
+        notifyAllAddonNodesRemoved();
         nodes.clear();
         connections.clear();
         invalidateRenderCaches();
@@ -867,6 +869,10 @@ public class NodeGraph {
                 }
             }
         }
+
+        // Let the owning addon evict per-node state (and blur if this node held focus)
+        // before the node leaves the graph. All discrete deletion paths funnel here.
+        notifyAddonNodeRemoved(node);
 
         boolean removedStartNode = node.getType() == NodeType.START;
         connections.removeIf(conn ->
@@ -9424,6 +9430,54 @@ public class NodeGraph {
     }
 
     /**
+     * Notifies an ADDON node's input handler that the node has been removed from the graph,
+     * so the addon can evict per-node state keyed by the stable {@code _node_id} (WR-04).
+     *
+     * <p>Fired from {@code removeNodeInternal} (every discrete deletion path funnels there)
+     * and, via {@link #notifyAllAddonNodesRemoved}, from the wholesale graph-replacement
+     * paths ({@code applyLoadedData}, {@code clearWorkspace}). If the removed node is the
+     * focused addon node it is blurred first, so {@code focusedAddonNode} cannot dangle
+     * on a node that is no longer in the graph.
+     *
+     * <p>Nodes that never rendered have no persisted {@code _node_id} and therefore no
+     * addon-side state — the callback is skipped rather than generating a fresh id.
+     */
+    private void notifyAddonNodeRemoved(Node node) {
+        if (node == null || node.getType() != NodeType.ADDON) {
+            return;
+        }
+        if (node == focusedAddonNode) {
+            blurFocusedAddonNode();
+        }
+        AddonNodeInputHandler handler = resolveInputHandler(node);
+        if (handler == null) {
+            return;
+        }
+        Map<String, Object> extra = node.getAddonExtraFields();
+        Object rawId = extra != null ? extra.get("_node_id") : null;
+        if (!(rawId instanceof String nodeId) || nodeId.isBlank()) {
+            return;
+        }
+        try {
+            handler.onNodeRemoved(nodeId);
+        } catch (Throwable t) {
+            org.slf4j.LoggerFactory.getLogger(NodeGraph.class)
+                .warn("[Pathmind] Addon onNodeRemoved threw for {}: {}", node.getAddonTypeId(), t.getMessage());
+        }
+    }
+
+    /**
+     * Fires {@link #notifyAddonNodeRemoved} for every node currently in the graph.
+     * Called before the bulk {@code nodes.clear()} in the graph-replacement paths,
+     * which bypass {@code removeNodeInternal}.
+     */
+    private void notifyAllAddonNodesRemoved() {
+        for (Node node : new java.util.ArrayList<>(nodes)) {
+            notifyAddonNodeRemoved(node);
+        }
+    }
+
+    /**
      * Blurs the currently focused addon node (if any), firing
      * {@link AddonNodeInputHandler#onFocusLost} on its handler.
      */
@@ -15952,6 +16006,8 @@ public class NodeGraph {
             node.setSelected(false);
         }
 
+        // Bulk clear bypasses removeNodeInternal — evict addon per-node state explicitly.
+        notifyAllAddonNodesRemoved();
         nodes.clear();
         connections.clear();
         invalidateRenderCaches();
@@ -15980,6 +16036,9 @@ public class NodeGraph {
     }
 
     private boolean applyLoadedData(NodeGraphData data) {
+        // Bulk clear bypasses removeNodeInternal — evict addon per-node state explicitly
+        // (preset load/import, undo/redo restore all funnel through here).
+        notifyAllAddonNodesRemoved();
         nodes.clear();
         connections.clear();
         invalidateRenderCaches();

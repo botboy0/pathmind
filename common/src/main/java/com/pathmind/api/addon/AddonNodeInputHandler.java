@@ -87,6 +87,28 @@ public interface AddonNodeInputHandler {
     void onFocusLost(AddonNodeContext ctx);
 
     /**
+     * Called when this node has been removed from the graph — either a discrete deletion
+     * (Delete key, context menu, cut, cascade delete, drag-to-sidebar) or a wholesale graph
+     * replacement (preset load/import, undo/redo restore, workspace clear).
+     *
+     * <p>Addons that key per-node state on {@link AddonNodeContext#getNodeId()} (editor
+     * widgets, caches) should evict that state here — without this hook such entries leak
+     * for the session lifetime.
+     *
+     * <p>Only the stable node id is passed (not a full {@link AddonNodeContext}): the node
+     * no longer exists in the graph, so there is no live script/error state to expose.
+     * Nodes that never rendered have no persisted id and produce no callback.
+     *
+     * <p>Default no-op — addons without per-node state need not implement this
+     * (v2 API extension).
+     *
+     * @param nodeId the removed node's stable identity, as previously seen via
+     *               {@link AddonNodeContext#getNodeId()}
+     */
+    default void onNodeRemoved(String nodeId) {
+    }
+
+    /**
      * Called by NodeGraph after the scissor clip has been disabled, allowing the addon to
      * render popups or overlays that must escape the node body clip region.
      *
