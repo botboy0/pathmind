@@ -24,7 +24,7 @@ _Last updated: 2026-07-10_
 
 ### Open gates before calling v1 done
 
-- [ ] **Phase 3 in-game UAT (SC#5)** — the 6-point editor checklist: typing/navigation/copy-paste without key leaks, gutter sync, error strip on failure and cleared on success, `pathmind.` and Ctrl+Space suggestion triggers, suggestion accept, Esc blur.
+- [ ] **Phase 3 in-game UAT (SC#5)** — the 6-point editor checklist. **5/6 automated & passing** (2026-07-10) via the vision-testkit spec `specs/lua-editor-uat.yaml` (mc-testkit, run `20260710-100816`, ~$0.009/run): typing without key leaks, gutter sync, `pathmind.` + Ctrl+Space suggestion triggers, suggestion accept, Esc closes popup / second Esc blurs (verified via typed-text-goes-nowhere). Remaining: **error strip on failure + cleared on success** — needs port wiring (drag) and a graph run (`K`) in the spec; the driver's drag support exists.
 - [x] **Phase 2 UAT formally confirmed** (2026-07-10) — full `pathmind.*` surface exercised in-game via the automated harness (`testing/testruns/20260710-001707/`, RESULT: PASS, 7/7 presets): variable round-trips for number/string/boolean + absent→nil + table rejection (`uat-lua-vars`), `getPosition`/`getBlock` loaded + unloaded→nil/`getInventory` shape (`uat-lua-gamestate`), awaitable `moveTo` with exact arrival 12 blocks out (`uat-lua-moveto`), uncaught error stops the graph with `script:3:` line number in chat (`uat-lua-error-expectfail`), and runaway loop killed by the 5s compute budget with `script:2:` in chat (`uat-lua-timeout-expectfail`).
 
 ## Infrastructure
@@ -32,6 +32,8 @@ _Last updated: 2026-07-10_
 - ✅ **Automated in-game test flow via HeadlessMC** (2026-07-09, retired 2026-07-10): built all jars, launched MC 1.21.4 headless via a harness mod, executed fixture presets, wrote `results.json` per run — used to close the Phase 2 UAT gate. Removed on 2026-07-10 together with the play/drive scripts; GUI testing now runs exclusively through the containerized vision testkit below.
 - ✅ **Containerized vision-driven GUI test pipeline** (2026-07-10): `testing/` (own repo, [botboy0/mc-testkit](https://github.com/botboy0/mc-testkit)) runs the dev client GPU-rendered in Docker on WSL2 (Mesa d3d12 → host RTX via `/dev/dxg`, hard renderer assertion, no llvmpipe) and executes natural-language YAML test steps via a vision model over OpenRouter (screenshot → grounded click/key via xdotool). Per run: `run.mp4` + `results.json` with per-step cost/tokens/timing. E2E proven: inventory + Pathmind editor opened and visually asserted, ~$0.002/run, warm boot ~20 s. This is the sole GUI test flow; the mod repo keeps only standard unit tests. Docs: `testing/README.md` + the in-game testing guide.
 - ✅ **Node-failure observability + expected-fail presets** (2026-07-10): node failures complete their futures normally and only surfaced as UI notifications, making them invisible to automation — `ExecutionManager.recordNodeFailure` (fed by `NodeExecutionCompletion.fail`) now exposes a queryable failure count/message, the harness fails a preset when one is recorded, and presets named `*-expectfail` invert pass/fail for negative-path fixtures. This immediately exposed the silently-broken `print` call in `smoke-lua` and the `moveTo` timeout bug.
+
+- ✅ **Testkit: loadouts, commentary mode, run dashboard** (2026-07-10): mc-testkit gained per-run persistent artifacts + a web dashboard (run list, live status, per-step video seeking, `https://` LAN access); **loadouts** (mount a mods/config overlay tree incl. `.wipe` state reset — the `pathmind-lua` jar now loads in the containerized dev client via Fabric runtime remapping, closing the "no addon in runClient" gap); and **commentary mode** (model reports visual oddities independent of verdicts). Commentary immediately surfaced the two editor rendering bugs now in the v2 backlog. Docs: `testing/README.md` + the [in-game testing guide](../guides/in-game-testing.md).
 
 ## v2 backlog
 
@@ -62,6 +64,8 @@ Carried over from explicit deferrals and accepted limitations in v1. Roughly gro
 - [ ] Syntax highlighting.
 - [ ] Script hot-reload without graph restart.
 - [ ] Handle `\n` in error tooltips (Lua stack traces wrap incorrectly).
+- [ ] Suggestion popup anchors one row too high: its first entry overlaps the current editor line's text (reported consistently by vision-run commentary, e.g. mc-testkit run `20260710-100816` steps 15/16).
+- [ ] Editor text rendering artifact around the `=` glyph / cursor on active lines ("crossed box" between variable and value; multiple independent commentary reports across runs) — verify whether the editor font atlas or caret rendering corrupts the glyph.
 
 ---
 

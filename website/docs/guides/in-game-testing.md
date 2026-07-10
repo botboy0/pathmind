@@ -55,9 +55,11 @@ Key properties:
 
 ## Writing and running specs
 
-Specs are YAML with four step kinds — `act` (natural-language instruction, grounded to
-one click or keypress), `assert` (visual condition, pass/fail + evidence), `screenshot`
-(named artifact), `wait` (seconds or `"settled"`):
+Specs are YAML with six step kinds — `act` (natural-language instruction, grounded to
+one click, keypress, or drag), `assert` (visual condition, pass/fail + evidence),
+`key` and `type` (deterministic keypresses/text entry, zero model calls — prefer these
+whenever the input is known in advance), `screenshot` (named artifact), `wait`
+(seconds or `"settled"`):
 
 ```yaml
 name: pathmind-editor-smoke
@@ -82,6 +84,45 @@ Exit codes: `0` passed · `1` test failure · `2` infra error · `3` budget exce
 Details — grounding contract (normalized 0–1000 coordinates), the failure ladder
 (parse-retry → escalation model → fail), budget guard, model choice, and the WSLg
 fallback — are documented in the testkit's own `README.md`.
+
+## Loadouts: running the Lua addon (or any extra mod) in the container
+
+The container boots Pathmind's dev client from source, which by itself contains no
+addon. A **loadout** (`LOADOUT=<dir-or-zip>`, default `testing/loadouts/default/`)
+mounts an overlay tree for the MC instance: top-level directories (`mods/`,
+`config/`, …) are merge-copied over the run dir on every boot, bare `*.jar` files
+are shorthand for `mods/`, and a `.wipe` file lists paths to delete first — the
+default loadout wipes `pathmind/` so workspace presets reset per boot. Fabric
+Loader remaps production jars for the dev client at runtime, so the
+`pathmind-lua` jar built on Windows drops straight in:
+
+```bash
+cd pathmind && ./gradlew.bat :fabric:publishToMavenLocal -Pmc_version=1.21.4
+cd ../pathmind-lua && ./gradlew.bat build
+cp build/libs/pathmind-lua-0.1.0.jar ../testing/loadouts/default/
+```
+
+Every run records the loadout manifest (path/size/sha256) in `meta.json`; the run
+dashboard lists it per run. This is how `specs/lua-editor-uat.yaml` (the Phase 3
+editor UAT, 5/6 checklist points) gets the Scripting category into the client.
+
+## Commentary mode
+
+`commentary: true` in a spec (or `COMMENTARY=1` in the env) lets the vision model
+report visual oddities — overlapping/clipped text, z-order glitches, artifacts —
+independent of any verdict. Findings never affect pass/fail; they land per step in
+`results.json` and in the dashboard, which offers a dedicated observations view
+with video-timestamp jump links. Treat it as a rendering-lint channel: it found
+the suggestion-popup overlap and the `=`-glyph artifact now tracked in the v2
+backlog, plus a state-leak bug in the harness itself.
+
+## Run dashboard
+
+`bash run-local.sh web` serves a dashboard on `http://localhost:8077` (and, with
+DuckDNS/Caddy configured, over HTTPS on the LAN): run history with live status,
+pass rate and cost, and a per-run detail view with the recorded video (per-step
+▶ timestamps seek directly), step results, screenshots, logs, and the loadout
+manifest. See `testing/README.md` for the HTTPS/phone setup.
 
 ## Practical notes
 
