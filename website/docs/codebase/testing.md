@@ -174,16 +174,16 @@ List.of(new NodeConnection(start, setVariable, 0, 0))
   - `NodeGraphPersistenceTest`: Tests serialization round-trips, custom node resolution
   - `ExecutionManagerValidationTest`: Tests graph validation logic
 
-**E2E Tests:**
-- Framework: HeadlessMC-driven in-game test flow (added 2026-07-09)
-- Entry point: `../../testing/run-tests.ps1` in the sidequests workspace (sibling of this repo)
-- How it works: a dedicated `pathmind-test-harness` Fabric mod (sibling project, inert unless
-  `-Dpathmind.testrun.dir` is set) creates a fixed-seed superflat world, executes fixture
-  presets through `ExecutionManager.executeExternalBranchAndWait`, captures screenshots at
-  `testpoint` variable changes (rendered mode), writes `results.json`, and stops the client.
-  HeadlessMC launches MC 1.21.4 fully headless (offline account, stubbed LWJGL) or rendered.
-- Fixtures: `testing/fixtures/presets/*.json`; artifacts per run in `testing/testruns/<timestamp>/`
-- Full docs: `testing/README.md` in the sidequests workspace root
+**GUI/E2E Tests (out of repo):**
+- Framework: mc-testkit — containerized vision-driven GUI test pipeline
+  (own repo, checked out at `testing/` in the sidequests workspace)
+- How it works: the dev client (`gradlew runClient`) boots GPU-rendered inside a Docker
+  container on WSL2 straight into a committed test world (vanilla quickPlay); YAML specs
+  written in natural language are executed by a vision model over OpenRouter
+  (screenshot → grounded xdotool click/key), producing `run.mp4` + `results.json`
+  (per-step outcome, tokens, cost, timing)
+- This repo itself contains only the standard unit/integration tests above
+- Full docs: `testing/README.md` and the in-game testing guide (`docs/guides/in-game-testing.md`)
 
 ## Common Patterns
 
