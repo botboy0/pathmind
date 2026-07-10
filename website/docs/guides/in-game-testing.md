@@ -17,15 +17,19 @@ necessary".
 
 ## How it works
 
-The pipeline boots the dev client (`gradlew runClient` — no launcher, no account)
-GPU-rendered inside a Docker container on WSL2 and executes test steps written in
-natural language via a vision model over OpenRouter:
+The pipeline boots a Fabric dev client (`gradlew runClient` from a **source-less
+"devshell" project baked into the image** — no launcher, no account, no mod repo
+checkout) GPU-rendered inside a Docker container on WSL2. The mods under test —
+Pathmind and any addon — arrive **prebuilt via the loadout**; Fabric Loader remaps
+the production jars (mixins and access wideners included) to the dev environment at
+launch. Test steps are written in natural language and executed via a vision model
+over OpenRouter:
 
 ```mermaid
 flowchart LR
     subgraph container [mc-testkit container]
         X[Xvfb :99] --> GL[Mesa d3d12 -> host RTX via /dev/dxg]
-        GL --> MC[gradlew runClient<br/>quickPlay testworld]
+        GL --> MC[devshell runClient<br/>quickPlay testworld<br/>mods from loadout]
         MC --> S[scrot screenshot]
         S --> V[vision model<br/>OpenRouter]
         V --> I[xdotool click/key]
@@ -85,26 +89,34 @@ Details — grounding contract (normalized 0–1000 coordinates), the failure la
 (parse-retry → escalation model → fail), budget guard, model choice, and the WSLg
 fallback — are documented in the testkit's own `README.md`.
 
-## Loadouts: running the Lua addon (or any extra mod) in the container
+## Loadouts: how the mods get into the container
 
-The container boots Pathmind's dev client from source, which by itself contains no
-addon. A **loadout** (`LOADOUT=<dir-or-zip>`, default `testing/loadouts/default/`)
+A **loadout** (`LOADOUT=<dir-or-zip>`, default `testing/loadouts/default/`)
 mounts an overlay tree for the MC instance: top-level directories (`mods/`,
 `config/`, …) are merge-copied over the run dir on every boot, bare `*.jar` files
 are shorthand for `mods/`, and a `.wipe` file lists paths to delete first — the
-default loadout wipes `pathmind/` so workspace presets reset per boot. Fabric
-Loader remaps production jars for the dev client at runtime, so the
-`pathmind-lua` jar built on Windows drops straight in:
+default loadout wipes `pathmind/` so workspace presets reset per boot.
+
+The loadout carries **all mods under test** (the devshell only provides the dev
+client plus `fabric-api`/`architectury` as dev-mapped runtime libraries). Both
+jars are built on Windows and dropped in — no in-container build, no WSL repo
+clone:
 
 ```bash
-cd pathmind && ./gradlew.bat :fabric:publishToMavenLocal -Pmc_version=1.21.4
+cd pathmind && ./gradlew.bat :fabric:remapJar -Pmc_version=1.21.4
+cp fabric/build/libs/pathmind-fabric-*+mc1.21.4.jar ../testing/loadouts/default/
 cd ../pathmind-lua && ./gradlew.bat build
 cp build/libs/pathmind-lua-0.1.0.jar ../testing/loadouts/default/
 ```
 
+(Take the plain jars, not `-dev-shadow`/`-sources`. If the Pathmind addon API
+changed, run `:fabric:publishToMavenLocal` before building the addon.)
+
 Every run records the loadout manifest (path/size/sha256) in `meta.json`; the run
-dashboard lists it per run. This is how `specs/lua-editor-uat.yaml` (the Phase 3
-editor UAT, 5/6 checklist points) gets the Scripting category into the client.
+dashboard lists it per run. Legacy mod-source mode — mounting a Pathmind repo at
+`/workspace` (`WORKSPACE_SRC=…` for `run-local.sh`) so the container builds and
+boots it from source — still exists for debugging against uncommitted trees, but
+the prebuilt-jar loadout is the default and the faster loop.
 
 ## Commentary mode
 
