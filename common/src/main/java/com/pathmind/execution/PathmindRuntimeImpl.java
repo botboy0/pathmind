@@ -313,6 +313,22 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
     }
 
     // -------------------------------------------------------------------------
+    // Generic action dispatch — v2 invokeAction
+    // -------------------------------------------------------------------------
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Delegates to {@link com.pathmind.nodes.AddonActionInvoker}, which builds a
+     * synthetic node of the requested type and routes it through the normal
+     * {@code NodeCommandDispatcher} path on the client thread.
+     */
+    @Override
+    public CompletableFuture<Void> invokeAction(String actionName, Map<String, Object> args) {
+        return com.pathmind.nodes.AddonActionInvoker.invoke(actionName, args);
+    }
+
+    // -------------------------------------------------------------------------
     // Error surfacing — BIND-04: fully implemented
     // -------------------------------------------------------------------------
 

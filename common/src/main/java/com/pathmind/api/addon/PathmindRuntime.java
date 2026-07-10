@@ -1,5 +1,6 @@
 package com.pathmind.api.addon;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -91,6 +92,33 @@ public interface PathmindRuntime {
      * @return namespaced block id (e.g. {@code "minecraft:stone"}), or null if unloaded
      */
     String getBlock(double x, double y, double z);
+
+    /**
+     * Invokes a single Pathmind action node by name — the generic action dispatch
+     * that opens the full world/player action surface to addon scripts (v2).
+     *
+     * <p><strong>Action names</strong> are Pathmind node-type names, case-insensitive:
+     * e.g. {@code "jump"}, {@code "look"}, {@code "message"}, {@code "equip_hand"},
+     * {@code "drop_item"}. Only concrete world/player/interface actions are invocable;
+     * flow control, sensors, data operations, and parameter nodes are rejected
+     * (scripts have Lua control flow and the variable API instead).
+     *
+     * <p><strong>Arguments</strong> map parameter names (as shown on the node in the
+     * editor, case-insensitive) to values of type {@link Double}, {@link Boolean}, or
+     * {@link String}. Special case: for {@code "message"}, the key {@code "text"} sets
+     * the message text. Unknown argument names fail the future — typos surface to the
+     * script instead of being silently ignored.
+     *
+     * <p>Returns a future that completes when the action finishes (some actions, e.g.
+     * navigation, may take seconds), or completes exceptionally on an unknown action,
+     * a disallowed action, a bad argument, or when the client is unavailable. The
+     * caller may safely block on the future from a worker thread.
+     *
+     * @param actionName case-insensitive node-type name of the action
+     * @param args       parameter values by name; may be null or empty
+     * @return a future that resolves when the action completes
+     */
+    CompletableFuture<Void> invokeAction(String actionName, Map<String, Object> args);
 
     /**
      * Sends an error message to the player chat with the Pathmind prefix.
