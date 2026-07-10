@@ -49,10 +49,12 @@ Carried over from explicit deferrals and accepted limitations in v1. Roughly gro
 - [ ] Full UI extension points: panels, categories, overlays; lifecycle hooks; Modrinth Maven publishing.
 
 ### Lua runtime
-- [ ] Generic `invokeAction(name, args)` dispatch (open the full action surface to scripts).
+- [x] Generic `invokeAction(name, args)` dispatch (2026-07-10) — `pathmind.invokeAction` invokes any world/player/interface action node by case-insensitive type name with parameter args (scalars, case-insensitive names, unknown names fail loudly with the valid list); flow control/sensors/data/parameter nodes stay graph-only. Pathmind side: `PathmindRuntime.invokeAction` + `AddonActionInvoker` (synthetic node through the normal `NodeCommandDispatcher` path on the client thread). Documented in the new [Lua Scripting Reference](../guides/lua-scripting.md).
 - [ ] Table/userdata variable marshaling (scalars only in v1).
 - [ ] Per-node timeout override.
 - [ ] Real instruction-budget sandboxing beyond the compute-time timeout.
+- [x] Fix the off-thread `whenComplete` touching Minecraft client state (2026-07-10) — addon executor futures complete on the addon's worker thread, so every downstream chain continuation ran off the client thread (all other node types complete inside `client.execute`). `Node.executeAddonNode` now hops to the client thread before completing the chain future.
+- [x] Navigator: short `moveTo` hops rejected (2026-07-10) — `searchPlanningTarget` discarded every non-exact path shorter than 8 entries, including the near-goal partials `findPathToGoal` deliberately returns; for short hops every legitimate path is short. The same ≤6-block proximity exception now applies before the floor. Verified in-game by the new `lua-moveto-short-hop.yaml` spec (4-block hop on a flat platform, run `20260710-190540`). Note: steep/obstructed terrain can still fail short hops later in the pipeline (`isViablePlannedPath` — "invalid movement sequence"), which is legitimate no-route behavior.
 - [x] Re-arm the timeout timer after awaitable actions (2026-07-10) — `CobaltVm` now runs a periodic compute-aware watchdog with a `blocked` flag raised around action futures; also fixes the safety-net `Thread.interrupt()` killing legitimate `moveTo` waits longer than ~5.5s wall-clock.
 - [ ] Fix the off-thread `whenComplete` touching Minecraft client state (latent race flagged in Phase 1 review).
 - [x] Provide a `print` binding in the Lua sandbox (2026-07-10) — sandbox-safe global `print` in `CobaltVm`/`PathmindBindings.buildPrint`, tab-joins arguments via Cobalt's `toStringDirect` and routes the line to player chat; the serializer default script now runs cleanly on a fresh node (unit-tested in `CobaltVmSmokeTest`).
