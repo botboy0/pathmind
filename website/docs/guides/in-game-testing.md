@@ -42,9 +42,10 @@ Key properties:
   through WSL's `/dev/dxg`; the entrypoint hard-fails if the GL renderer is not the real
   GPU (no silent llvmpipe).
 - **Deterministic entry**: vanilla quickPlay boots straight into the committed test world
-  (`worlds/testworld`, superflat/creative); the world is re-copied pristine every run and
-  gamerules (mobs, weather, daylight) are frozen via chat commands typed blindly with
-  xdotool. No menu navigation, ever.
+  (`worlds/testworld` — vanilla survival, seed `-2350879005487267529`, cherry-grove
+  village spawn); the world is re-copied pristine every run and the environment is frozen
+  via chat commands typed blindly with xdotool (peaceful, no mob spawning, noon, clear).
+  No menu navigation, ever.
 - **Vision only where needed**: readiness comes from the client log plus a
   screenshot-stability gate — the model is never polled for "is it loaded yet".
 - **Per-run artifacts**: `run.mp4` (full session video), `results.json` (per-step
