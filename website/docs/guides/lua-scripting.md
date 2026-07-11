@@ -112,29 +112,39 @@ pathmind.invokeAction('goto', { X = 100, Y = 64, Z = -20 })
 - **Errors are loud:** an unknown action name or an argument that matches no parameter raises a Lua error listing the valid parameter names — typos never silently no-op.
 - **Not invocable:** flow control (`control_if`, `start_chain`, …), sensors, data/list operations, and parameter nodes. Scripts have Lua's own control flow and `getVar`/`setVar` instead.
 
-### Direct action calls — `pathmind.<action>{...}`
+### Direct action calls — `pathmind.<action>_({...})`
 
 Every invocable action is **also a direct function** on the `pathmind` table — the
 bindings are generated at runtime from Pathmind's action catalog
 (`PathmindRuntime.listActions()`), so new node types appear automatically with no
-addon update:
+addon update. Generated action functions carry a **trailing underscore**:
 
 ```lua
-pathmind.jump()
-pathmind.message{ text = 'hello from Lua' }
-pathmind.press_key{ Key = 'GLFW_KEY_W', Duration = 0.5 }
-pathmind.craft{ Item = 'stick', Amount = 4 }
+pathmind.jump_()
+pathmind.message_({ text = 'hello from Lua' })
+pathmind.press_key_({ Key = 'GLFW_KEY_W', Duration = 0.5 })
+pathmind.goto_({ X = 100, Y = 64, Z = -20 })
 ```
 
-These are sugar over `invokeAction` — same argument matching, same blocking
-semantics, same loud errors. Two things to know:
+The underscore is one uniform rule for the whole generated surface. It marks
+"this dispatches a Pathmind action node and takes a single args table", and it
+lifts every action name out of Lua's reserved-word space (`goto`, `break` are
+Lua keywords — `goto_`, `break_` are plain identifiers, so the same dot syntax
+works for all 40+ actions with no bracket-access special case). Curated
+functions with positional parameters (`moveTo(x, y, z)`, `getVar(name)`) stay
+camelCase without the suffix. There are **no bare-name aliases**: `pathmind.jump`
+does not exist, only `pathmind.jump_`.
 
-- **Reserved words:** action names that collide with Lua keywords must use bracket
-  syntax — `pathmind["goto"]{ X = 100, Y = 64, Z = -20 }`, `pathmind["break"]()`.
-  The editor's completion inserts the bracket form for you.
-- **Default mode:** the generated signature reflects the action's *default node
-  mode* (e.g. `goto` = X/Y/Z coordinates). Other modes' parameter sets are a
-  planned `invokeAction` extension.
+Since the args table is the only argument, Lua also accepts the paren-free sugar
+form `pathmind.message_{ text = 'hi' }` — identical call, style preference.
+
+These are sugar over `invokeAction` — same argument matching, same blocking
+semantics, same loud errors. Note that `invokeAction` itself keeps the **plain
+catalog name as a string**: `pathmind.invokeAction('goto', { X = 0, Y = 64, Z = 0 })`
+(no underscore — the string is data, not an identifier, so no collision exists).
+The generated signature reflects the action's *default node mode* (e.g. `goto_` =
+X/Y/Z coordinates); other modes' parameter sets are a planned `invokeAction`
+extension.
 
 ### External editors — generated LuaCATS definitions
 
@@ -173,10 +183,10 @@ The Script node body is an inline editor with a line-number gutter, syntax highl
 
 Completion works in two modes:
 
-- **While typing**, the popup opens automatically when a line ends with `pathmind.` — it lists the **entire API surface alphabetically** (curated functions plus all ~44 catalog actions), each with an argument hint derived from the node definitions (`press_key {Key, Duration}`, `collect {Block, Amount}`), and a detail strip below the popup shows the selected entry's description (e.g. *"Breaks a targeted or specified block"*). Plain identifier prefixes filter keywords, the small stdlib set, and the `pathmind` module itself (so typing `p` offers `pathmind` next to `print` and `pairs`).
+- **While typing**, the popup opens automatically when a line ends with `pathmind.` — it lists the **entire API surface alphabetically** (curated functions plus all ~44 catalog actions under their underscore names), each with an argument hint derived from the node definitions (`press_key_ ({Key, Duration})`, `collect_ ({Block, Amount})`), and a detail strip below the popup shows the selected entry's description (e.g. *"Breaks a targeted or specified block"*). Plain identifier prefixes filter keywords, the small stdlib set, and the `pathmind` module itself (so typing `p` offers `pathmind` next to `print` and `pairs`).
 - **Ctrl+Space** requests completion explicitly, Eclipse-style: with a prefix under the cursor it shows the same filtered results; on a blank line it opens the full discovery list — the qualified `pathmind.*` API entries first (insertable as-is), followed by Lua keywords and stdlib. Lists longer than the visible rows scroll with the keyboard selection.
 
-Up/Down selects, Enter accepts, Esc closes the popup without blurring the editor. Accepting replaces the token before the cursor and inserts a **complete call**: parameterless functions get `()` (`pathmind.jump()`), actions with arguments get `{}` with the cursor placed inside the braces — ready to type the arguments, with signature help showing. Reserved-word actions insert the bracket form (`pathmind["break"]()`), so the accepted line always compiles as-is. Accepting `pathmind` and typing `.` chains straight into the function list.
+Up/Down selects, Enter accepts, Esc closes the popup without blurring the editor. Accepting replaces the token before the cursor and inserts a **complete call**: parameterless functions get `()` (`pathmind.jump_()`), actions with arguments get `({})` with the cursor placed inside the args table — ready to type the arguments, with signature help showing. The accepted line always compiles as-is. Accepting `pathmind` and typing `.` chains straight into the function list.
 
 ### Diagnostics and signature help
 
