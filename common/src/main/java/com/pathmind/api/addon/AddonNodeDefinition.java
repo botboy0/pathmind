@@ -27,7 +27,8 @@ public final class AddonNodeDefinition {
     private final String provenanceLabel;
     private final AddonNodeBodyRenderer bodyRenderer;
     private final AddonNodeInputHandler inputHandler;
-    private final int bodyHeight;
+    private final java.util.function.IntSupplier bodyHeight;
+    private final java.util.function.IntSupplier bodyWidth;
 
     private AddonNodeDefinition(Builder b) {
         this.id = b.id;
@@ -38,6 +39,7 @@ public final class AddonNodeDefinition {
         this.bodyRenderer = b.bodyRenderer;
         this.inputHandler = b.inputHandler;
         this.bodyHeight = b.bodyHeight;
+        this.bodyWidth = b.bodyWidth;
     }
 
     /**
@@ -109,12 +111,25 @@ public final class AddonNodeDefinition {
     /**
      * Returns the declared body height for this node in pixels, or {@code -1} if no override
      * is specified (Phase 3 API extension). When {@code -1}, NodeDimensionCalculator uses the
-     * default TEMPLATE_NODE_HEIGHT (108 px).
+     * default TEMPLATE_NODE_HEIGHT (108 px). Evaluated on every call, so supplier-based
+     * declarations (settings extension) resize live.
      *
      * @return body height in pixels, or -1 for default
      */
     public int getBodyHeight() {
-        return bodyHeight;
+        return bodyHeight.getAsInt();
+    }
+
+    /**
+     * Returns the declared body width for this node in pixels, or {@code -1} if no override
+     * is specified (settings extension). When {@code -1}, NodeDimensionCalculator uses the
+     * default TEMPLATE_NODE_WIDTH (160 px). Evaluated on every call, so supplier-based
+     * declarations resize live.
+     *
+     * @return body width in pixels, or -1 for default
+     */
+    public int getBodyWidth() {
+        return bodyWidth.getAsInt();
     }
 
     /**
@@ -139,7 +154,9 @@ public final class AddonNodeDefinition {
         private String provenanceLabel = "";
         private AddonNodeBodyRenderer bodyRenderer = null;
         private AddonNodeInputHandler inputHandler = null;
-        private int bodyHeight = -1; // -1 = let NodeDimensionCalculator use default field logic
+        // -1 = let NodeDimensionCalculator use its defaults
+        private java.util.function.IntSupplier bodyHeight = () -> -1;
+        private java.util.function.IntSupplier bodyWidth = () -> -1;
 
         private Builder(String id) {
             this.id = id;
@@ -221,7 +238,44 @@ public final class AddonNodeDefinition {
          * @return this builder
          */
         public Builder bodyHeight(int px) {
-            this.bodyHeight = px;
+            this.bodyHeight = () -> px;
+            return this;
+        }
+
+        /**
+         * Sets a dynamic body height supplier, re-evaluated on every layout pass —
+         * e.g. reading an {@link AddonSettings} value so users can resize the node
+         * live from the settings popup (settings extension).
+         *
+         * @param px height supplier returning pixels, or -1 for the default
+         * @return this builder
+         */
+        public Builder bodyHeight(java.util.function.IntSupplier px) {
+            this.bodyHeight = px != null ? px : () -> -1;
+            return this;
+        }
+
+        /**
+         * Sets the fixed body width for this node type in pixels (settings extension).
+         * Use {@code -1} (the default) for the standard addon node width (160 px).
+         *
+         * @param px body width in pixels; use -1 for the default
+         * @return this builder
+         */
+        public Builder bodyWidth(int px) {
+            this.bodyWidth = () -> px;
+            return this;
+        }
+
+        /**
+         * Sets a dynamic body width supplier, re-evaluated on every layout pass
+         * (settings extension) — the width counterpart of {@link #bodyHeight(java.util.function.IntSupplier)}.
+         *
+         * @param px width supplier returning pixels, or -1 for the default
+         * @return this builder
+         */
+        public Builder bodyWidth(java.util.function.IntSupplier px) {
+            this.bodyWidth = px != null ? px : () -> -1;
             return this;
         }
 

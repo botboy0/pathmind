@@ -26,4 +26,15 @@ public interface PathmindAddonEntrypoint {
      * @param registrar the mutable collector; sealed after all entrypoints have run
      */
     void registerNodes(NodeTypeRegistrar registrar);
+
+    /**
+     * Optional hook called right after {@link #registerNodes} for the same addon.
+     * Register user-configurable settings here; they appear in the editor settings
+     * popup under "Addon Settings" and are read back via {@link AddonSettings}.
+     * The registrar is pre-bound to this addon's mod id. Default no-op.
+     *
+     * @param registrar collector for this addon's settings declarations
+     */
+    default void registerSettings(AddonSettingsRegistrar registrar) {
+    }
 }

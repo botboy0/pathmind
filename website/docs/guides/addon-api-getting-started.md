@@ -369,6 +369,64 @@ public void onNodeRemoved(String nodeId) {
 
 ---
 
+## 8b. (Optional) Register addon settings
+
+Addons can register **user-configurable settings** that Pathmind renders in the editor
+settings popup under an **"Addon Settings"** section — no addon-side UI code needed.
+Values persist in Pathmind's `settings.json` (an `addonSettings` map keyed by your mod
+id), survive updates, and are validated against your declaration on every read: unknown
+or unparsable stored values fall back to the declared default, out-of-range integers
+clamp into bounds.
+
+Override the optional `registerSettings` hook on your entrypoint (it is called right
+after `registerNodes`; the registrar is pre-bound to your mod id):
+
+```java
+@Override
+public void registerSettings(AddonSettingsRegistrar registrar) {
+    registrar.register(AddonSetting.intSetting(
+        "script_node_width", "Script node width",
+        "Width of the Lua Script node body in pixels.",
+        280, 160, 640));                       // default, min, max → slider row
+    registrar.register(AddonSetting.boolSetting(
+        "fancy_mode", "Fancy rendering", "", true)); // → toggle row
+}
+```
+
+Read values anywhere with `AddonSettings.getInt("your_mod_id", "script_node_width")` /
+`getBoolean(...)` — cheap enough for per-frame use.
+
+### Dynamic node sizing from settings
+
+`AddonNodeDefinition.Builder` accepts **`IntSupplier` overloads** for `bodyWidth` and
+`bodyHeight` that are re-evaluated on every layout pass. Combined with a registered
+setting, users can resize your node live from the settings popup:
+
+```java
+AddonNodeDefinition.builder("mymod:my_node")
+    // ...
+    .bodyWidth(() -> AddonSettings.getInt(MOD_ID, "script_node_width"))
+    .bodyHeight(() -> AddonSettings.getInt(MOD_ID, "script_node_height"))
+    .build()
+```
+
+Your `AddonNodeBodyRenderer.render` already receives the current `width`/`height` each
+frame — derive all body layout from those parameters and resizing works with no extra
+code. (The fixed `bodyHeight(int)` / `bodyWidth(int)` overloads remain for static sizes;
+`-1` keeps Pathmind's defaults of 160×108.)
+
+```mermaid
+flowchart LR
+    E[Addon entrypoint\nregisterSettings] --> R[AddonSettings registry]
+    R --> UI[Pathmind settings popup\n\"Addon Settings\" section]
+    UI -- setInt/setBoolean --> J[(settings.json\naddonSettings map)]
+    J --> G[AddonSettings.getInt]
+    G --> S[bodyWidth/bodyHeight\nIntSupplier]
+    S --> L[NodeDimensionCalculator\nper layout pass]
+```
+
+---
+
 ## 9. Build and test
 
 ```bash

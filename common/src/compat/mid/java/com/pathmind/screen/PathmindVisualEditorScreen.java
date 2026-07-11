@@ -315,6 +315,8 @@ public class PathmindVisualEditorScreen extends Screen {
     private int nodeDelayMs = 150;
     private boolean nodeDelayDragging = false;
     private boolean createListRadiusDragging = false;
+    /** {@code addonId key} while an Addon Settings slider is being dragged, else null. */
+    private String addonSettingDragKey = null;
     private TextFieldWidget nodeDelayField;
     private TextFieldWidget createListRadiusField;
     private TextFieldWidget settingsNodeSearchField;
@@ -1819,6 +1821,9 @@ public class PathmindVisualEditorScreen extends Screen {
             if (createListRadiusDragging) {
                 updateCreateListRadiusFromMouse(getEffectiveSettingsTargetNode(), (int) mouseX, getSettingsPopupX(), SETTINGS_POPUP_WIDTH);
             }
+            if (addonSettingDragKey != null) {
+                updateAddonSettingFromMouse((int) mouseX, getSettingsPopupX(), SETTINGS_POPUP_WIDTH);
+            }
             return true;
         }
         if (createPresetPopupAnimation.isVisible()) {
@@ -1922,6 +1927,7 @@ public class PathmindVisualEditorScreen extends Screen {
         if (settingsPopupAnimation.isVisible()) {
             nodeDelayDragging = false;
             createListRadiusDragging = false;
+            addonSettingDragKey = null;
             settingsNodeSelectorScrollDragging = false;
             settingsPopupScrollDragging = false;
             if (nodeDelayField != null) {
@@ -7418,6 +7424,26 @@ public class PathmindVisualEditorScreen extends Screen {
             }
         }
 
+        java.util.List<com.pathmind.api.addon.AddonSettings.Registration> addonRegs =
+            com.pathmind.api.addon.AddonSettings.registrations();
+        if (!addonRegs.isEmpty()) {
+            int addonSectionTop = getSettingsAddonSectionTop(popupX, popupY, scaledWidth, scaledHeight, contentX, nodeSettingsContentY);
+            context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16, addonSectionTop,
+                getPopupAnimatedColor(settingsPopupAnimation, UITheme.BORDER_SUBTLE));
+            drawPopupTextWithEllipsis(context, "Addon Settings", contentX, addonSectionTop + 6, scaledWidth - 40,
+                getPopupAnimatedColor(settingsPopupAnimation, UITheme.TEXT_SECONDARY));
+            int[] addonRowCenters = getSettingsAddonRowCenters(addonSectionTop);
+            for (int i = 0; i < addonRegs.size(); i++) {
+                com.pathmind.api.addon.AddonSettings.Registration reg = addonRegs.get(i);
+                if (reg.setting().type() == com.pathmind.api.addon.AddonSetting.Type.BOOLEAN) {
+                    renderToggleRow(context, mouseX, mouseY, contentX, addonRowCenters[i], reg.setting().label(),
+                        com.pathmind.api.addon.AddonSettings.getBoolean(reg.addonId(), reg.setting().key()), popupX, scaledWidth);
+                } else {
+                    renderAddonIntSliderRow(context, mouseX, mouseY, contentX, addonRowCenters[i], reg, popupX, scaledWidth);
+                }
+            }
+        }
+
         int[] clearCacheButtonBounds = getSettingsClearCacheButtonBounds(popupX, popupY, scaledWidth, scaledHeight, contentX, nodeSettingsContentY);
         int clearCacheRowCenterY = getSettingsClearCacheRowCenterY(popupX, popupY, scaledWidth, scaledHeight, contentX, nodeSettingsContentY);
         context.drawHorizontalLine(sectionDividerX, popupX + scaledWidth - 16,
@@ -7950,7 +7976,111 @@ public class PathmindVisualEditorScreen extends Screen {
     }
 
     private int getSettingsClearCacheDividerY(int popupX, int popupY, int popupWidth, int popupHeight, int contentX, int nodeSettingsContentY) {
+        return getSettingsNodeSectionContentBottom(popupX, popupY, popupWidth, popupHeight, contentX, nodeSettingsContentY) + 10
+            + getSettingsAddonSectionHeight();
+    }
+
+    // ---- Addon Settings section (settings extension) ---------------------------------
+
+    /** Top divider Y of the Addon Settings section (sits between node settings and clear cache). */
+    private int getSettingsAddonSectionTop(int popupX, int popupY, int popupWidth, int popupHeight, int contentX, int nodeSettingsContentY) {
         return getSettingsNodeSectionContentBottom(popupX, popupY, popupWidth, popupHeight, contentX, nodeSettingsContentY) + 10;
+    }
+
+    /** Total height of the Addon Settings section; 0 when no addon registered settings. */
+    private int getSettingsAddonSectionHeight() {
+        java.util.List<com.pathmind.api.addon.AddonSettings.Registration> regs =
+            com.pathmind.api.addon.AddonSettings.registrations();
+        if (regs.isEmpty()) {
+            return 0;
+        }
+        int height = 18; // section label
+        for (com.pathmind.api.addon.AddonSettings.Registration reg : regs) {
+            height += reg.setting().type() == com.pathmind.api.addon.AddonSetting.Type.INT ? 26 : 22;
+        }
+        return height;
+    }
+
+    /** Row center Y per registered addon setting, in registration order — shared by render and clicks. */
+    private int[] getSettingsAddonRowCenters(int sectionTop) {
+        java.util.List<com.pathmind.api.addon.AddonSettings.Registration> regs =
+            com.pathmind.api.addon.AddonSettings.registrations();
+        int[] centers = new int[regs.size()];
+        int y = sectionTop + 18;
+        for (int i = 0; i < regs.size(); i++) {
+            int rowHeight = regs.get(i).setting().type() == com.pathmind.api.addon.AddonSetting.Type.INT ? 26 : 22;
+            centers[i] = y + rowHeight / 2;
+            y += rowHeight;
+        }
+        return centers;
+    }
+
+    /** Applies an in-progress Addon Settings slider drag (persists via AddonSettings.setInt). */
+    private void updateAddonSettingFromMouse(int mouseX, int popupX, int popupWidth) {
+        if (addonSettingDragKey == null) {
+            return;
+        }
+        // Drag key format "addonId key" — neither part may contain spaces by construction.
+        int sep = addonSettingDragKey.indexOf(' ');
+        if (sep <= 0) {
+            return;
+        }
+        String addonId = addonSettingDragKey.substring(0, sep);
+        String key = addonSettingDragKey.substring(sep + 1);
+        com.pathmind.api.addon.AddonSetting setting = null;
+        for (com.pathmind.api.addon.AddonSettings.Registration reg : com.pathmind.api.addon.AddonSettings.registrations()) {
+            if (reg.addonId().equals(addonId) && reg.setting().key().equals(key)) {
+                setting = reg.setting();
+                break;
+            }
+        }
+        if (setting == null) {
+            return;
+        }
+        int sliderX = popupX + popupWidth - SETTINGS_SLIDER_WIDTH - 20;
+        int localX = MathHelper.clamp(mouseX - sliderX, 0, SETTINGS_SLIDER_WIDTH);
+        float t = SETTINGS_SLIDER_WIDTH <= 0 ? 0f : localX / (float) SETTINGS_SLIDER_WIDTH;
+        int value = setting.minInt() + Math.round(t * (setting.maxInt() - setting.minInt()));
+        if (value != com.pathmind.api.addon.AddonSettings.getInt(addonId, key)) {
+            com.pathmind.api.addon.AddonSettings.setInt(addonId, key, value);
+        }
+    }
+
+    /** Renders one INT addon setting as a label + value + slider row (settings extension). */
+    private void renderAddonIntSliderRow(DrawContext context, int mouseX, int mouseY, int labelX, int centerY,
+                                         com.pathmind.api.addon.AddonSettings.Registration reg,
+                                         int popupX, int scaledWidth) {
+        com.pathmind.api.addon.AddonSetting setting = reg.setting();
+        int value = com.pathmind.api.addon.AddonSettings.getInt(reg.addonId(), setting.key());
+        int sliderX = popupX + scaledWidth - SETTINGS_SLIDER_WIDTH - 20;
+        int sliderY = centerY - SETTINGS_SLIDER_HEIGHT / 2;
+        String valueText = Integer.toString(value);
+        int valueX = sliderX - this.textRenderer.getWidth(valueText) - 8;
+        int labelYText = centerY - this.textRenderer.fontHeight / 2;
+        int maxLabelWidth = Math.max(0, valueX - labelX - 8);
+        drawPopupTextWithEllipsis(context, setting.label(), labelX, labelYText, maxLabelWidth,
+            getPopupAnimatedColor(settingsPopupAnimation, UITheme.TEXT_SECONDARY));
+        context.drawTextWithShadow(this.textRenderer, Text.literal(valueText), valueX, labelYText,
+            getPopupAnimatedColor(settingsPopupAnimation, UITheme.TEXT_HEADER));
+        String dragKey = reg.addonId() + " " + setting.key();
+        boolean hovered = isPointInRect(mouseX, mouseY, sliderX, sliderY - 4, SETTINGS_SLIDER_WIDTH, SETTINGS_SLIDER_HEIGHT + 8);
+        float sliderHoverProgress = dragKey.equals(addonSettingDragKey) ? 1f : getHoverProgress("settings-addon-slider:" + dragKey, hovered);
+        int trackColor = AnimationHelper.lerpColor(UITheme.DROPDOWN_OPTION_BG, UITheme.DROPDOWN_OPTION_HOVER, sliderHoverProgress);
+        int trackBorder = AnimationHelper.lerpColor(UITheme.BORDER_SUBTLE, getAccentColor(), sliderHoverProgress * 0.45f);
+        trackColor = settingsPopupAnimation.getAnimatedPopupColor(trackColor);
+        trackBorder = settingsPopupAnimation.getAnimatedPopupColor(trackBorder);
+        context.fill(sliderX, sliderY, sliderX + SETTINGS_SLIDER_WIDTH, sliderY + SETTINGS_SLIDER_HEIGHT, trackColor);
+        DrawContextBridge.drawBorder(context, sliderX, sliderY, SETTINGS_SLIDER_WIDTH, SETTINGS_SLIDER_HEIGHT, trackBorder);
+        int clamped = setting.clamp(value);
+        float t = setting.maxInt() == setting.minInt() ? 0f
+            : (clamped - setting.minInt()) / (float) (setting.maxInt() - setting.minInt());
+        int handleX = sliderX + Math.round(t * (SETTINGS_SLIDER_WIDTH - SETTINGS_SLIDER_HANDLE_WIDTH));
+        int handleY = centerY - SETTINGS_SLIDER_HANDLE_HEIGHT / 2;
+        int handleColor = settingsPopupAnimation.getAnimatedPopupColor(getAccentColor());
+        int handleBorder = AnimationHelper.lerpColor(UITheme.BORDER_SUBTLE, getAccentColor(), sliderHoverProgress);
+        handleBorder = getPopupAnimatedColor(settingsPopupAnimation, handleBorder);
+        context.fill(handleX, handleY, handleX + SETTINGS_SLIDER_HANDLE_WIDTH, handleY + SETTINGS_SLIDER_HANDLE_HEIGHT, handleColor);
+        DrawContextBridge.drawBorder(context, handleX, handleY, SETTINGS_SLIDER_HANDLE_WIDTH, SETTINGS_SLIDER_HANDLE_HEIGHT, handleBorder);
     }
 
     private int getSettingsClearCacheSectionHeight() {
@@ -8485,6 +8615,7 @@ public class PathmindVisualEditorScreen extends Screen {
         languageDropdownOpen = false;
         nodeDelayDragging = false;
         createListRadiusDragging = false;
+        addonSettingDragKey = null;
         settingsNodeSelectorScrollDragging = false;
         settingsNodeSelectorScrollDragOffset = 0;
         settingsPopupScrollDragging = false;
@@ -8711,6 +8842,32 @@ public class PathmindVisualEditorScreen extends Screen {
                 return true;
             }
         }
+        java.util.List<com.pathmind.api.addon.AddonSettings.Registration> addonRegs =
+            com.pathmind.api.addon.AddonSettings.registrations();
+        if (bodyHovered && !addonRegs.isEmpty()) {
+            int addonSectionTop = getSettingsAddonSectionTop(popupX, popupY, SETTINGS_POPUP_WIDTH, popupHeight, contentX, nodeSettingsContentY);
+            int[] addonRowCenters = getSettingsAddonRowCenters(addonSectionTop);
+            for (int i = 0; i < addonRegs.size(); i++) {
+                com.pathmind.api.addon.AddonSettings.Registration reg = addonRegs.get(i);
+                com.pathmind.api.addon.AddonSetting setting = reg.setting();
+                if (setting.type() == com.pathmind.api.addon.AddonSetting.Type.BOOLEAN) {
+                    int addonToggleY = addonRowCenters[i] - SETTINGS_TOGGLE_HEIGHT / 2;
+                    if (isPointInRect(mouseXi, mouseYi, gridToggleX, addonToggleY, SETTINGS_TOGGLE_WIDTH, SETTINGS_TOGGLE_HEIGHT)) {
+                        com.pathmind.api.addon.AddonSettings.setBoolean(reg.addonId(), setting.key(),
+                            !com.pathmind.api.addon.AddonSettings.getBoolean(reg.addonId(), setting.key()));
+                        return true;
+                    }
+                } else {
+                    int addonSliderY = addonRowCenters[i] - SETTINGS_SLIDER_HEIGHT / 2;
+                    if (isPointInRect(mouseXi, mouseYi, sliderX, addonSliderY - 4, SETTINGS_SLIDER_WIDTH, SETTINGS_SLIDER_HEIGHT + 8)) {
+                        addonSettingDragKey = reg.addonId() + " " + setting.key();
+                        updateAddonSettingFromMouse(mouseXi, popupX, SETTINGS_POPUP_WIDTH);
+                        return true;
+                    }
+                }
+            }
+        }
+
         int[] clearCacheButtonBounds = getSettingsClearCacheButtonBounds(
             popupX, popupY, SETTINGS_POPUP_WIDTH, popupHeight, contentX, nodeSettingsContentY);
         if (isPointInRect(mouseXi, mouseYi, clearCacheButtonBounds[0], clearCacheButtonBounds[1],

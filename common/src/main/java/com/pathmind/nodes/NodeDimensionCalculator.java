@@ -33,10 +33,11 @@ final class NodeDimensionCalculator {
             AddonNodeDefinition def = addonTypeId != null
                 ? NodeTypeRegistry.INSTANCE.definitionFor(addonTypeId)
                 : null;
-            int bh = (def != null && def.getBodyHeight() > 0)
-                ? def.getBodyHeight()
-                : Node.TEMPLATE_NODE_HEIGHT; // 108 px fallback
-            layoutState.setSize(Node.TEMPLATE_NODE_WIDTH, bh);
+            int declaredHeight = def != null ? def.getBodyHeight() : -1;
+            int declaredWidth = def != null ? def.getBodyWidth() : -1;
+            int bh = declaredHeight > 0 ? declaredHeight : Node.TEMPLATE_NODE_HEIGHT; // 108 px fallback
+            int bw = declaredWidth > 0 ? declaredWidth : Node.TEMPLATE_NODE_WIDTH;    // 160 px fallback
+            layoutState.setSize(bw, bh);
             return false;
         }
 

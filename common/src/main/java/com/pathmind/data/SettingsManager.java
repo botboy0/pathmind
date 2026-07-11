@@ -51,6 +51,8 @@ public final class SettingsManager {
         public Boolean createListUseCustomRadius = false;
         public Integer createListRadius = 64;
         public Map<String, Map<String, String>> presetInputValues = new LinkedHashMap<>();
+        /** Addon-registered settings: addon id → setting key → value string (see AddonSettings). */
+        public Map<String, Map<String, String>> addonSettings = new LinkedHashMap<>();
         public Map<String, String> presetGroupColors = new LinkedHashMap<>();
         public Map<String, Boolean> presetGroupsExpanded = new LinkedHashMap<>();
         public java.util.List<String> presetGroupOrder = new java.util.ArrayList<>();
@@ -263,6 +265,9 @@ public final class SettingsManager {
         }
         if (settings.presetInputValues == null) {
             settings.presetInputValues = new LinkedHashMap<>();
+        }
+        if (settings.addonSettings == null) {
+            settings.addonSettings = new LinkedHashMap<>();
         }
         if (settings.presetGroupColors == null) {
             settings.presetGroupColors = new LinkedHashMap<>();

@@ -83,6 +83,11 @@ public final class AddonLoader {
                 }
 
                 container.getEntrypoint().registerNodes(registrar);
+
+                // Settings extension: registrar pre-bound to the addon's mod id.
+                String settingsAddonId = addonId;
+                container.getEntrypoint().registerSettings(
+                    setting -> com.pathmind.api.addon.AddonSettings.register(settingsAddonId, setting));
                 LOGGER.info("[Pathmind] Addon '{}' registered nodes successfully", addonId);
 
             } catch (Throwable t) {
