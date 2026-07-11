@@ -149,6 +149,26 @@ model dropdowns) edits live — the next run picks up whatever the dropdowns say
 OAuth stays in the CLIs; the broker only reads and refreshes their stored tokens.
 Details: `testing/README.md`, section *Vision backends (models & broker)*.
 
+The role split is not cosmetic — it was validated end-to-end on 2026-07-11:
+`gpt-5.6-sol` as **grounder** misses small targets by 20–40 px (a sidebar drag
+and an editor click landed just outside their panels and failed whole specs),
+but as **assert model** it reads screens verbatim and catches misses the cheap
+grounder-class models wave through — re-judging an old qwen-passed assert
+("popup below the current editor line" while the popup covered the line), it
+returned the correct fail. Keep the grounder on a grounding-tuned VL model
+(qwen) and spend the strong model on asserts. The dashboard's run list shows
+the per-role model stack (grounder / assert / escalation) for every run.
+
+## Regression suite
+
+`bash run-suite.sh` (in `testing/`) runs every lua spec sequentially with
+broker + commentary on — the standard dress rehearsal before calling a change
+done. A failing spec doesn't abort the suite. The full set (9 specs, ~17 min,
+~$0.03 in grounding calls, asserts free via subscription) passes 9/9 on the
+qwen-grounder + sol-assert stack. Hard-killed runs can no longer stall the
+next boot: the container entrypoint sweeps orphaned gradle lock files at boot
+and fails fast if gradle still waits on a cache lock.
+
 ## Run dashboard
 
 `bash run-local.sh web` serves a dashboard on `http://localhost:8077` (and, with
