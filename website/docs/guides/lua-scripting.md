@@ -69,6 +69,23 @@ local p = pathmind.getPosition()
 pathmind.moveTo(p.x + 10, p.y, p.z)
 ```
 
+**`moveTo` vs. `invokeAction('goto')`** — two deliberately different backends
+(verified in-game 2026-07-11):
+
+- `moveTo` always runs on **PathmindNavigator**, Pathmind's own bounded
+  walkable-space A*. It is dependency-free and deterministic, but local:
+  short-range hops on reasonably open terrain. It does not use Baritone even
+  when Baritone is installed.
+- `invokeAction('goto', { X=, Y=, Z= })` dispatches a real **GOTO node**
+  through the graph pipeline — with the [Baritone API
+  mod](https://github.com/cabaletta/baritone/releases) installed (the
+  `baritone-api-fabric` variant; the standalone jar proguards the
+  `baritone.api` packages away), that means full Baritone pathfinding:
+  long-range routes, terrain traversal, its path rendering. Without Baritone
+  it falls back to the same built-in navigator.
+
+Rule of thumb: `moveTo` for short scripted hops, `goto` for real journeys.
+
 ### Game state — `getPosition()`, `getInventory()`, `getBlock(x, y, z)`
 
 ```lua

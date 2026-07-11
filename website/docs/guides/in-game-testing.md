@@ -177,6 +177,16 @@ pass rate and cost, and a per-run detail view with the recorded video (per-step
 ▶ timestamps seek directly), step results, screenshots, logs, and the loadout
 manifest. See `testing/README.md` for the HTTPS/phone setup.
 
+**Loadout download** (2026-07-11): every run records its mod loadout with
+sha256 hashes; the detail page's Loadout card and a ⬇ column in the run list
+serve the run's exact jars as `loadout.zip` (verified against the manifest —
+exact bytes or a 409), ready to drop into a normal Minecraft `mods/` folder.
+Handy after a run whose behavior you want in your own game. The default
+loadout now also carries `baritone-api-fabric-1.13.1` (MC 1.21.4), which
+Pathmind's upstream Baritone integration picks up automatically — see the
+`moveTo` vs. `invokeAction('goto')` note in the
+[Lua Scripting Reference](./lua-scripting.md).
+
 **Live view** (2026-07-11): while a spec run is in progress, the run detail
 page shows a live stream of the container display — the same ffmpeg that
 records `run.mp4` additionally emits rolling 2-second HLS segments via the
