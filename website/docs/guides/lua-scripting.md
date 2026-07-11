@@ -7,6 +7,8 @@ title: Lua Scripting Reference
 
 The **Lua Script node** (from the [pathmind-lua addon](https://github.com/botboy0/pathmind-lua)) runs a sandboxed Lua script as a step in your node graph. This page documents everything a script can do.
 
+Ready-to-run example scripts (with importable workspace presets) live in the addon repo's [`examples/`](https://github.com/botboy0/pathmind-lua/tree/main/examples) folder.
+
 ## The sandbox
 
 Scripts run on **Cobalt** (a Lua 5.2-family VM) on a background worker thread — a running script never blocks the game. The environment is deliberately restricted:
