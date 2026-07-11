@@ -16,6 +16,15 @@ Two co-developed pieces of work: (1) refactoring Pathmind — a visual node-base
 - **Compatibility**: Pathmind must remain fully functional standalone (no addon installed) across its existing 1.21–1.21.11 range
 - **Dependency direction**: Addon depends on Pathmind, never the reverse
 
+### Fork discipline — upstream semantics are a guardrail
+
+This repo is a **fork of `soymods/pathmind`** (remote `upstream`); the upstream developer's internal logic must stay intact so the fork can keep tracking upstream. Concretely:
+
+- **Do not change upstream execution semantics.** The upstream pattern for node failures is deliberate: *show an error notification, then complete the node future NORMALLY so the graph chain continues* (see `NodeExecutionCompletion.fail` and the "node-failure observability" comment in `ExecutionManager`). Never switch upstream code paths to `completeExceptionally` or otherwise alter continue-on-error graph behavior.
+- **Strictness belongs in the fork's API layer.** Files that are fork-only additions (e.g. `com.pathmind.api.addon.*`, `PathmindRuntimeImpl`, `AddonActionInvoker`, `AddonListEntryCodec`) are where addon-facing behavior changes go. Example precedent: the PLACE false-success fix (2026-07-12) kept the executor behaviorally identical for graph nodes (routing failure paths through the existing `NodeExecutionCompletion.fail`, which fires the fork's `recordNodeFailure` hook) and implemented strict fail-on-error semantics only in `AddonActionInvoker` via the failure-counter snapshot.
+- **Check before you touch:** `git diff upstream/main main --numstat -- <file>` tells you whether a file is upstream code (unchanged/small delta) or fork-owned (all-insertions). For upstream files, keep any touch minimal and behavior-preserving; if a real behavior change in upstream code seems unavoidable, stop and discuss it with the repo owner first instead of implementing it.
+- Beware line-ending noise: huge symmetric diffs vs upstream (e.g. `Node.java`) are CRLF artifacts, not real divergence. Never commit full-file line-ending rewrites.
+
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:codebase/STACK.md -->
