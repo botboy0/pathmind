@@ -133,7 +133,20 @@ end
 
 ## Editor
 
-The Script node body is an inline editor with a line-number gutter, syntax highlighting, and autosuggestions: typing `pathmind.` (or pressing **Ctrl+Space**) opens a popup with the function list — Up/Down to select, Enter to accept, Esc to close. Esc with no popup open blurs the editor; a second Esc closes the node editor screen.
+The Script node body is an inline editor with a line-number gutter, syntax highlighting, and autosuggestions. Esc with no popup open blurs the editor; a second Esc closes the node editor screen.
+
+### Code completion
+
+Completion works in two modes:
+
+- **While typing**, the popup opens automatically when a line ends with `pathmind.` — it lists the API functions with their signatures, filtered live as you keep typing. Plain identifier prefixes filter keywords, the small stdlib set, and the `pathmind` module itself (so typing `p` offers `pathmind` next to `print` and `pairs`).
+- **Ctrl+Space** requests completion explicitly, Eclipse-style: with a prefix under the cursor it shows the same filtered results; on a blank line it opens the full discovery list — the qualified `pathmind.*` API entries first (insertable as-is), followed by Lua keywords and stdlib. Lists longer than the visible rows scroll with the keyboard selection.
+
+Up/Down selects, Enter accepts (replacing the token before the cursor), Esc closes the popup without blurring the editor. Accepting `pathmind` and typing `.` chains straight into the function list.
+
+### Diagnostics and signature help
+
+The buffer is compiled (not run) as you edit: syntax errors appear immediately in the error strip below the editor with their line number, visually distinct from runtime errors reported by an actual run. When the cursor sits inside the parentheses of a known `pathmind.*` call, a hint shows the function's signature.
 
 ### Syntax highlighting
 
