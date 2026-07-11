@@ -672,11 +672,32 @@ public class Node {
         layoutState.setPosition(x, y);
     }
 
+    /** AddonSettings.version() observed at the last ADDON-node layout (live-resize check). */
+    private int addonSettingsVersionAtLayout = -1;
+
+    /**
+     * ADDON node sizes may derive from addon settings (IntSupplier body sizes); poll the
+     * cheap settings version counter and re-layout when a settings write happened, so
+     * dragging a size slider in the settings popup resizes the node live.
+     */
+    private void refreshAddonDimensionsIfStale() {
+        if (type != NodeType.ADDON) {
+            return;
+        }
+        int current = com.pathmind.api.addon.AddonSettings.version();
+        if (current != addonSettingsVersionAtLayout) {
+            addonSettingsVersionAtLayout = current;
+            recalculateDimensions();
+        }
+    }
+
     public int getWidth() {
+        refreshAddonDimensionsIfStale();
         return layoutState.getWidth();
     }
 
     public int getHeight() {
+        refreshAddonDimensionsIfStale();
         return layoutState.getHeight();
     }
 

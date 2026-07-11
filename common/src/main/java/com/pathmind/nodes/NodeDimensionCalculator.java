@@ -33,8 +33,20 @@ final class NodeDimensionCalculator {
             AddonNodeDefinition def = addonTypeId != null
                 ? NodeTypeRegistry.INSTANCE.definitionFor(addonTypeId)
                 : null;
-            int declaredHeight = def != null ? def.getBodyHeight() : -1;
-            int declaredWidth = def != null ? def.getBodyWidth() : -1;
+            // Supplier-based sizes run addon code inside the layout/render path — a throwing
+            // supplier (e.g. an unregistered settings key) must degrade to the defaults, not
+            // crash the render thread.
+            int declaredHeight = -1;
+            int declaredWidth = -1;
+            if (def != null) {
+                try {
+                    declaredHeight = def.getBodyHeight();
+                    declaredWidth = def.getBodyWidth();
+                } catch (Throwable t) {
+                    System.err.println("[Pathmind] Addon body-size supplier for '" + node.getAddonTypeId()
+                        + "' failed, using defaults: " + t);
+                }
+            }
             int bh = declaredHeight > 0 ? declaredHeight : Node.TEMPLATE_NODE_HEIGHT; // 108 px fallback
             int bw = declaredWidth > 0 ? declaredWidth : Node.TEMPLATE_NODE_WIDTH;    // 160 px fallback
             layoutState.setSize(bw, bh);

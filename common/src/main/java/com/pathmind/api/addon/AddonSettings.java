@@ -27,7 +27,19 @@ public final class AddonSettings {
     /** Registration order preserved per addon for stable UI listing. */
     private static final Map<String, Map<String, AddonSetting>> REGISTRY = new LinkedHashMap<>();
 
+    /** Bumped on every write; consumers with settings-derived caches re-evaluate on change. */
+    private static volatile int version = 0;
+
     private AddonSettings() {
+    }
+
+    /**
+     * Monotonic change counter, incremented by every {@link #setInt}/{@link #setBoolean}.
+     * Cheap to poll from hot paths (e.g. node layout) to notice settings changes without
+     * an observer wiring — supplier-based node sizes resize live this way.
+     */
+    public static int version() {
+        return version;
     }
 
     /** Registers a setting for an addon; called by Pathmind's addon loader. */
@@ -122,6 +134,7 @@ public final class AddonSettings {
         }
         settings.addonSettings.computeIfAbsent(addonId, k -> new LinkedHashMap<>()).put(key, value);
         SettingsManager.save(settings);
+        version++;
     }
 
     /** One registered setting together with its owning addon id. */
