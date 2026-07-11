@@ -9745,6 +9745,10 @@ public class NodeGraph {
             com.pathmind.execution.AddonLiveScripts.publish(nodeId, ctx.getScriptText());
         }
 
+        // Editor contexts get the runtime too (not just execution contexts), so
+        // renderers can serve API metadata — e.g. listActions() for completion.
+        ctx.setRuntime(new com.pathmind.execution.PathmindRuntimeImpl(ExecutionManager.getInstance()));
+
         return ctx;
     }
 
