@@ -148,6 +148,11 @@ The generated signature reflects the action's *default node mode* (e.g. `goto_` 
 X/Y/Z coordinates); other modes' parameter sets are a planned `invokeAction`
 extension.
 
+Coordinate-directed placement (`place_({ Block=, X=, Y=, Z= })`) completes only
+after Minecraft reports the requested block at the exact target coordinates. A
+rejected placement or a block that does not appear within the confirmation window
+raises a Lua error instead of letting the script continue as if placement succeeded.
+
 ### External editors — generated LuaCATS definitions
 
 On first editor open the addon writes `<minecraft>/pathmind/pathmind-api.lua` — a
