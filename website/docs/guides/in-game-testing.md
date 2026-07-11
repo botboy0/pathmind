@@ -177,6 +177,15 @@ pass rate and cost, and a per-run detail view with the recorded video (per-step
 ▶ timestamps seek directly), step results, screenshots, logs, and the loadout
 manifest. See `testing/README.md` for the HTTPS/phone setup.
 
+**Live view** (2026-07-11): while a spec run is in progress, the run detail
+page shows a live stream of the container display — the same ffmpeg that
+records `run.mp4` additionally emits rolling 2-second HLS segments via the
+`tee` muxer into the run's artifacts dir, and the dashboard plays them with a
+vendored hls.js (LIVE badge, a few seconds behind real time; no CDN, no extra
+ports). After the run the live segments are cleaned up and the page falls back
+to the finished `run.mp4`. Implemented by a Codex-delegated task on an
+isolated worktree, reviewed and merged like an external PR.
+
 ## Practical notes
 
 - The Pathmind editor keybind defaults to **Right Alt** (`GLFW_KEY_RIGHT_ALT`) in a
