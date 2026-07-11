@@ -79,4 +79,35 @@ class AddonActionInvokerTest {
         assertInstanceOf(IllegalStateException.class, cause,
             "valid action in headless context must fail on the missing client, got: " + cause);
     }
+
+    @Test
+    void recordedNodeFailureFailsAddonInvocation() {
+        CompletableFuture<Void> invocationFuture = new CompletableFuture<>();
+
+        AddonActionInvoker.completeInvocation(invocationFuture, null, 7L, 8L,
+            "Attempted placement did not appear at 34, 116, 55");
+
+        Throwable cause = failureOf(invocationFuture);
+        assertEquals("Attempted placement did not appear at 34, 116, 55", cause.getMessage());
+    }
+
+    @Test
+    void unchangedFailureCountCompletesAddonInvocationNormally() {
+        CompletableFuture<Void> invocationFuture = new CompletableFuture<>();
+
+        AddonActionInvoker.completeInvocation(invocationFuture, null, 7L, 7L, null);
+
+        assertTrue(invocationFuture.isDone());
+        assertFalse(invocationFuture.isCompletedExceptionally());
+    }
+
+    @Test
+    void exceptionalActionFailureIsPreserved() {
+        CompletableFuture<Void> invocationFuture = new CompletableFuture<>();
+        IllegalStateException actionFailure = new IllegalStateException("dispatch failed");
+
+        AddonActionInvoker.completeInvocation(invocationFuture, actionFailure, 7L, 8L, "node failed");
+
+        assertSame(actionFailure, failureOf(invocationFuture));
+    }
 }

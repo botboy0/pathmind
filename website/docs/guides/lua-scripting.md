@@ -148,10 +148,13 @@ The generated signature reflects the action's *default node mode* (e.g. `goto_` 
 X/Y/Z coordinates); other modes' parameter sets are a planned `invokeAction`
 extension.
 
-Coordinate-directed placement (`place_({ Block=, X=, Y=, Z= })`) completes only
-after Minecraft reports the requested block at the exact target coordinates. A
-rejected placement or a block that does not appear within the confirmation window
-raises a Lua error instead of letting the script continue as if placement succeeded.
+Pathmind graph nodes deliberately continue the graph after an action failure: they
+show an error and record the failure, but complete their internal future normally.
+The addon API snapshots that failure record around each `invokeAction` call and turns
+a newly recorded failure into a Lua error. As a result, coordinate-directed placement
+(`place_({ Block=, X=, Y=, Z= })`) raises when the server rejects placement or the
+requested block does not appear at the exact target coordinates, while regular graph
+PLACE nodes retain their existing continue-on-error behavior.
 
 ### External editors — generated LuaCATS definitions
 
