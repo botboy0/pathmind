@@ -128,6 +128,27 @@ with video-timestamp jump links. Treat it as a rendering-lint channel: it found
 the suggestion-popup overlap and the `=`-glyph artifact now tracked in the v2
 backlog, plus a state-leak bug in the harness itself.
 
+## Vision backends: models per role, subscription broker
+
+The driver uses up to three models per run, each with its own job:
+
+| role | env / spec key | what it does |
+|---|---|---|
+| grounder | `GROUNDER_MODEL` / `model` | finds things on screen (`act` clicks/drags) — cheap and fast wins |
+| assert | `ASSERT_MODEL` / `assert_model` | judges `assert` conditions and writes commentary — a stronger model pays off here |
+| escalation | `ESCALATION_MODEL` | retry ladder + second opinion when an assert fails |
+
+By default everything goes to OpenRouter. The host-side **vision broker**
+(`testing/tools/vision-broker.py`) additionally exposes subscription backends by
+model prefix — `claude/…` uses a Claude Pro/Max OAuth token (`claude setup-token`),
+`codex/…` the Codex CLI's ChatGPT login — so assert-quality vision runs on flat-rate
+plans (per-run cost 0) instead of API credit. Start the broker, then run with
+`BROKER=1`: the three roles default to `auto-*` aliases resolved from
+`~/.mc-testkit/broker.json`, which the dashboard's broker card (backend health +
+model dropdowns) edits live — the next run picks up whatever the dropdowns say.
+OAuth stays in the CLIs; the broker only reads and refreshes their stored tokens.
+Details: `testing/README.md`, section *Vision backends (models & broker)*.
+
 ## Run dashboard
 
 `bash run-local.sh web` serves a dashboard on `http://localhost:8077` (and, with
