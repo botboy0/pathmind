@@ -486,8 +486,7 @@ final class NodeWorldActionCommandExecutor {
             try {
                 ensureBlockInHand(client, parameterBlockId, hand);
             } catch (Node.PlacementFailure e) {
-                owner.sendNodeErrorMessage(client, e.getMessage());
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, e.getMessage());
                 return;
             }
         }
@@ -554,15 +553,13 @@ final class NodeWorldActionCommandExecutor {
             blockIdToUse = getBlockIdFromHand(client, hand);
         }
         if (blockIdToUse == null || blockIdToUse.isEmpty() || Node.isAnySelectionValue(blockIdToUse)) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeNoBlockSelected"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.placeNoBlockSelected"));
             return;
         }
 
         Block desiredBlock = owner.resolveBlockForPlacement(blockIdToUse);
         if (desiredBlock == null) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeUnknownBlock", blockIdToUse));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.placeUnknownBlock", blockIdToUse));
             return;
         }
 
@@ -605,18 +602,19 @@ final class NodeWorldActionCommandExecutor {
                 }
                 boolean placed = owner.waitForBlockPlacement(client, placementPos, resolvedBlock);
                 if (!placed) {
-                    owner.sendNodeErrorMessage(client, tr("pathmind.error.placeDidNotAppear", resolvedBlockId, formatBlockPos(placementPos)));
+                    NodeExecutionCompletion.fail(owner, client, future,
+                        tr("pathmind.error.placeDidNotAppear", resolvedBlockId, formatBlockPos(placementPos)));
+                } else {
+                    future.complete(null);
                 }
-                future.complete(null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 future.completeExceptionally(e);
             } catch (Node.PlacementFailure e) {
-                owner.sendNodeErrorMessage(client, e.getMessage());
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, e.getMessage());
             } catch (RuntimeException e) {
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.placeFailed", resolvedBlockId, e.getMessage()));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future,
+                    tr("pathmind.error.placeFailed", resolvedBlockId, e.getMessage()));
             }
         }, "Pathmind-PlaceHand").start();
     }
@@ -865,7 +863,7 @@ final class NodeWorldActionCommandExecutor {
                 continue;
             }
 
-            Direction placementSide = direction.getOpposite();
+            Direction placementSide = placementSideTowardTarget(direction);
             Vec3d faceCenter = Vec3d.ofCenter(supportPos).add(
                 placementSide.getOffsetX() * 0.5D,
                 placementSide.getOffsetY() * 0.5D,
@@ -929,6 +927,10 @@ final class NodeWorldActionCommandExecutor {
             }
         }
         return bestResult;
+    }
+
+    static Direction placementSideTowardTarget(Direction supportDirection) {
+        return supportDirection.getOpposite();
     }
 
     private static final long SNEAK_SYNC_DELAY_MS = 75L;
@@ -1114,8 +1116,7 @@ final class NodeWorldActionCommandExecutor {
         }
 
         if (block == null || block.isEmpty() || Node.isAnySelectionValue(block)) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeNoBlockSelected"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.placeNoBlockSelected"));
             return;
         }
 
@@ -1123,8 +1124,7 @@ final class NodeWorldActionCommandExecutor {
             try {
                 ensureBlockInHand(client, block, Hand.MAIN_HAND);
             } catch (Node.PlacementFailure e) {
-                owner.sendNodeErrorMessage(client, e.getMessage());
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, e.getMessage());
                 return;
             }
         }
@@ -1179,8 +1179,7 @@ final class NodeWorldActionCommandExecutor {
 
         Block desiredBlock = resolveBlockForPlacement(block);
         if (desiredBlock == null) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.placeUnknownBlock", block));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.placeUnknownBlock", block));
             return;
         }
 
@@ -1210,18 +1209,19 @@ final class NodeWorldActionCommandExecutor {
                 });
                 boolean placed = waitForBlockPlacement(client, placementPos, resolvedBlock);
                 if (!placed) {
-                    owner.sendNodeErrorMessage(client, tr("pathmind.error.placeDidNotAppear", resolvedBlockId, formatBlockPos(placementPos)));
+                    NodeExecutionCompletion.fail(owner, client, future,
+                        tr("pathmind.error.placeDidNotAppear", resolvedBlockId, formatBlockPos(placementPos)));
+                } else {
+                    future.complete(null);
                 }
-                future.complete(null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 future.completeExceptionally(e);
             } catch (Node.PlacementFailure e) {
-                owner.sendNodeErrorMessage(client, e.getMessage());
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, e.getMessage());
             } catch (RuntimeException e) {
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.placeFailed", resolvedBlockId, e.getMessage()));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future,
+                    tr("pathmind.error.placeFailed", resolvedBlockId, e.getMessage()));
             }
         }, "Pathmind-Place").start();
     }

@@ -5,6 +5,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import com.pathmind.execution.ExecutionManager;
+
 import net.minecraft.client.MinecraftClient;
 
 /**
@@ -53,7 +55,8 @@ public final class AddonActionInvoker {
      * @param args       parameter-name → value map; may be null or empty. Values must be
      *                   Double, Boolean, or String.
      * @return a future that completes when the action finishes, or exceptionally on an
-     *         unknown action, disallowed category, unknown parameter, or missing client
+     *         unknown action, disallowed category, unknown parameter, missing client,
+     *         or a node failure recorded while the action runs
      */
     public static CompletableFuture<Void> invoke(String actionName, Map<String, Object> args) {
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -92,7 +95,17 @@ public final class AddonActionInvoker {
                     future.completeExceptionally(new IllegalArgumentException(argError));
                     return;
                 }
-                NodeCommandDispatcher.execute(node, future);
+                ExecutionManager executionManager = ExecutionManager.getInstance();
+                long failureCountBefore = executionManager.getNodeFailureCount();
+                CompletableFuture<Void> actionFuture = new CompletableFuture<>();
+                actionFuture.whenComplete((ignored, throwable) -> completeInvocation(
+                    future,
+                    throwable,
+                    failureCountBefore,
+                    executionManager.getNodeFailureCount(),
+                    executionManager.getLastNodeFailureMessage()
+                ));
+                NodeCommandDispatcher.execute(node, actionFuture);
             } catch (Throwable t) {
                 if (!future.isDone()) {
                     future.completeExceptionally(t);
@@ -100,6 +113,22 @@ public final class AddonActionInvoker {
             }
         });
         return future;
+    }
+
+    static void completeInvocation(CompletableFuture<Void> invocationFuture, Throwable actionFailure,
+                                   long failureCountBefore, long failureCountAfter, String failureMessage) {
+        if (actionFailure != null) {
+            invocationFuture.completeExceptionally(actionFailure);
+            return;
+        }
+        if (failureCountAfter > failureCountBefore) {
+            String message = failureMessage == null || failureMessage.isBlank()
+                ? "Pathmind action failed"
+                : failureMessage;
+            invocationFuture.completeExceptionally(new RuntimeException(message));
+            return;
+        }
+        invocationFuture.complete(null);
     }
 
     /**

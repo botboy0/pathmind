@@ -148,6 +148,14 @@ The generated signature reflects the action's *default node mode* (e.g. `goto_` 
 X/Y/Z coordinates); other modes' parameter sets are a planned `invokeAction`
 extension.
 
+Pathmind graph nodes deliberately continue the graph after an action failure: they
+show an error and record the failure, but complete their internal future normally.
+The addon API snapshots that failure record around each `invokeAction` call and turns
+a newly recorded failure into a Lua error. As a result, coordinate-directed placement
+(`place_({ Block=, X=, Y=, Z= })`) raises when the server rejects placement or the
+requested block does not appear at the exact target coordinates, while regular graph
+PLACE nodes retain their existing continue-on-error behavior.
+
 ### External editors — generated LuaCATS definitions
 
 On first editor open the addon writes `<minecraft>/pathmind/pathmind-api.lua` — a
