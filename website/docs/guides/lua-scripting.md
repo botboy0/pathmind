@@ -112,6 +112,40 @@ pathmind.invokeAction('goto', { X = 100, Y = 64, Z = -20 })
 - **Errors are loud:** an unknown action name or an argument that matches no parameter raises a Lua error listing the valid parameter names — typos never silently no-op.
 - **Not invocable:** flow control (`control_if`, `start_chain`, …), sensors, data/list operations, and parameter nodes. Scripts have Lua's own control flow and `getVar`/`setVar` instead.
 
+### Direct action calls — `pathmind.<action>{...}`
+
+Every invocable action is **also a direct function** on the `pathmind` table — the
+bindings are generated at runtime from Pathmind's action catalog
+(`PathmindRuntime.listActions()`), so new node types appear automatically with no
+addon update:
+
+```lua
+pathmind.jump()
+pathmind.message{ text = 'hello from Lua' }
+pathmind.press_key{ Key = 'GLFW_KEY_W', Duration = 0.5 }
+pathmind.craft{ Item = 'stick', Amount = 4 }
+```
+
+These are sugar over `invokeAction` — same argument matching, same blocking
+semantics, same loud errors. Two things to know:
+
+- **Reserved words:** action names that collide with Lua keywords must use bracket
+  syntax — `pathmind["goto"]{ X = 100, Y = 64, Z = -20 }`, `pathmind["break"]()`.
+  The editor's completion inserts the bracket form for you.
+- **Default mode:** the generated signature reflects the action's *default node
+  mode* (e.g. `goto` = X/Y/Z coordinates). Other modes' parameter sets are a
+  planned `invokeAction` extension.
+
+### External editors — generated LuaCATS definitions
+
+On first editor open the addon writes `<minecraft>/pathmind/pathmind-api.lua` — a
+[LuaCATS](https://luals.github.io/wiki/annotations/) `---@meta` stub covering the
+whole API (curated functions + every catalog action, with `---@param` annotations
+and the node descriptions as doc comments). Point a VS Code workspace with the
+[Lua language server (sumneko/LuaLS)](https://marketplace.visualstudio.com/items?itemName=sumneko.lua)
+at that file (`Lua.workspace.library`) and you get full IntelliSense — completion,
+signatures, hovers — when writing Pathmind scripts externally.
+
 ## Error handling
 
 An uncaught script error stops the graph at the Script node, prints `Lua error: script:LINE: message` to chat, and shows a persistent red **error strip** on the node (`⚠ Line N: …`). The strip:
@@ -139,7 +173,7 @@ The Script node body is an inline editor with a line-number gutter, syntax highl
 
 Completion works in two modes:
 
-- **While typing**, the popup opens automatically when a line ends with `pathmind.` — it lists the API functions with their signatures, filtered live as you keep typing. Plain identifier prefixes filter keywords, the small stdlib set, and the `pathmind` module itself (so typing `p` offers `pathmind` next to `print` and `pairs`).
+- **While typing**, the popup opens automatically when a line ends with `pathmind.` — it lists the **entire API surface alphabetically** (curated functions plus all ~44 catalog actions), each with an argument hint derived from the node definitions (`press_key {Key, Duration}`, `collect {Block, Amount}`), and a detail strip below the popup shows the selected entry's description (e.g. *"Breaks a targeted or specified block"*). Plain identifier prefixes filter keywords, the small stdlib set, and the `pathmind` module itself (so typing `p` offers `pathmind` next to `print` and `pairs`).
 - **Ctrl+Space** requests completion explicitly, Eclipse-style: with a prefix under the cursor it shows the same filtered results; on a blank line it opens the full discovery list — the qualified `pathmind.*` API entries first (insertable as-is), followed by Lua keywords and stdlib. Lists longer than the visible rows scroll with the keyboard selection.
 
 Up/Down selects, Enter accepts (replacing the token before the cursor), Esc closes the popup without blurring the editor. Accepting `pathmind` and typing `.` chains straight into the function list.
