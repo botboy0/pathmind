@@ -1,4 +1,3 @@
-<!-- GSD:project-start source:PROJECT.md -->
 
 ## Project
 
@@ -25,9 +24,7 @@ This repo is a **fork of `soymods/pathmind`** (remote `upstream`); the upstream 
 - **Check before you touch:** `git diff upstream/main main --numstat -- <file>` tells you whether a file is upstream code (unchanged/small delta) or fork-owned (all-insertions). For upstream files, keep any touch minimal and behavior-preserving; if a real behavior change in upstream code seems unavoidable, stop and discuss it with the repo owner first instead of implementing it.
 - Beware line-ending noise: huge symmetric diffs vs upstream (e.g. `Node.java`) are CRLF artifacts, not real divergence. Never commit full-file line-ending rewrites.
 
-<!-- GSD:project-end -->
 
-<!-- GSD:stack-start source:codebase/STACK.md -->
 
 ## Technology Stack
 
@@ -130,9 +127,7 @@ This repo is a **fork of `soymods/pathmind`** (remote `upstream`); the upstream 
 - NeoForge: Official Mojang mappings (obfuscated param names, deobfuscated class/method names)
 - Custom remapping task for NeoForge common jars: `RemapJarToMojangTask` in `buildSrc/`
 
-<!-- GSD:stack-end -->
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
 
 ## Conventions
 
@@ -244,9 +239,7 @@ This repo is a **fork of `soymods/pathmind`** (remote `upstream`); the upstream 
 - `com.pathmind.screen`: Custom screen implementations
 - `com.pathmind.marketplace`: Marketplace integration
 
-<!-- GSD:conventions-end -->
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
 
 ## Architecture
 
@@ -382,18 +375,15 @@ This repo is a **fork of `soymods/pathmind`** (remote `upstream`); the upstream 
 
 ### ExecutionManager Singleton
 
-<!-- GSD:architecture-end -->
 
-<!-- GSD:skills-start source:skills/ -->
 
 ## Project Skills
 
-No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
-<!-- GSD:skills-end -->
+- `deploy` (`.claude/skills/deploy/SKILL.md`) — build and deploy the mod jars into the Modrinth "Pathmind" profile for manual in-game testing.
 
 ## Documentation
 
-Project documentation lives in the Docusaurus site at `website/` (docs in `website/docs/`). The former GSD planning artifacts were migrated there: project overview/requirements/roadmap under `website/docs/project/`, codebase and research docs under `website/docs/codebase/` and `website/docs/research/`, and historical GSD phase plans/summaries under `website/docs/archive/`. Run the site with `cd website && npm start`; build with `npm run build`. Keep durable docs in the site rather than creating new `.planning/` artifacts.
+Project documentation lives in the Docusaurus site at `website/` (docs in `website/docs/`): project overview/requirements/roadmap under `website/docs/project/`, codebase and research docs under `website/docs/codebase/` and `website/docs/research/`, historical planning artifacts under `website/docs/archive/`. Run the site with `cd website && npm start`; build with `npm run build`. Keep durable docs in the site.
 
 **Documentation policy — every major addition gets documented in the Docusaurus site, in the same session that lands it.** "Major" means: new infrastructure or tooling, new API surface or contracts, new subsystems, or behavior changes a user or addon developer would notice. Requirements:
 
