@@ -141,6 +141,29 @@ public interface PathmindRuntime {
     CompletableFuture<Void> invokeAction(String actionName, Map<String, Object> args);
 
     /**
+     * Returns the catalog of actions invocable via {@link #invokeAction} — one
+     * {@link ActionInfo} per action, with the localized display name, description,
+     * and the parameter names/types/defaults the action accepts.
+     *
+     * <p>The catalog is derived from Pathmind's node definitions (never
+     * hand-maintained) and mirrors {@code invokeAction}'s accept set exactly:
+     * every listed action is invocable and every invocable action is listed.
+     * Addons use it to generate per-action bindings, editor completion entries,
+     * and external editor stubs (e.g. LuaCATS definitions).
+     *
+     * <p>Safe to call from any thread; the result is cached after the first call.
+     *
+     * <p>Default implementation returns an empty list — keeps older runtime
+     * implementations (and test fakes) source-compatible; Pathmind's real
+     * runtime always overrides it.
+     *
+     * @return immutable list of invocable actions, sorted by name; never null
+     */
+    default java.util.List<ActionInfo> listActions() {
+        return java.util.List.of();
+    }
+
+    /**
      * Sends an error message to the player chat with the Pathmind prefix.
      *
      * <p>Safe to call from any thread — dispatches to the Minecraft client

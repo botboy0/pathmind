@@ -603,6 +603,18 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
         return com.pathmind.nodes.AddonActionInvoker.invoke(actionName, args);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Delegates to {@link com.pathmind.nodes.AddonActionCatalog}, which derives the
+     * catalog from the same node definitions {@code invokeAction} dispatches against
+     * and caches it after the first build.
+     */
+    @Override
+    public java.util.List<com.pathmind.api.addon.ActionInfo> listActions() {
+        return com.pathmind.nodes.AddonActionCatalog.list();
+    }
+
     // -------------------------------------------------------------------------
     // Error surfacing — BIND-04: fully implemented
     // -------------------------------------------------------------------------
