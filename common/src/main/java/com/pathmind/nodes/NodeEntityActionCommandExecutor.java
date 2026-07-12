@@ -107,8 +107,7 @@ final class NodeEntityActionCommandExecutor {
             blockSelectionRaw = owner.getBlockParameterValue(attachedParameter);
             if (blockSelectionRaw == null || blockSelectionRaw.isBlank()) {
                 restoreSneakState.run();
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.interactUnknownBlock", "block"));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.interactUnknownBlock", "block"));
                 return;
             }
         } else {
@@ -125,24 +124,21 @@ final class NodeEntityActionCommandExecutor {
             Optional<BlockSelection> blockSelection = BlockSelection.parse(blockSelectionRaw);
             if (blockSelection.isEmpty()) {
                 restoreSneakState.run();
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.interactUnknownBlock", blockSelectionRaw));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.interactUnknownBlock", blockSelectionRaw));
                 return;
             }
 
             Optional<BlockPos> targetPos = findNearestReachableBlock(client, List.of(blockSelection.get()));
             if (targetPos.isEmpty()) {
                 restoreSneakState.run();
-                owner.sendNodeErrorMessage(client, blockSelectionRaw + " is too far away to interact with.");
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, blockSelectionRaw + " is too far away to interact with.");
                 return;
             }
 
             List<BlockHitResult> hitCandidates = buildInteractionHitCandidates(client, targetPos.get());
             if (hitCandidates.isEmpty()) {
                 restoreSneakState.run();
-                owner.sendNodeErrorMessage(client, blockSelectionRaw + " is too far away to interact with.");
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, blockSelectionRaw + " is too far away to interact with.");
                 return;
             }
 
@@ -157,8 +153,7 @@ final class NodeEntityActionCommandExecutor {
                     String entityName = String.valueOf(Registries.ENTITY_TYPE.getId(targetEntity.getType()))
                         .replace("minecraft:", "")
                         .replace("_", " ");
-                    owner.sendNodeErrorMessage(client, tr("pathmind.error.entityTooFarToInteract", entityName));
-                    future.complete(null);
+                    NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.entityTooFarToInteract", entityName));
                     return;
                 }
                 orientPlayerTowards(client, targetEntity.getBoundingBox().getCenter());
@@ -167,8 +162,7 @@ final class NodeEntityActionCommandExecutor {
                 Entity entity = entityHit.getEntity();
                 if (entity == null || entity.squaredDistanceTo(client.player.getEyePos()) > Node.getEntityInteractionReachSquared(client)) {
                     restoreSneakState.run();
-                    owner.sendNodeErrorMessage(client, "Target is too far away to interact with.");
-                    future.complete(null);
+                    NodeExecutionCompletion.fail(owner, client, future, "Target is too far away to interact with.");
                     return;
                 }
                 orientPlayerTowards(client, entity.getBoundingBox().getCenter());
@@ -176,16 +170,14 @@ final class NodeEntityActionCommandExecutor {
             } else if (client.crosshairTarget instanceof BlockHitResult blockHit) {
                 if (!isHitWithinReach(client, blockHit.getPos())) {
                     restoreSneakState.run();
-                    owner.sendNodeErrorMessage(client, "Target is too far away to interact with.");
-                    future.complete(null);
+                    NodeExecutionCompletion.fail(owner, client, future, "Target is too far away to interact with.");
                     return;
                 }
                 orientPlayerTowards(client, blockHit.getPos());
                 result = client.interactionManager.interactBlock(client.player, hand, blockHit);
             } else {
                 restoreSneakState.run();
-                owner.sendNodeErrorMessage(client, "No target in range for " + owner.getType().getDisplayName() + ".");
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, "No target in range for " + owner.getType().getDisplayName() + ".");
                 return;
             }
         }
