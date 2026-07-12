@@ -129,16 +129,20 @@ public interface PathmindRuntime {
      * the message text. Unknown argument names fail the future — typos surface to the
      * script instead of being silently ignored.
      *
-     * <p>Returns a future that completes when the action finishes (some actions, e.g.
-     * navigation, may take seconds), or completes exceptionally on an unknown action,
-     * a disallowed action, a bad argument, or when the client is unavailable. The
-     * caller may safely block on the future from a worker thread.
+     * <p>Returns a future that resolves to the action's {@link ActionResult} envelope
+     * when the action finishes (some actions, e.g. navigation, may take seconds).
+     * Expected action failures — the world saying no (missing ingredients, no matching
+     * hotbar item, target not found) — resolve to {@code ok == false} with a symbolic
+     * status; see {@link ActionResult}. The future completes exceptionally only on
+     * caller errors (unknown action, disallowed action, bad argument) and mod-internal
+     * errors (incl. the client being unavailable). The caller may safely block on the
+     * future from a worker thread.
      *
      * @param actionName case-insensitive node-type name of the action
      * @param args       parameter values by name; may be null or empty
-     * @return a future that resolves when the action completes
+     * @return a future resolving to the action's result envelope
      */
-    CompletableFuture<Void> invokeAction(String actionName, Map<String, Object> args);
+    CompletableFuture<ActionResult> invokeAction(String actionName, Map<String, Object> args);
 
     /**
      * Returns the catalog of actions invocable via {@link #invokeAction} — one

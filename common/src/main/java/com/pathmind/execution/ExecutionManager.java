@@ -358,6 +358,25 @@ public class ExecutionManager {
         return lastNodeFailureMessage;
     }
 
+    /**
+     * Records a classified node failure: like {@link #recordNodeFailure(String)}, but
+     * additionally stores the structured {@link FailureDetail} for the addon envelope
+     * layer to snapshot. Called by NodeExecutionCompletion's detail-carrying overload.
+     */
+    public void recordNodeFailure(String message, FailureDetail detail) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
+    /**
+     * Structured detail of the most recent node failure, or null if the most recent
+     * failure was unclassified (or none occurred yet). An unclassified failure clears
+     * any previously stored detail — the detail always belongs to the most recent
+     * failure, never a stale earlier one.
+     */
+    public FailureDetail getLastNodeFailureDetail() {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
     public boolean setRuntimeVariable(Node startNode, String name, RuntimeVariable value) {
         if (startNode == null || name == null || name.trim().isEmpty() || value == null) {
             return false;

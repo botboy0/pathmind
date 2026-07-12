@@ -599,7 +599,7 @@ public class PathmindRuntimeImpl implements PathmindRuntime {
      * {@code NodeCommandDispatcher} path on the client thread.
      */
     @Override
-    public CompletableFuture<Void> invokeAction(String actionName, Map<String, Object> args) {
+    public CompletableFuture<com.pathmind.api.addon.ActionResult> invokeAction(String actionName, Map<String, Object> args) {
         return com.pathmind.nodes.AddonActionInvoker.invoke(actionName, args);
     }
 

@@ -19,6 +19,17 @@ final class NodeExecutionCompletion {
         complete(future);
     }
 
+    /**
+     * Like {@link #fail(Node, MinecraftClient, CompletableFuture, String)}, but records a
+     * structured {@link com.pathmind.execution.FailureDetail} alongside the message for
+     * the addon envelope layer. Graph behavior is identical (notification + normal
+     * completion); a null detail behaves exactly like the plain overload.
+     */
+    static void fail(Node owner, MinecraftClient client, CompletableFuture<Void> future, String message,
+                     com.pathmind.execution.FailureDetail detail) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
     static void failWithCurrentClient(Node owner, CompletableFuture<Void> future, String message) {
         fail(owner, MinecraftClient.getInstance(), future, message);
     }

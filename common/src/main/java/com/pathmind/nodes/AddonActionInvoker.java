@@ -54,15 +54,21 @@ public final class AddonActionInvoker {
     /**
      * Invokes the named action with the given arguments.
      *
+     * <p><strong>Result envelope:</strong> the future resolves to an
+     * {@link com.pathmind.api.addon.ActionResult}. Expected action failures — a node
+     * failure recorded while the action runs (class 2: the world says no) — resolve
+     * to {@code ok == false} with a symbolic status ({@code "failed"} when the failure
+     * site recorded no classification). Caller errors (class 1: unknown action,
+     * disallowed category, unknown parameter or mode) and mod-internal errors
+     * (class 3, incl. missing client) still complete the future exceptionally.
+     *
      * @param actionName case-insensitive {@link NodeType} name (e.g. {@code "jump"})
      * @param args       parameter-name → value map; may be null or empty. Values must be
      *                   Double, Boolean, or String.
-     * @return a future that completes when the action finishes, or exceptionally on an
-     *         unknown action, disallowed category, unknown parameter, missing client,
-     *         or a node failure recorded while the action runs
+     * @return a future resolving to the action's result envelope
      */
-    public static CompletableFuture<Void> invoke(String actionName, Map<String, Object> args) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    public static CompletableFuture<com.pathmind.api.addon.ActionResult> invoke(String actionName, Map<String, Object> args) {
+        CompletableFuture<com.pathmind.api.addon.ActionResult> future = new CompletableFuture<>();
 
         if (actionName == null || actionName.isBlank()) {
             future.completeExceptionally(new IllegalArgumentException("Action name must not be empty"));
@@ -125,7 +131,9 @@ public final class AddonActionInvoker {
                     throwable,
                     failureCountBefore,
                     executionManager.getNodeFailureCount(),
-                    executionManager.getLastNodeFailureMessage()
+                    executionManager.getLastNodeFailureMessage(),
+                    executionManager.getLastNodeFailureDetail(),
+                    null
                 ));
                 NodeCommandDispatcher.execute(node, actionFuture);
             } catch (Throwable t) {
@@ -137,20 +145,47 @@ public final class AddonActionInvoker {
         return future;
     }
 
-    static void completeInvocation(CompletableFuture<Void> invocationFuture, Throwable actionFailure,
-                                   long failureCountBefore, long failureCountAfter, String failureMessage) {
-        if (actionFailure != null) {
-            invocationFuture.completeExceptionally(actionFailure);
-            return;
-        }
-        if (failureCountAfter > failureCountBefore) {
-            String message = failureMessage == null || failureMessage.isBlank()
-                ? "Pathmind action failed"
-                : failureMessage;
-            invocationFuture.completeExceptionally(new RuntimeException(message));
-            return;
-        }
-        invocationFuture.complete(null);
+    /**
+     * Maps the outcome of a dispatched action onto the invocation future's result
+     * envelope. Package-visible for unit tests — this method IS the three-class
+     * contract:
+     *
+     * <ul>
+     *   <li>{@code actionFailure != null} (class 1/3): the future completes
+     *       exceptionally with that failure, unchanged.</li>
+     *   <li>failure counter bumped (class 2): the future resolves to
+     *       {@code ok == false} with the recorded message; status and detail fields
+     *       come from {@code failureDetail} when the failure site classified itself,
+     *       else status {@code "failed"} with no detail fields.</li>
+     *   <li>otherwise: the future resolves to {@code ok == true} carrying
+     *       {@code successFields} (never null on the result, empty when absent).</li>
+     * </ul>
+     */
+    static void completeInvocation(CompletableFuture<com.pathmind.api.addon.ActionResult> invocationFuture,
+                                   Throwable actionFailure,
+                                   long failureCountBefore, long failureCountAfter, String failureMessage,
+                                   com.pathmind.execution.FailureDetail failureDetail,
+                                   Map<String, Object> successFields) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
+    /**
+     * Computes the action-specific success fields from before/after snapshots taken
+     * around the dispatch on the client thread. Pure; package-visible for unit tests.
+     *
+     * <p>v1 contract: CRAFT → {@code produced} (inventory-count delta of the "Item"
+     * argument, floored at 0); COLLECT → {@code collected} (delta of the "Block"
+     * argument, falling back to "Item"); GOTO → final {@code x}, {@code y}, {@code z}
+     * from {@code positionAfter}. All other actions: empty map. Argument keys are
+     * case-insensitive; bare item/block ids get the {@code minecraft:} namespace.
+     * Inventory snapshots map namespaced item ids to total counts; missing entries
+     * count as 0. Never returns null.
+     */
+    static Map<String, Object> successFields(NodeType type, Map<String, Object> args,
+                                             Map<String, Integer> inventoryBefore,
+                                             Map<String, Integer> inventoryAfter,
+                                             double[] positionAfter) {
+        throw new UnsupportedOperationException("not implemented");
     }
 
     /**

@@ -1934,6 +1934,19 @@ final class NodeCraftCommandExecutor {
         return plannedSlots;
     }
 
+    /**
+     * Simulated-inventory twin of the missing-ingredient derivation used for the
+     * {@code missing_resource} envelope detail (same convention as
+     * {@link #planIngredientSourceSlotsForTests}): consumes one inventory count per
+     * satisfiable ingredient key and returns the distinct keys (first-seen order) of
+     * the ingredients that could not be sourced. Returns an empty list when every
+     * ingredient is satisfiable; never returns null for non-null inputs.
+     */
+    static List<String> missingIngredientKeysForTests(List<TestIngredientStack> inventoryStacks,
+                                                      List<String> ingredientKeys) {
+        throw new UnsupportedOperationException("not implemented");
+    }
+
     private int findIngredientSourceSlot(ScreenHandler handler,
                                          Ingredient ingredient,
                                          Object registryManager,
