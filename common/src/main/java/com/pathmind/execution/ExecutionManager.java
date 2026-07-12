@@ -341,11 +341,11 @@ public class ExecutionManager {
     private final java.util.concurrent.atomic.AtomicLong nodeFailureCount =
         new java.util.concurrent.atomic.AtomicLong();
     private volatile String lastNodeFailureMessage;
+    private volatile FailureDetail lastNodeFailureDetail;
 
     /** Records a node failure surfaced through the fail path. Called by NodeExecutionCompletion. */
     public void recordNodeFailure(String message) {
-        lastNodeFailureMessage = message;
-        nodeFailureCount.incrementAndGet();
+        recordNodeFailure(message, null);
     }
 
     /** Monotonic count of node failures this session. */
@@ -364,7 +364,9 @@ public class ExecutionManager {
      * layer to snapshot. Called by NodeExecutionCompletion's detail-carrying overload.
      */
     public void recordNodeFailure(String message, FailureDetail detail) {
-        throw new UnsupportedOperationException("not implemented");
+        lastNodeFailureMessage = message;
+        lastNodeFailureDetail = detail;
+        nodeFailureCount.incrementAndGet();
     }
 
     /**
@@ -374,7 +376,7 @@ public class ExecutionManager {
      * failure, never a stale earlier one.
      */
     public FailureDetail getLastNodeFailureDetail() {
-        throw new UnsupportedOperationException("not implemented");
+        return lastNodeFailureDetail;
     }
 
     public boolean setRuntimeVariable(Node startNode, String name, RuntimeVariable value) {

@@ -2,6 +2,7 @@ package com.pathmind.nodes;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.pathmind.execution.FailureDetail;
 import com.pathmind.util.EntityCompatibilityBridge;
 import com.pathmind.util.RecipeCompatibilityBridge;
 import dev.architectury.platform.Platform;
@@ -120,7 +121,7 @@ final class NodeCraftCommandExecutor {
             String unavailableMessage = craftMode == NodeMode.CRAFT_CRAFTING_TABLE
                     ? "Cannot craft: open a crafting table GUI before running this node."
                     : "Cannot craft: open your inventory or a crafting table GUI before running this node.";
-            NodeExecutionCompletion.fail(owner, client, future, unavailableMessage);
+            NodeExecutionCompletion.fail(owner, client, future, unavailableMessage, FailureDetail.precondition());
             return;
         }
 
@@ -129,7 +130,8 @@ final class NodeCraftCommandExecutor {
         ScreenHandler handler = client.player.currentScreenHandler;
         if (!isCompatibleCraftingHandler(handler, craftMode)) {
             NodeExecutionCompletion.fail(owner, client, future,
-                "Cannot craft " + itemDisplayName + ": the crafting screen closed.");
+                "Cannot craft " + itemDisplayName + ": the crafting screen closed.",
+                FailureDetail.transientFailure());
             return;
         }
 
@@ -175,13 +177,15 @@ final class NodeCraftCommandExecutor {
         CachedRecipe cachedRecipe = findCachedRecipe(client, targetItem, effectiveCraftMode);
         if (recipeEntry == null && displayEntry == null && cachedRecipe == null) {
             String message;
+            FailureDetail failureDetail = null;
             if (effectiveCraftMode == NodeMode.CRAFT_PLAYER_GUI && requiresCraftingTable.get()) {
                 message = "Cannot craft " + itemDisplayName + ": recipe requires a crafting table.";
+                failureDetail = FailureDetail.unsupported();
             } else {
                 message = "Cannot craft " + itemDisplayName + ": no matching recipe found. "
                     + "If this is a multiplayer server, open a singleplayer world once to cache recipes.";
             }
-            NodeExecutionCompletion.fail(owner, client, future, message);
+            NodeExecutionCompletion.fail(owner, client, future, message, failureDetail);
             return;
         }
 
@@ -258,7 +262,7 @@ final class NodeCraftCommandExecutor {
                 }
 
                 if (summary.failureMessage != null) {
-                    NodeExecutionCompletion.fail(owner, client, future, summary.failureMessage);
+                    NodeExecutionCompletion.fail(owner, client, future, summary.failureMessage, summary.failureDetail);
                     return;
                 }
 
@@ -1394,6 +1398,7 @@ final class NodeCraftCommandExecutor {
                                                    Object registryManager) throws InterruptedException {
         int totalProduced = 0;
         String failureMessage = null;
+        FailureDetail failureDetail = null;
 
         for (int attempt = 0; attempt < craftsRequested; attempt++) {
             if (Thread.currentThread().isInterrupted()) {
@@ -1404,12 +1409,14 @@ final class NodeCraftCommandExecutor {
                 failureMessage = craftMode == NodeMode.CRAFT_CRAFTING_TABLE
                         ? "Cannot craft " + itemDisplayName + ": open a crafting table GUI before running this node."
                         : "Cannot craft " + itemDisplayName + ": open your inventory or a crafting table GUI before running this node.";
+                failureDetail = FailureDetail.precondition();
                 break;
             }
 
             ScreenHandler handler = client.player != null ? client.player.currentScreenHandler : null;
             if (!isCompatibleCraftingHandler(handler, craftMode)) {
                 failureMessage = "Cannot craft " + itemDisplayName + ": the crafting screen closed.";
+                failureDetail = FailureDetail.transientFailure();
                 break;
             }
 
@@ -1417,12 +1424,15 @@ final class NodeCraftCommandExecutor {
             int craftsThisAttempt = getCraftBatchSize(client, gridIngredients, registryManager, craftsRemaining);
             if (craftsThisAttempt <= 0) {
                 failureMessage = "Cannot craft " + itemDisplayName + ": missing required ingredients.";
+                failureDetail = FailureDetail.missingResource(
+                    missingIngredientKeys(handler, gridIngredients, registryManager, 1));
                 break;
             }
 
             CraftingAttemptResult attemptResult = performCraftingAttempt(client, targetItem, itemDisplayName, gridIngredients, gridSlots, craftMode, registryManager, craftsThisAttempt);
             if (attemptResult.errorMessage != null) {
                 failureMessage = attemptResult.errorMessage;
+                failureDetail = attemptResult.failureDetail;
                 if (attemptResult.produced > 0) {
                     totalProduced += attemptResult.produced;
                 }
@@ -1431,6 +1441,7 @@ final class NodeCraftCommandExecutor {
 
             if (attemptResult.produced <= 0) {
                 failureMessage = "Cannot craft " + itemDisplayName + ": missing required ingredients.";
+                failureDetail = FailureDetail.missingResource(List.of());
                 break;
             }
 
@@ -1444,9 +1455,10 @@ final class NodeCraftCommandExecutor {
 
         if (totalProduced <= 0 && failureMessage == null) {
             failureMessage = "Cannot craft " + itemDisplayName + ": missing required ingredients.";
+            failureDetail = FailureDetail.missingResource(List.of());
         }
 
-        return new CraftingSummary(totalProduced, failureMessage);
+        return new CraftingSummary(totalProduced, failureMessage, failureDetail);
     }
 
     private CraftingAttemptResult performCraftingAttempt(net.minecraft.client.MinecraftClient client,
@@ -1458,6 +1470,7 @@ final class NodeCraftCommandExecutor {
                                                          Object registryManager,
                                                          int craftsThisAttempt) throws InterruptedException {
         java.util.concurrent.atomic.AtomicReference<String> errorRef = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<FailureDetail> errorDetailRef = new java.util.concurrent.atomic.AtomicReference<>();
         java.util.concurrent.atomic.AtomicInteger producedRef = new java.util.concurrent.atomic.AtomicInteger();
         java.util.concurrent.atomic.AtomicReference<List<Integer>> plannedSourceSlotsRef = new java.util.concurrent.atomic.AtomicReference<>();
 
@@ -1471,6 +1484,7 @@ final class NodeCraftCommandExecutor {
             ScreenHandler handler = client.player != null ? client.player.currentScreenHandler : null;
             if (handler == null) {
                 errorRef.set("Cannot craft " + itemDisplayName + ": the crafting screen closed.");
+                errorDetailRef.set(FailureDetail.transientFailure());
                 return;
             }
 
@@ -1478,18 +1492,22 @@ final class NodeCraftCommandExecutor {
             List<Integer> plannedSourceSlots = planIngredientSourceSlots(handler, gridIngredients, registryManager, craftsThisAttempt);
             if (plannedSourceSlots == null || plannedSourceSlots.size() != gridIngredients.size()) {
                 errorRef.set("Cannot craft " + itemDisplayName + ": missing required ingredients.");
+                errorDetailRef.set(FailureDetail.missingResource(
+                    missingIngredientKeys(handler, gridIngredients, registryManager, craftsThisAttempt)));
                 return;
             }
             plannedSourceSlotsRef.set(plannedSourceSlots);
         });
 
         if (errorRef.get() != null) {
-            return new CraftingAttemptResult(0, errorRef.get());
+            return new CraftingAttemptResult(0, errorRef.get(), errorDetailRef.get());
         }
 
         List<Integer> plannedSourceSlots = plannedSourceSlotsRef.get();
         if (plannedSourceSlots == null || plannedSourceSlots.size() != gridIngredients.size()) {
-            return new CraftingAttemptResult(0, "Cannot craft " + itemDisplayName + ": missing required ingredients.");
+            return new CraftingAttemptResult(0,
+                "Cannot craft " + itemDisplayName + ": missing required ingredients.",
+                FailureDetail.missingResource(List.of()));
         }
 
         for (int ingredientIndex = 0; ingredientIndex < gridIngredients.size(); ingredientIndex++) {
@@ -1518,12 +1536,15 @@ final class NodeCraftCommandExecutor {
                 ScreenHandler handler = client.player != null ? client.player.currentScreenHandler : null;
                 if (handler == null) {
                     errorRef.set("Cannot craft " + itemDisplayName + ": the crafting screen closed.");
+                    errorDetailRef.set(FailureDetail.transientFailure());
                     return;
                 }
 
                 int sourceSlot = plannedSourceSlot;
                 if (sourceSlot == -1) {
                     errorRef.set("Cannot craft " + itemDisplayName + ": missing required ingredients.");
+                    errorDetailRef.set(FailureDetail.missingResource(
+                        missingIngredientKeys(handler, gridIngredients, registryManager, craftsThisAttempt)));
                     return;
                 }
 
@@ -1567,7 +1588,7 @@ final class NodeCraftCommandExecutor {
             });
 
             if (errorRef.get() != null) {
-                return new CraftingAttemptResult(producedRef.get(), errorRef.get());
+                return new CraftingAttemptResult(producedRef.get(), errorRef.get(), errorDetailRef.get());
             }
 
             if (!placed.get()) {
@@ -1588,6 +1609,7 @@ final class NodeCraftCommandExecutor {
                 ScreenHandler handler = client.player != null ? client.player.currentScreenHandler : null;
                 if (handler == null) {
                     errorRef.set("Cannot craft " + itemDisplayName + ": the crafting screen closed.");
+                    errorDetailRef.set(FailureDetail.transientFailure());
                     return;
                 }
 
@@ -1626,6 +1648,7 @@ final class NodeCraftCommandExecutor {
                 ScreenHandler handler = client.player != null ? client.player.currentScreenHandler : null;
                 if (handler == null) {
                     errorRef.set("Cannot craft " + itemDisplayName + ": the crafting screen closed.");
+                    errorDetailRef.set(FailureDetail.transientFailure());
                     return;
                 }
 
@@ -1633,7 +1656,7 @@ final class NodeCraftCommandExecutor {
             });
 
             if (errorRef.get() != null) {
-                return new CraftingAttemptResult(producedRef.get(), errorRef.get());
+                return new CraftingAttemptResult(producedRef.get(), errorRef.get(), errorDetailRef.get());
             }
 
             Thread.sleep(CRAFTING_ACTION_DELAY_MS);
@@ -1641,26 +1664,28 @@ final class NodeCraftCommandExecutor {
         }
 
         if (errorRef.get() != null) {
-            return new CraftingAttemptResult(producedRef.get(), errorRef.get());
+            return new CraftingAttemptResult(producedRef.get(), errorRef.get(), errorDetailRef.get());
         }
 
-        String outputFailureMessage = logCraftingOutputFailure(client, itemDisplayName, craftMode, gridIngredients, plannedSourceSlots);
-        return new CraftingAttemptResult(0, outputFailureMessage);
+        return logCraftingOutputFailure(client, itemDisplayName, craftMode, gridIngredients, plannedSourceSlots);
     }
 
-    private String logCraftingOutputFailure(net.minecraft.client.MinecraftClient client,
-                                            String itemDisplayName,
-                                            NodeMode craftMode,
-                                            List<GridIngredient> gridIngredients,
-                                            List<Integer> plannedSourceSlots) {
+    private CraftingAttemptResult logCraftingOutputFailure(net.minecraft.client.MinecraftClient client,
+                                                           String itemDisplayName,
+                                                           NodeMode craftMode,
+                                                           List<GridIngredient> gridIngredients,
+                                                           List<Integer> plannedSourceSlots) {
         if (client == null || client.player == null) {
-            return "Cannot craft " + itemDisplayName + ": crafting failed before the result could be inspected.";
+            return new CraftingAttemptResult(0,
+                "Cannot craft " + itemDisplayName + ": crafting failed before the result could be inspected.");
         }
 
         ScreenHandler handler = client.player.currentScreenHandler;
         if (handler == null) {
             LOGGER.warn("Crafting '{}' failed before output appeared: handler missing after placement.", itemDisplayName);
-            return "Cannot craft " + itemDisplayName + ": crafting screen closed before the result appeared.";
+            return new CraftingAttemptResult(0,
+                "Cannot craft " + itemDisplayName + ": crafting screen closed before the result appeared.",
+                FailureDetail.transientFailure());
         }
 
         String outputDescription = "missing";
@@ -1688,8 +1713,9 @@ final class NodeCraftCommandExecutor {
             plannedSourceSlots,
             describeCraftingGridIngredients(gridIngredients)
         );
-        return "Cannot craft " + itemDisplayName + ": ingredients were placed, but the result slot stayed "
-            + outputDescription + " (cursor " + cursorDescription + ").";
+        return new CraftingAttemptResult(0,
+            "Cannot craft " + itemDisplayName + ": ingredients were placed, but the result slot stayed "
+                + outputDescription + " (cursor " + cursorDescription + ").");
     }
 
     private ItemStack safeCopySlotStack(ScreenHandler handler, int slotIndex) {
@@ -1853,6 +1879,61 @@ final class NodeCraftCommandExecutor {
         return plannedSlots;
     }
 
+    private List<String> missingIngredientKeys(ScreenHandler handler,
+                                               List<GridIngredient> gridIngredients,
+                                               Object registryManager,
+                                               int countPerIngredient) {
+        if (handler == null || gridIngredients == null) {
+            return List.of();
+        }
+
+        List<ItemStack> inventoryStacks = new ArrayList<>();
+        for (Slot slot : handler.slots) {
+            if (!(slot.inventory instanceof PlayerInventory)) {
+                continue;
+            }
+            int inventoryIndex = slot.getIndex();
+            if (inventoryIndex < 0 || inventoryIndex >= PlayerInventory.MAIN_SIZE) {
+                continue;
+            }
+            inventoryStacks.add(slot.getStack().copy());
+        }
+
+        List<String> missing = new ArrayList<>();
+        for (GridIngredient ingredient : gridIngredients) {
+            if (ingredient == null
+                || (!ingredient.allowEmpty()
+                    && RecipeCompatibilityBridge.isIngredientEmpty(ingredient.ingredient(), registryManager))) {
+                continue;
+            }
+            int inventorySlot = findIngredientInventorySlot(
+                inventoryStacks, ingredient.ingredient(), registryManager, ingredient.allowEmpty());
+            if (inventorySlot == -1 || inventoryStacks.get(inventorySlot).getCount() < countPerIngredient) {
+                String key = ingredientKey(ingredient, registryManager);
+                if (key != null && !missing.contains(key)) {
+                    missing.add(key);
+                }
+                continue;
+            }
+            inventoryStacks.get(inventorySlot).decrement(countPerIngredient);
+        }
+        return missing;
+    }
+
+    private String ingredientKey(GridIngredient ingredient, Object registryManager) {
+        List<ItemStack> candidates = RecipeCompatibilityBridge.getIngredientStacks(
+            ingredient.ingredient(), registryManager);
+        if (candidates == null) {
+            return null;
+        }
+        for (ItemStack candidate : candidates) {
+            if (candidate != null && !candidate.isEmpty()) {
+                return String.valueOf(Registries.ITEM.getId(candidate.getItem()));
+            }
+        }
+        return null;
+    }
+
     private void clearCraftingGrid(net.minecraft.client.MinecraftClient client,
                                    ClientPlayerInteractionManager interactionManager,
                                    ScreenHandler handler,
@@ -1944,7 +2025,31 @@ final class NodeCraftCommandExecutor {
      */
     static List<String> missingIngredientKeysForTests(List<TestIngredientStack> inventoryStacks,
                                                       List<String> ingredientKeys) {
-        throw new UnsupportedOperationException("not implemented");
+        if (inventoryStacks == null || ingredientKeys == null) {
+            return List.of();
+        }
+
+        List<TestIngredientStack> simulatedInventory = new ArrayList<>(inventoryStacks.size());
+        for (TestIngredientStack stack : inventoryStacks) {
+            simulatedInventory.add(stack == null ? new TestIngredientStack("", 0) : stack);
+        }
+
+        List<String> missing = new ArrayList<>();
+        for (String ingredientKey : ingredientKeys) {
+            int inventorySlot = -1;
+            for (int slotIdx = 0; slotIdx < simulatedInventory.size(); slotIdx++) {
+                TestIngredientStack stack = simulatedInventory.get(slotIdx);
+                if (stack.count() > 0 && Objects.equals(stack.key(), ingredientKey)) {
+                    inventorySlot = slotIdx;
+                    simulatedInventory.set(slotIdx, new TestIngredientStack(stack.key(), stack.count() - 1));
+                    break;
+                }
+            }
+            if (inventorySlot == -1 && ingredientKey != null && !missing.contains(ingredientKey)) {
+                missing.add(ingredientKey);
+            }
+        }
+        return missing;
     }
 
     private int findIngredientSourceSlot(ScreenHandler handler,
@@ -3081,10 +3186,16 @@ final class NodeCraftCommandExecutor {
     static class CraftingSummary {
         final int produced;
         final String failureMessage;
+        final FailureDetail failureDetail;
 
         CraftingSummary(int produced, String failureMessage) {
+            this(produced, failureMessage, null);
+        }
+
+        CraftingSummary(int produced, String failureMessage, FailureDetail failureDetail) {
             this.produced = produced;
             this.failureMessage = failureMessage;
+            this.failureDetail = failureDetail;
         }
     }
 
@@ -3505,10 +3616,16 @@ final class NodeCraftCommandExecutor {
     static class CraftingAttemptResult {
         final int produced;
         final String errorMessage;
+        final FailureDetail failureDetail;
 
         CraftingAttemptResult(int produced, String errorMessage) {
+            this(produced, errorMessage, null);
+        }
+
+        CraftingAttemptResult(int produced, String errorMessage, FailureDetail failureDetail) {
             this.produced = produced;
             this.errorMessage = errorMessage;
+            this.failureDetail = failureDetail;
         }
     }
 }

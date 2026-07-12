@@ -1,5 +1,7 @@
 package com.pathmind.api.addon;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -20,13 +22,17 @@ import java.util.Map;
  * (e.g. {@code produced} for craft) and no status.
  */
 public final class ActionResult {
+    private final boolean ok;
+    private final String status;
+    private final String message;
+    private final Map<String, Object> fields;
 
     /**
      * Creates a successful result. {@code fields} carries action-specific data
      * (may be null or empty for actions without success data).
      */
     public static ActionResult success(Map<String, Object> fields) {
-        throw new UnsupportedOperationException("not implemented");
+        return new ActionResult(true, null, null, fields);
     }
 
     /**
@@ -34,25 +40,31 @@ public final class ActionResult {
      * message, and optional machine-readable detail fields (may be null or empty).
      */
     public static ActionResult failure(String status, String message, Map<String, Object> fields) {
-        throw new UnsupportedOperationException("not implemented");
+        return new ActionResult(false, status, message, fields);
     }
 
-    private ActionResult() {
+    private ActionResult(boolean ok, String status, String message, Map<String, Object> fields) {
+        this.ok = ok;
+        this.status = status;
+        this.message = message;
+        this.fields = fields == null || fields.isEmpty()
+            ? Map.of()
+            : Collections.unmodifiableMap(new LinkedHashMap<>(fields));
     }
 
     /** Whether the action succeeded. */
     public boolean isOk() {
-        throw new UnsupportedOperationException("not implemented");
+        return ok;
     }
 
     /** Symbolic failure status (v1 vocabulary), or null on success. */
     public String getStatus() {
-        throw new UnsupportedOperationException("not implemented");
+        return status;
     }
 
     /** Human-readable failure message, or null on success. */
     public String getMessage() {
-        throw new UnsupportedOperationException("not implemented");
+        return message;
     }
 
     /**
@@ -60,6 +72,6 @@ public final class ActionResult {
      * per-status failure detail (e.g. {@code missing}). Never null; unmodifiable.
      */
     public Map<String, Object> getFields() {
-        throw new UnsupportedOperationException("not implemented");
+        return fields;
     }
 }

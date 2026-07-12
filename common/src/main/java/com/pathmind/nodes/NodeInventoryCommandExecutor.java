@@ -74,7 +74,8 @@ final class NodeInventoryCommandExecutor {
                 }
             }
             if (foundSlot == -1) {
-                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noMatchingHotbarItem"));
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noMatchingHotbarItem"),
+                    com.pathmind.execution.FailureDetail.notFound());
                 return;
             }
             slot = foundSlot;

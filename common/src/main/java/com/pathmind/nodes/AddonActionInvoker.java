@@ -1,5 +1,6 @@
 package com.pathmind.nodes;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -8,6 +9,9 @@ import java.util.concurrent.CompletableFuture;
 import com.pathmind.execution.ExecutionManager;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 
 /**
  * Executes a single Pathmind action node on behalf of an addon script — the bridge
@@ -123,18 +127,46 @@ public final class AddonActionInvoker {
                     future.completeExceptionally(new IllegalArgumentException(argError));
                     return;
                 }
+                Map<String, Object> actionArgs = remainingArgs == null
+                    ? Map.of()
+                    : new LinkedHashMap<>(remainingArgs);
+                Map<String, Integer> inventoryBefore = usesInventorySnapshot(type)
+                    ? inventorySnapshot(client)
+                    : null;
                 ExecutionManager executionManager = ExecutionManager.getInstance();
                 long failureCountBefore = executionManager.getNodeFailureCount();
                 CompletableFuture<Void> actionFuture = new CompletableFuture<>();
-                actionFuture.whenComplete((ignored, throwable) -> completeInvocation(
-                    future,
-                    throwable,
-                    failureCountBefore,
-                    executionManager.getNodeFailureCount(),
-                    executionManager.getLastNodeFailureMessage(),
-                    executionManager.getLastNodeFailureDetail(),
-                    null
-                ));
+                actionFuture.whenComplete((ignored, throwable) -> {
+                    try {
+                        client.execute(() -> {
+                            try {
+                                Map<String, Integer> inventoryAfter = usesInventorySnapshot(type)
+                                    ? inventorySnapshot(client)
+                                    : null;
+                                double[] positionAfter = type == NodeType.GOTO
+                                    ? positionSnapshot(client)
+                                    : null;
+                                completeInvocation(
+                                    future,
+                                    throwable,
+                                    failureCountBefore,
+                                    executionManager.getNodeFailureCount(),
+                                    executionManager.getLastNodeFailureMessage(),
+                                    executionManager.getLastNodeFailureDetail(),
+                                    successFields(type, actionArgs, inventoryBefore, inventoryAfter, positionAfter)
+                                );
+                            } catch (Throwable t) {
+                                if (!future.isDone()) {
+                                    future.completeExceptionally(t);
+                                }
+                            }
+                        });
+                    } catch (Throwable t) {
+                        if (!future.isDone()) {
+                            future.completeExceptionally(t);
+                        }
+                    }
+                });
                 NodeCommandDispatcher.execute(node, actionFuture);
             } catch (Throwable t) {
                 if (!future.isDone()) {
@@ -166,7 +198,20 @@ public final class AddonActionInvoker {
                                    long failureCountBefore, long failureCountAfter, String failureMessage,
                                    com.pathmind.execution.FailureDetail failureDetail,
                                    Map<String, Object> successFields) {
-        throw new UnsupportedOperationException("not implemented");
+        if (actionFailure != null) {
+            invocationFuture.completeExceptionally(actionFailure);
+            return;
+        }
+        if (failureCountAfter > failureCountBefore) {
+            String message = failureMessage == null || failureMessage.isBlank()
+                ? "Pathmind action failed"
+                : failureMessage;
+            String status = failureDetail == null ? "failed" : failureDetail.getStatus();
+            Map<String, Object> fields = failureDetail == null ? Map.of() : failureDetail.getFields();
+            invocationFuture.complete(com.pathmind.api.addon.ActionResult.failure(status, message, fields));
+            return;
+        }
+        invocationFuture.complete(com.pathmind.api.addon.ActionResult.success(successFields));
     }
 
     /**
@@ -185,7 +230,82 @@ public final class AddonActionInvoker {
                                              Map<String, Integer> inventoryBefore,
                                              Map<String, Integer> inventoryAfter,
                                              double[] positionAfter) {
-        throw new UnsupportedOperationException("not implemented");
+        if (type == NodeType.CRAFT) {
+            String itemId = namespacedArgument(args, "Item");
+            return itemId == null
+                ? Map.of()
+                : Map.of("produced", inventoryDelta(itemId, inventoryBefore, inventoryAfter));
+        }
+        if (type == NodeType.COLLECT) {
+            String itemId = namespacedArgument(args, "Block");
+            if (itemId == null) {
+                itemId = namespacedArgument(args, "Item");
+            }
+            return itemId == null
+                ? Map.of()
+                : Map.of("collected", inventoryDelta(itemId, inventoryBefore, inventoryAfter));
+        }
+        if (type == NodeType.GOTO && positionAfter != null && positionAfter.length >= 3) {
+            Map<String, Object> fields = new LinkedHashMap<>();
+            fields.put("x", positionAfter[0]);
+            fields.put("y", positionAfter[1]);
+            fields.put("z", positionAfter[2]);
+            return fields;
+        }
+        return Map.of();
+    }
+
+    private static boolean usesInventorySnapshot(NodeType type) {
+        return type == NodeType.CRAFT || type == NodeType.COLLECT;
+    }
+
+    private static Map<String, Integer> inventorySnapshot(MinecraftClient client) {
+        Map<String, Integer> counts = new java.util.HashMap<>();
+        if (client == null || client.player == null) {
+            return counts;
+        }
+        PlayerInventory inventory = client.player.getInventory();
+        int mainSize = Math.min(PlayerInventory.MAIN_SIZE, inventory.size());
+        for (int slot = 0; slot < mainSize; slot++) {
+            ItemStack stack = inventory.getStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String itemId = Registries.ITEM.getId(stack.getItem()).toString();
+            counts.merge(itemId, stack.getCount(), Integer::sum);
+        }
+        return counts;
+    }
+
+    private static double[] positionSnapshot(MinecraftClient client) {
+        if (client == null || client.player == null) {
+            return null;
+        }
+        return new double[]{client.player.getX(), client.player.getY(), client.player.getZ()};
+    }
+
+    private static int inventoryDelta(String itemId, Map<String, Integer> before, Map<String, Integer> after) {
+        int beforeCount = before == null ? 0 : before.getOrDefault(itemId, 0);
+        int afterCount = after == null ? 0 : after.getOrDefault(itemId, 0);
+        return Math.max(0, afterCount - beforeCount);
+    }
+
+    private static String namespacedArgument(Map<String, Object> args, String name) {
+        if (args == null || args.isEmpty()) {
+            return null;
+        }
+        Object value = null;
+        for (Map.Entry<String, Object> entry : args.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(name)) {
+                value = entry.getValue();
+                break;
+            }
+        }
+        if (!(value instanceof String itemId) || itemId.isBlank()) {
+            return null;
+        }
+        String normalized = itemId.trim();
+        return normalized.contains(":") ? normalized : "minecraft:" + normalized;
     }
 
     /**
