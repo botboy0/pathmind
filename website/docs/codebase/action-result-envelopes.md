@@ -1,9 +1,11 @@
 # Design: Action Result Envelopes
 
-**Status:** decided design, not yet implemented (design discussion 2026-07-12).
-**Supersedes (once built):** the raise-on-every-failure semantics described in the
-[Lua Scripting Reference](../guides/lua-scripting.md) — a deliberate revision, not a
-contradiction; see "Why we are revising the strict-raise model" below.
+**Status:** implemented (2026-07-12; designed and shipped the same day). The
+[Lua Scripting Reference](../guides/lua-scripting.md) documents the shipped
+contract; this page keeps the design rationale.
+**Supersedes:** the raise-on-every-failure semantics of the earlier strictness
+work — a deliberate revision, not a contradiction; see "Why we are revising the
+strict-raise model" below.
 
 ## Summary
 

@@ -159,29 +159,65 @@ pathmind.goto_({ Mode = "goto_xz", X = 100, Z = -20 })          -- XZ, Y = surfa
 An unknown mode, or a mode that belongs to a different node type, raises a Lua
 error listing the action's valid modes.
 
-Pathmind graph nodes deliberately continue the graph after an action failure: they
-show an error and record the failure, but complete their internal future normally.
-The addon API snapshots that failure record around each `invokeAction` call and turns
-a newly recorded failure into a Lua error. As a result, coordinate-directed placement
-(`place_({ Block=, X=, Y=, Z= })`) raises when the server rejects placement or the
-requested block does not appear at the exact target coordinates, while regular graph
-PLACE nodes retain their existing continue-on-error behavior.
+### Action results — the envelope
 
-This strictness covers the full action surface: a 2026-07-12 sweep routed every
-executor failure path that used to complete silently (crafting failures such as
-missing ingredients or a closed crafting screen, no matching hotbar item, invalid
-inventory slot selections, GUI clicks without an open screen, unknown key/mouse
-names, unresolved entity/item/player parameters, list-item lookups, and more)
-through the shared failure record. If an action could not do what you asked,
-the corresponding `pathmind.*_` call raises with the executor's actual error
-message — wrap calls in `pcall` where you want to handle the failure yourself.
+Every action invocation — `invokeAction` and every `pathmind.<action>_` wrapper —
+**returns a result table** (the *envelope*), and **expected action failures are
+returned rather than raised**. The model follows the intuition that an action call
+behaves like a web request: an HTTP client *returns* a 404 response but *throws* on
+`ECONNREFUSED` — the same boundary applies here.
+
+```lua
+local r = pathmind.craft_({ Item = "stone_pickaxe" })
+if r.ok then
+  print("crafted " .. r.produced)
+elseif r.status == "missing_resource" then
+  gather(r.missing)            -- machine-readable: e.g. { "minecraft:stick" }
+elseif r.status == "transient" then
+  pathmind.wait_({ Duration = 1 })
+  -- retry
+end
+```
+
+- **Success:** `{ ok = true }` plus action-specific fields — `craft_` reports
+  `produced` (how many of the requested item actually appeared), `collect_`
+  reports `collected`, `goto_` reports the final `x`, `y`, `z`.
+- **Expected failure (the world says no):** `{ ok = false, status = ..., message = ... }`
+  plus per-status detail fields. These are normal outcomes a script plans around —
+  they do **not** raise.
+- **Lua errors stay reserved for real errors:** an unknown action name, a bad
+  argument or mode (script bugs), and mod-internal errors still raise, exactly as
+  before. You no longer need `pcall` around ordinary action calls.
+
+**Status vocabulary** (symbolic strings, never numbers):
+
+| `status` | Meaning | Detail fields | Script reaction |
+|---|---|---|---|
+| `missing_resource` | required items/blocks absent | `missing` — list of item ids | gather them |
+| `precondition` | required state absent (GUI not open, wrong screen) | — | establish it, retry |
+| `transient` | timing/desync (e.g. crafting screen closed mid-craft) | — | wait and retry |
+| `unsupported` | the request cannot work this way (3×3 recipe in the 2×2 player grid) | — | change approach |
+| `not_found` | target entity/item/player not found nearby | — | search elsewhere |
+| `failed` | unclassified fallback | — | read `message` |
+
+Classification is attached where scripts need it most (crafting, GUI preconditions,
+hotbar selection) and grows incrementally; an unclassified failure comes back as
+`status = "failed"` with the executor's human-readable `message`. Graph nodes are
+unchanged: they still show the error notification and continue the graph — the
+envelope exists only on the addon API surface. (This supersedes the earlier
+raise-on-every-failure semantics; see the
+[action-result-envelopes design doc](../codebase/action-result-envelopes.md) for
+the rationale and the three-class failure model.)
 
 ### External editors — generated LuaCATS definitions
 
 On first editor open the addon writes `<minecraft>/pathmind/pathmind-api.lua` — a
 [LuaCATS](https://luals.github.io/wiki/annotations/) `---@meta` stub covering the
 whole API (curated functions + every catalog action, with `---@param` annotations
-and the node descriptions as doc comments). Point a VS Code workspace with the
+and the node descriptions as doc comments). Action functions are annotated with
+`---@return PathmindActionResult` — the envelope class (`ok`, optional
+`status`/`message`, detail fields like `missing`) is part of the generated stub,
+so the language server autocompletes `r.ok`/`r.status` on action results. Point a VS Code workspace with the
 [Lua language server (sumneko/LuaLS)](https://marketplace.visualstudio.com/items?itemName=sumneko.lua)
 at that file (`Lua.workspace.library`) and you get full IntelliSense — completion,
 signatures, hovers — when writing Pathmind scripts externally.
