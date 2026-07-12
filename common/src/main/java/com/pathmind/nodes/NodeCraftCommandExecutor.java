@@ -258,7 +258,8 @@ final class NodeCraftCommandExecutor {
                 }
 
                 if (summary.failureMessage != null) {
-                    owner.sendNodeErrorMessage(client, summary.failureMessage);
+                    NodeExecutionCompletion.fail(owner, client, future, summary.failureMessage);
+                    return;
                 }
 
                 NodeExecutionCompletion.complete(future);
