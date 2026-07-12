@@ -24,10 +24,13 @@ import net.minecraft.client.MinecraftClient;
  *
  * <p><strong>Allowed actions:</strong> only categories {@link NodeCategory#WORLD},
  * {@link NodeCategory#PLAYER}, and {@link NodeCategory#INTERFACE} — concrete
- * player/world actions. Flow control, sensors, data/list operations, parameter nodes,
- * and custom/addon nodes are rejected: they only make sense wired into a graph
- * (scripts have Lua's own control flow and the variable API instead).
- * {@code STICKY_NOTE} and {@code ADDON} are rejected explicitly.
+ * player/world actions — plus {@link NodeType#WAIT} as the single FLOW exception:
+ * a timed pause is a primitive scripts genuinely need (e.g. giving the client a tick
+ * to open a GUI between an interact and a craft), and exposing the native node keeps
+ * wait semantics identical to graphs. Other flow control, sensors, data/list
+ * operations, parameter nodes, and custom/addon nodes are rejected: they only make
+ * sense wired into a graph (scripts have Lua's own control flow and the variable API
+ * instead). {@code STICKY_NOTE} and {@code ADDON} are rejected explicitly.
  *
  * <p><strong>Arguments</strong> are matched case-insensitively against the node's
  * parameter names (the same names the node shows in the editor). Values may be
@@ -76,7 +79,7 @@ public final class AddonActionInvoker {
         if (!isInvocable(type)) {
             future.completeExceptionally(new IllegalArgumentException(
                 "Action '" + actionName + "' is not invocable from scripts (category "
-                    + type.getCategory() + " — only world/player/interface actions are allowed)"));
+                    + type.getCategory() + " — only world/player/interface actions and 'wait' are allowed)"));
             return future;
         }
 
@@ -138,6 +141,10 @@ public final class AddonActionInvoker {
     static boolean isInvocable(NodeType type) {
         if (type == NodeType.STICKY_NOTE || type == NodeType.ADDON) {
             return false;
+        }
+        if (type == NodeType.WAIT) {
+            // The single FLOW exception: a native timed pause, identical to the graph node.
+            return true;
         }
         NodeCategory cat = type.getCategory();
         return cat == NodeCategory.WORLD || cat == NodeCategory.PLAYER || cat == NodeCategory.INTERFACE;

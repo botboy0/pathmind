@@ -113,6 +113,7 @@ pathmind.invokeAction('goto', { X = 100, Y = 64, Z = -20 })
 - **`args`** is an optional table mapping the node's **parameter names** (as shown on the node in the editor, case-insensitive) to number/string/boolean values. For `message`, the key `text` sets the message text.
 - **Errors are loud:** an unknown action name or an argument that matches no parameter raises a Lua error listing the valid parameter names — typos never silently no-op.
 - **Not invocable:** flow control (`control_if`, `start_chain`, …), sensors, data/list operations, and parameter nodes. Scripts have Lua's own control flow and `getVar`/`setVar` instead.
+- **The one FLOW exception — `wait`:** the native WAIT node is invocable (`pathmind.wait_({ Duration = 1 })`, default mode seconds). A timed pause is a primitive scripts genuinely need, most commonly to give the client a tick or two to open a GUI between an `interact_` and a `craft_` — INTERACT completes when the click is sent, not when the resulting screen has opened.
 
 ### Direct action calls — `pathmind.<action>_({...})`
 

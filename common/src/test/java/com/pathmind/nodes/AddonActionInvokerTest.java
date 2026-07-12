@@ -71,6 +71,16 @@ class AddonActionInvokerTest {
     }
 
     @Test
+    void waitIsTheSingleInvocableFlowException() {
+        // Scripts need a native timed pause (e.g. letting a GUI open between an
+        // interact and a craft); every other FLOW node stays graph-only.
+        assertTrue(AddonActionInvoker.isInvocable(NodeType.WAIT));
+        assertFalse(AddonActionInvoker.isInvocable(NodeType.START));
+        assertFalse(AddonActionInvoker.isInvocable(NodeType.STOP_CHAIN));
+        assertFalse(AddonActionInvoker.isInvocable(NodeType.CONTROL_WAIT_UNTIL));
+    }
+
+    @Test
     void actionNamesAreCaseInsensitive() {
         // In a headless test the client is null, so a VALID name+category must fail
         // with the client-unavailable IllegalStateException — proving it passed the
