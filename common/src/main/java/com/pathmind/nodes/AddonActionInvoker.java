@@ -167,7 +167,13 @@ public final class AddonActionInvoker {
                         }
                     }
                 });
-                NodeCommandDispatcher.execute(node, actionFuture);
+                if (type == NodeType.WAIT) {
+                    // Graph-executor WAIT no-ops for synthetic nodes (active-node
+                    // guard) — the fork layer times the wait itself.
+                    completeSyntheticWait(node, actionFuture);
+                } else {
+                    NodeCommandDispatcher.execute(node, actionFuture);
+                }
             } catch (Throwable t) {
                 if (!future.isDone()) {
                     future.completeExceptionally(t);
@@ -307,6 +313,46 @@ public final class AddonActionInvoker {
         String normalized = itemId.trim();
         return normalized.contains(":") ? normalized : "minecraft:" + normalized;
     }
+
+    /**
+     * Parses the effective wait duration of a synthetic WAIT node — the same
+     * Duration/mode conversion the graph executor applies (seconds by default;
+     * ticks are 50 ms, minutes/hours scale accordingly; negative durations clamp
+     * to 0). Pure; package-visible for unit tests.
+     */
+    static long syntheticWaitMillis(Node node) {
+        double baseDuration = Math.max(0.0, node.getDoubleParameter("Duration", 1.0));
+        NodeMode mode = node.getMode() != null ? node.getMode() : NodeMode.WAIT_SECONDS;
+        double unitSeconds = switch (mode) {
+            case WAIT_TICKS -> 0.05;
+            case WAIT_MINUTES -> 60.0;
+            case WAIT_HOURS -> 3600.0;
+            default -> 1.0;
+        };
+        return (long) (baseDuration * unitSeconds * 1000.0);
+    }
+
+    /**
+     * Completes the future after the synthetic WAIT node's duration has elapsed.
+     *
+     * <p>Script-invoked WAIT cannot route through the graph executor: that
+     * executor guards on "is my node the active node of the current execution",
+     * which a synthetic addon node never is — it would complete immediately
+     * (observed 2026-07-13). The fork layer therefore implements the timed wait
+     * itself on a shared daemon scheduler; graph WAIT nodes are untouched.
+     */
+    static void completeSyntheticWait(Node node, CompletableFuture<Void> future) {
+        SYNTHETIC_WAIT_SCHEDULER.schedule(() -> future.complete(null),
+            syntheticWaitMillis(node), java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** Shared daemon timer for synthetic WAIT nodes — never blocks a game thread. */
+    private static final java.util.concurrent.ScheduledExecutorService SYNTHETIC_WAIT_SCHEDULER =
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "Pathmind-Addon-Wait");
+            thread.setDaemon(true);
+            return thread;
+        });
 
     /**
      * Returns whether the given node type may be invoked from a script.

@@ -268,6 +268,65 @@ class AddonActionInvokerTest {
         assertTrue(fields.isEmpty());
     }
 
+    // ---------------------------------------------------------------------
+    // Synthetic WAIT — script-invoked wait_ must actually wait. The graph
+    // executor's active-node guard makes a synthetic WAIT node complete
+    // immediately, so the invoker times the wait itself (fork layer).
+    // ---------------------------------------------------------------------
+
+    @Test
+    void syntheticWaitParsesDurationAndModes() {
+        Node oneSecondDefault = new Node(NodeType.WAIT, 0, 0);
+        assertEquals(1000L, AddonActionInvoker.syntheticWaitMillis(oneSecondDefault));
+
+        Node fractional = new Node(NodeType.WAIT, 0, 0);
+        assertNull(AddonActionInvoker.applyMode(fractional, NodeType.WAIT, "wait_seconds"));
+        fractional.getParameters().stream().filter(p -> p.getName().equalsIgnoreCase("Duration"))
+            .findFirst().orElseThrow().setStringValue("0.2");
+        assertEquals(200L, AddonActionInvoker.syntheticWaitMillis(fractional));
+
+        Node ticks = new Node(NodeType.WAIT, 0, 0);
+        assertNull(AddonActionInvoker.applyMode(ticks, NodeType.WAIT, "wait_ticks"));
+        ticks.getParameters().stream().filter(p -> p.getName().equalsIgnoreCase("Duration"))
+            .findFirst().orElseThrow().setStringValue("3");
+        assertEquals(150L, AddonActionInvoker.syntheticWaitMillis(ticks));
+
+        Node minutes = new Node(NodeType.WAIT, 0, 0);
+        assertNull(AddonActionInvoker.applyMode(minutes, NodeType.WAIT, "wait_minutes"));
+        minutes.getParameters().stream().filter(p -> p.getName().equalsIgnoreCase("Duration"))
+            .findFirst().orElseThrow().setStringValue("2");
+        assertEquals(120000L, AddonActionInvoker.syntheticWaitMillis(minutes));
+    }
+
+    @Test
+    void syntheticWaitActuallyWaitsBeforeCompleting() throws Exception {
+        Node node = new Node(NodeType.WAIT, 0, 0);
+        node.getParameters().stream().filter(p -> p.getName().equalsIgnoreCase("Duration"))
+            .findFirst().orElseThrow().setStringValue("0.25");
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        long start = System.nanoTime();
+        AddonActionInvoker.completeSyntheticWait(node, future);
+        assertFalse(future.isDone(), "wait must not complete synchronously");
+
+        future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        assertTrue(elapsedMs >= 200,
+            "wait completed after " + elapsedMs + "ms — must wait ~250ms, not return immediately");
+    }
+
+    @Test
+    void syntheticZeroWaitCompletesPromptly() throws Exception {
+        Node node = new Node(NodeType.WAIT, 0, 0);
+        node.getParameters().stream().filter(p -> p.getName().equalsIgnoreCase("Duration"))
+            .findFirst().orElseThrow().setStringValue("0");
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        AddonActionInvoker.completeSyntheticWait(node, future);
+        future.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        assertFalse(future.isCompletedExceptionally());
+    }
+
     @Test
     void otherActionsYieldEmptySuccessFields() {
         for (NodeType type : new NodeType[]{NodeType.JUMP, NodeType.MESSAGE, NodeType.WAIT}) {
