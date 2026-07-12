@@ -93,7 +93,26 @@ public final class AddonActionInvoker {
         client.execute(() -> {
             try {
                 Node node = new Node(type, 0, 0);
-                String argError = applyArgs(node, type, args);
+                Map<String, Object> remainingArgs = args;
+                if (args != null && !args.isEmpty()) {
+                    // Optional "Mode" argument selects a non-default node mode
+                    // (e.g. goto_xz / goto_y / goto_block on GOTO). Must be applied
+                    // before the parameter args: setMode reinitializes the list.
+                    String modeError = null;
+                    remainingArgs = new java.util.LinkedHashMap<>();
+                    for (Map.Entry<String, Object> entry : args.entrySet()) {
+                        if (entry.getKey() != null && entry.getKey().equalsIgnoreCase("Mode")) {
+                            modeError = applyMode(node, type, entry.getValue());
+                        } else {
+                            remainingArgs.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    if (modeError != null) {
+                        future.completeExceptionally(new IllegalArgumentException(modeError));
+                        return;
+                    }
+                }
+                String argError = applyArgs(node, type, remainingArgs);
                 if (argError != null) {
                     future.completeExceptionally(new IllegalArgumentException(argError));
                     return;
@@ -148,6 +167,56 @@ public final class AddonActionInvoker {
         }
         NodeCategory cat = type.getCategory();
         return cat == NodeCategory.WORLD || cat == NodeCategory.PLAYER || cat == NodeCategory.INTERFACE;
+    }
+
+    /**
+     * Applies the optional "Mode" argument: selects one of the node type's modes by
+     * case-insensitive {@link NodeMode} name (e.g. {@code "goto_block"} on GOTO).
+     * Package-visible for unit tests.
+     *
+     * @return an error message on failure (non-string value, unknown mode, or a mode
+     *         that does not belong to this node type), or null on success
+     */
+    static String applyMode(Node node, NodeType type, Object modeValue) {
+        if (!(modeValue instanceof String modeName) || modeName.isBlank()) {
+            return "Argument 'Mode' must be a non-empty string naming a node mode";
+        }
+        NodeMode requested;
+        try {
+            requested = NodeMode.valueOf(modeName.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return "Unknown mode '" + modeName + "' for action '" + type.name().toLowerCase(Locale.ROOT)
+                + "' (available: " + availableModeNames(type) + ")";
+        }
+        NodeMode[] modes = NodeMode.getModesForNodeType(type);
+        boolean valid = false;
+        if (modes != null) {
+            for (NodeMode mode : modes) {
+                if (mode == requested) {
+                    valid = true;
+                    break;
+                }
+            }
+        }
+        if (!valid) {
+            return "Mode '" + modeName + "' does not belong to action '" + type.name().toLowerCase(Locale.ROOT)
+                + "' (available: " + availableModeNames(type) + ")";
+        }
+        node.setMode(requested);
+        return null;
+    }
+
+    private static String availableModeNames(NodeType type) {
+        NodeMode[] modes = NodeMode.getModesForNodeType(type);
+        if (modes == null || modes.length == 0) {
+            return "none";
+        }
+        StringBuilder names = new StringBuilder();
+        for (NodeMode mode : modes) {
+            if (!names.isEmpty()) names.append(", ");
+            names.append(mode.name().toLowerCase(Locale.ROOT));
+        }
+        return names.toString();
     }
 
     /**

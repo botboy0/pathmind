@@ -91,6 +91,29 @@ class AddonActionInvokerTest {
     }
 
     @Test
+    void modeArgumentSelectsANonDefaultMode() {
+        Node node = new Node(NodeType.GOTO, 0, 0);
+        assertNull(AddonActionInvoker.applyMode(node, NodeType.GOTO, "goto_block"));
+        assertEquals(NodeMode.GOTO_BLOCK, node.getMode());
+        assertTrue(node.getParameters().stream().anyMatch(p -> p.getName().equals("Block")),
+            "goto_block mode must expose the Block parameter");
+    }
+
+    @Test
+    void invalidModeArgumentsFailWithTheValidList() {
+        Node node = new Node(NodeType.GOTO, 0, 0);
+        String unknown = AddonActionInvoker.applyMode(node, NodeType.GOTO, "warp_drive");
+        assertNotNull(unknown);
+        assertTrue(unknown.contains("goto_xz"), "error must list valid modes, got: " + unknown);
+
+        String wrongType = AddonActionInvoker.applyMode(node, NodeType.GOTO, "collect_single");
+        assertNotNull(wrongType);
+        assertTrue(wrongType.contains("does not belong"), "got: " + wrongType);
+
+        assertNotNull(AddonActionInvoker.applyMode(node, NodeType.GOTO, 42.0));
+    }
+
+    @Test
     void recordedNodeFailureFailsAddonInvocation() {
         CompletableFuture<Void> invocationFuture = new CompletableFuture<>();
 

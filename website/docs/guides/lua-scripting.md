@@ -146,8 +146,18 @@ semantics, same loud errors. Note that `invokeAction` itself keeps the **plain
 catalog name as a string**: `pathmind.invokeAction('goto', { X = 0, Y = 64, Z = 0 })`
 (no underscore — the string is data, not an identifier, so no collision exists).
 The generated signature reflects the action's *default node mode* (e.g. `goto_` =
-X/Y/Z coordinates); other modes' parameter sets are a planned `invokeAction`
-extension.
+X/Y/Z coordinates). Other modes are selected with the optional **`Mode`** argument —
+a case-insensitive node-mode name; the remaining args must then match that mode's
+parameters:
+
+```lua
+pathmind.goto_({ Mode = "goto_block", Block = "grass_block" })  -- nearest grass block
+pathmind.goto_({ Mode = "goto_y", Y = 30 })                     -- to a Y level
+pathmind.goto_({ Mode = "goto_xz", X = 100, Z = -20 })          -- XZ, Y = surface
+```
+
+An unknown mode, or a mode that belongs to a different node type, raises a Lua
+error listing the action's valid modes.
 
 Pathmind graph nodes deliberately continue the graph after an action failure: they
 show an error and record the failure, but complete their internal future normally.
