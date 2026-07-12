@@ -177,8 +177,7 @@ final class EntityParameterDefinition {
         }
         List<String> entityIds = owner.resolveEntityIdsFromParameter(parameterNode);
         if (entityIds.isEmpty()) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.noEntitySelectedForNode", owner.getType().getDisplayName()));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noEntitySelectedForNode", owner.getType().getDisplayName()));
             return null;
         }
         String state = owner.getEntityParameterState(parameterNode);
@@ -202,8 +201,7 @@ final class EntityParameterDefinition {
             }
         }
         if (nearest == null) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.noMatchingEntityNearby", owner.getType().getDisplayName()));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noMatchingEntityNearby", owner.getType().getDisplayName()));
             return null;
         }
         RuntimeParameterData data = owner.getRuntimeState().runtimeParameterData;

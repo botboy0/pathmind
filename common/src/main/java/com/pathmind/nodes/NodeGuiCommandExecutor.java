@@ -35,8 +35,7 @@ final class NodeGuiCommandExecutor {
         }
 
         if (!com.pathmind.util.UiUtilsProxy.isAvailable()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.uiUtilsNotInstalled"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.uiUtilsNotInstalled"));
             return;
         }
 
@@ -205,8 +204,7 @@ final class NodeGuiCommandExecutor {
             Thread.currentThread().interrupt();
             future.completeExceptionally(e);
         } catch (RuntimeException e) {
-            sendNodeErrorMessage(client, e.getMessage());
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, e.getMessage());
         }
     }
 
@@ -515,8 +513,7 @@ final class NodeGuiCommandExecutor {
             Thread.currentThread().interrupt();
             future.completeExceptionally(e);
         } catch (RuntimeException e) {
-            sendNodeErrorMessage(client, e.getMessage());
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, e.getMessage());
         }
     }
 

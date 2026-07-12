@@ -916,12 +916,7 @@ final class NodeVariableListCommandExecutor {
         NodeType resolvedType = parameterNode.getResolvedValueType();
         Map<String, String> exported = exportResolvedParameterValues(parameterNode);
         if (resolvedType == null || exported == null || exported.isEmpty()) {
-            if (client != null) {
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.noValueForList"));
-            }
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noValueForList"));
             return null;
         }
         return new Node.ListValueEntry(resolvedType, serializeListEntryValues(exported));
@@ -1177,22 +1172,16 @@ final class NodeVariableListCommandExecutor {
         String safeListName = listName == null ? "" : listName.trim();
         net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
         if (list == null || list.isEmpty()) {
-            if (reportErrors && client != null) {
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.listEmptyOrMissing", safeListName));
-            }
-            if (reportErrors && future != null && !future.isDone()) {
-                future.complete(null);
+            if (reportErrors) {
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.listEmptyOrMissing", safeListName));
             }
             return null;
         }
 
         int index = Node.parseNodeInt(listNode, "Index", 1);
         if (index <= 0 || index > list.size()) {
-            if (reportErrors && client != null) {
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", safeListName, index));
-            }
-            if (reportErrors && future != null && !future.isDone()) {
-                future.complete(null);
+            if (reportErrors) {
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.listNoItem", safeListName, index));
             }
             return null;
         }

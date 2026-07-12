@@ -204,8 +204,7 @@ final class NodeMovementCommandExecutor {
         if (useMouseButton) {
             Integer mouseButton = owner.resolveMouseButtonCode(buttonValue);
             if (mouseButton == null) {
-                owner.sendNodeErrorMessage(client, tr("pathmind.error.unknownMouseButton", buttonValue));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.unknownMouseButton", buttonValue));
                 return;
             }
             InputUtil.Key inputKey = InputUtil.Type.MOUSE.createFromCode(mouseButton);
@@ -232,8 +231,7 @@ final class NodeMovementCommandExecutor {
 
         Integer keyCode = owner.resolveKeyCode(buttonValue);
         if (keyCode == null) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.unknownKey", buttonValue));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.unknownKey", buttonValue));
             return;
         }
 

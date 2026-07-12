@@ -74,8 +74,7 @@ final class PlayerParameterDefinition {
         }
         Optional<AbstractClientPlayerEntity> match = findPlayer(client, playerName);
         if (match.isEmpty()) {
-            owner.sendNodeErrorMessage(client, NodeBehaviorDefinitionSupport.playerSearchFailureMessage(owner, playerName));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, NodeBehaviorDefinitionSupport.playerSearchFailureMessage(owner, playerName));
             return null;
         }
 

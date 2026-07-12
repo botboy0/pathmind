@@ -299,10 +299,7 @@ final class NodeWorldActionCommandExecutor {
             return true;
         }
         if (parameterData.slotSelectionType == SlotSelectionType.GUI_CONTAINER) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.useCannotUseGuiSlots"));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.useCannotUseGuiSlots"));
             return false;
         }
         PlayerInventory inventory = client.player.getInventory();
@@ -310,19 +307,13 @@ final class NodeWorldActionCommandExecutor {
         boolean armorSlot = clampedSlot >= PlayerInventory.MAIN_SIZE
             && clampedSlot < PlayerInventory.MAIN_SIZE + Node.PLAYER_ARMOR_SLOT_COUNT;
         if (armorSlot) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.useCannotActivateArmorSlots"));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.useCannotActivateArmorSlots"));
             return false;
         }
 
         ItemStack stack = inventory.getStack(clampedSlot);
         if (stack.isEmpty()) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.selectedSlotEmpty", owner.getType().getDisplayName()));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.selectedSlotEmpty", owner.getType().getDisplayName()));
             return false;
         }
 
@@ -345,10 +336,7 @@ final class NodeWorldActionCommandExecutor {
         boolean prepared = preparedRef.get();
 
         if (!prepared) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.failedPrepareSelectedItem", owner.getType().getDisplayName()));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.failedPrepareSelectedItem", owner.getType().getDisplayName()));
         }
         return prepared;
     }

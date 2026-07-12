@@ -6828,46 +6828,31 @@ public class Node {
 
         String listName = getParameterString(listNode, "List");
         if (listName == null || listName.trim().isEmpty()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.listNameEmpty"));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listNameEmpty"));
             return null;
         }
 
         ExecutionManager.RuntimeList list = resolveRuntimeList(listNode);
         if (list == null || list.getEntries().isEmpty()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.listEmptyOrMissing", listName.trim()));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listEmptyOrMissing", listName.trim()));
             return null;
         }
 
         int index = parseNodeInt(listNode, "Index", 1);
         if (index <= 0) {
-            sendNodeErrorMessage(client, tr("pathmind.error.listIndexPositive"));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listIndexPositive"));
             return null;
         }
 
         int listIndex = index - 1;
         if (listIndex >= list.getEntries().size()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", listName.trim(), index));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listNoItem", listName.trim(), index));
             return null;
         }
 
         String entry = list.getEntries().get(listIndex);
         if (entry == null || entry.isEmpty()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", listName.trim(), index));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listNoItem", listName.trim(), index));
             return null;
         }
 
@@ -6892,18 +6877,12 @@ public class Node {
 
         if (list.getElementType() == NodeType.PARAM_GUI) {
             if (getParameter("Slot") == null && getParameter("SourceSlot") == null && getParameter("TargetSlot") == null) {
-                sendNodeErrorMessage(client, tr("pathmind.error.listGuiSlotsUnsupported", listName.trim(), type.getDisplayName()));
-                if (future != null && !future.isDone()) {
-                    future.complete(null);
-                }
+                NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listGuiSlotsUnsupported", listName.trim(), type.getDisplayName()));
                 return null;
             }
             ListSlotEntry slotEntry = parseListSlotEntry(entry);
             if (slotEntry == null) {
-                sendNodeErrorMessage(client, tr("pathmind.error.listItemInvalidGuiSlot", listName.trim(), index));
-                if (future != null && !future.isDone()) {
-                    future.complete(null);
-                }
+                NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listItemInvalidGuiSlot", listName.trim(), index));
                 return null;
             }
             if (data != null) {
@@ -6918,10 +6897,7 @@ public class Node {
             java.util.UUID uuid = java.util.UUID.fromString(entry);
             Entity entity = resolveEntityByUuid(client, uuid);
             if (entity == null || entity.isRemoved()) {
-                sendNodeErrorMessage(client, tr("pathmind.error.listItemUnavailable", listName.trim(), index));
-                if (future != null && !future.isDone()) {
-                    future.complete(null);
-                }
+                NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listItemUnavailable", listName.trim(), index));
                 return null;
             }
             if (data != null) {
@@ -6974,10 +6950,7 @@ public class Node {
                 }
             }
 
-            sendNodeErrorMessage(client, tr("pathmind.error.listItemUnavailable", listName.trim(), index));
-            if (future != null && !future.isDone()) {
-                future.complete(null);
-            }
+            NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listItemUnavailable", listName.trim(), index));
             return null;
         }
     }
@@ -7024,22 +6997,16 @@ public class Node {
 
         int index = parseNodeInt(listNode, "Index", 1);
         if (index <= 0 || index > list.getEntries().size()) {
-            if (reportErrors && client != null) {
-                sendNodeErrorMessage(client, tr("pathmind.error.listNoItem", safeListName, index));
-            }
-            if (reportErrors && future != null && !future.isDone()) {
-                future.complete(null);
+            if (reportErrors) {
+                NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listNoItem", safeListName, index));
             }
             return null;
         }
         String entry = list.getEntries().get(index - 1);
         ListSlotEntry parsed = parseListSlotEntry(entry);
         if (parsed == null) {
-            if (reportErrors && client != null) {
-                sendNodeErrorMessage(client, tr("pathmind.error.listItemInvalidGuiSlot", safeListName, index));
-            }
-            if (reportErrors && future != null && !future.isDone()) {
-                future.complete(null);
+            if (reportErrors) {
+                NodeExecutionCompletion.fail(this, client, future, tr("pathmind.error.listItemInvalidGuiSlot", safeListName, index));
             }
         }
         return parsed;

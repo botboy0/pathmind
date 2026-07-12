@@ -105,8 +105,7 @@ final class ItemParameterDefinition {
         }
         List<String> itemIds = owner.resolveItemIdsFromParameter(parameterNode);
         if (itemIds.isEmpty()) {
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.noItemSelectedForNode", owner.getType().getDisplayName()));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noItemSelectedForNode", owner.getType().getDisplayName()));
             return null;
         }
         double searchRange = Node.parseDoubleOrDefault(Node.getParameterString(parameterNode, "Range"), Node.PARAMETER_SEARCH_RADIUS);
@@ -131,8 +130,7 @@ final class ItemParameterDefinition {
 
         if (matchedPosition.isEmpty()) {
             String reference = String.join(", ", itemIds);
-            owner.sendNodeErrorMessage(client, tr("pathmind.error.noDroppedItemNearby", reference, owner.getType().getDisplayName()));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noDroppedItemNearby", reference, owner.getType().getDisplayName()));
             return null;
         }
 

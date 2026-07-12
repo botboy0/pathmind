@@ -74,8 +74,7 @@ final class NodeInventoryCommandExecutor {
                 }
             }
             if (foundSlot == -1) {
-                sendNodeErrorMessage(client, tr("pathmind.error.noMatchingHotbarItem"));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noMatchingHotbarItem"));
                 return;
             }
             slot = foundSlot;
@@ -192,8 +191,7 @@ final class NodeInventoryCommandExecutor {
         SlotSelectionType selectionType = resolveInventorySlotSelectionType(0);
         SlotResolution resolution = resolveInventorySlot(handler, inventory, slotValue, selectionType);
         if (resolution == null || resolution.slot == null) {
-            sendNodeErrorMessage(client, tr("pathmind.error.clickSlotRequiresValidSelection"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.clickSlotRequiresValidSelection"));
             return;
         }
 
@@ -217,8 +215,7 @@ final class NodeInventoryCommandExecutor {
             return;
         }
         if (client.currentScreen == null) {
-            sendNodeErrorMessage(client, tr("pathmind.error.clickScreenRequiresOpenGui"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.clickScreenRequiresOpenGui"));
             return;
         }
 
@@ -254,8 +251,7 @@ final class NodeInventoryCommandExecutor {
                 );
             }
             if (!moved || !pressed) {
-                sendNodeErrorMessage(client, tr("pathmind.error.screenClickDispatchFailed"));
-                future.complete(null);
+                NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.screenClickDispatchFailed"));
                 return;
             }
 
@@ -304,8 +300,7 @@ final class NodeInventoryCommandExecutor {
         }
 
         if (!handler.getCursorStack().isEmpty()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.cursorHoldingStack"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.cursorHoldingStack"));
             return;
         }
 
@@ -345,26 +340,22 @@ final class NodeInventoryCommandExecutor {
             : resolveInventorySlot(handler, inventory, requestedTargetSlot, targetSelection);
 
         if (sourceResolution == null) {
-            sendNodeErrorMessage(client, tr("pathmind.error.moveItemSourceUnresolved"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.moveItemSourceUnresolved"));
             return;
         }
         if (!shiftClickTarget && targetResolution == null) {
-            sendNodeErrorMessage(client, tr("pathmind.error.moveItemTargetUnresolved"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.moveItemTargetUnresolved"));
             return;
         }
 
         if (!shiftClickTarget && sourceResolution.handlerSlotIndex == targetResolution.handlerSlotIndex) {
-            sendNodeErrorMessage(client, tr("pathmind.error.moveItemSameSlot"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.moveItemSameSlot"));
             return;
         }
 
         ItemStack sourceStack = sourceResolution.slot.getStack();
         if (sourceStack.isEmpty()) {
-            sendNodeErrorMessage(client, tr("pathmind.error.moveItemSourceEmpty"));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.moveItemSourceEmpty"));
             return;
         }
 
@@ -380,7 +371,7 @@ final class NodeInventoryCommandExecutor {
 
         if (shiftClickTarget) {
             if (moveAllMatchingStacks) {
-                quickMoveAllMatchingStacks(client, interactionManager, handler, inventory, sourceParameterNode, sourceSelection);
+                quickMoveAllMatchingStacks(client, interactionManager, handler, inventory, sourceParameterNode, sourceSelection, future);
             } else if (requestedCount > 0) {
                 moveRequestedCountToGuiTarget(
                     client,
@@ -439,7 +430,8 @@ final class NodeInventoryCommandExecutor {
                                             ScreenHandler handler,
                                             PlayerInventory inventory,
                                             Node sourceParameterNode,
-                                            SlotSelectionType sourceSelection) {
+                                            SlotSelectionType sourceSelection,
+                                            CompletableFuture<Void> future) {
         if (client == null || client.player == null || interactionManager == null || handler == null || inventory == null || sourceParameterNode == null) {
             return;
         }
@@ -484,7 +476,7 @@ final class NodeInventoryCommandExecutor {
         }
 
         if (movedStacks == 0) {
-            sendNodeErrorMessage(client, tr("pathmind.error.noMatchingStacksQuickMoved", type.getDisplayName()));
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.noMatchingStacksQuickMoved", type.getDisplayName()));
         }
     }
 
@@ -996,8 +988,7 @@ final class NodeInventoryCommandExecutor {
             : getIntParameter("Slot", 0);
         SlotResolution resolution = resolveInventorySlot(handler, inventory, configuredSlot, selectionType);
         if (resolution == null || resolution.slot == null) {
-            sendNodeErrorMessage(client, tr("pathmind.error.requiresValidSlotSelection", type.getDisplayName()));
-            future.complete(null);
+            NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.requiresValidSlotSelection", type.getDisplayName()));
             return;
         }
         if (resolution.slot.getStack() == null || resolution.slot.getStack().isEmpty()) {
@@ -1412,10 +1403,7 @@ final class NodeInventoryCommandExecutor {
             SlotSelectionType selectionType = resolveInventorySlotSelectionType(parameterNode);
             if (selectionType == SlotSelectionType.GUI_CONTAINER) {
                 if (reportErrors) {
-                    sendNodeErrorMessage(client, tr("pathmind.error.useOnlyPlayerInventorySlots"));
-                    if (future != null && !future.isDone()) {
-                        future.complete(null);
-                    }
+                    NodeExecutionCompletion.fail(owner, client, future, tr("pathmind.error.useOnlyPlayerInventorySlots"));
                 }
                 return null;
             }
