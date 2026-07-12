@@ -198,16 +198,73 @@ end
 | `transient` | timing/desync (e.g. crafting screen closed mid-craft) | — | wait and retry |
 | `unsupported` | the request cannot work this way (3×3 recipe in the 2×2 player grid) | — | change approach |
 | `not_found` | target entity/item/player not found nearby | — | search elsewhere |
+| `no_route` | Baritone never started the navigation task (no path to the goal) | — | reposition, or retry with `AllowBreak = true` |
+| `off_target` | navigation ran and stopped, but the final position misses the goal | — | inspect final `x`/`y`/`z`, retry |
 | `failed` | unclassified fallback | — | read `message` |
 
 Classification is attached where scripts need it most (crafting, GUI preconditions,
-hotbar selection) and grows incrementally; an unclassified failure comes back as
+hotbar selection, navigation) and grows incrementally; an unclassified failure comes back as
 `status = "failed"` with the executor's human-readable `message`. Graph nodes are
 unchanged: they still show the error notification and continue the graph — the
 envelope exists only on the addon API surface. (This supersedes the earlier
 raise-on-every-failure semantics; see the
 [action-result-envelopes design doc](../codebase/action-result-envelopes.md) for
 the rationale and the three-class failure model.)
+
+### Baritone actions
+
+Navigation and mining actions (`goto_`, `collect_`, `path_`, `follow_`, …) are
+backed by the [Baritone](https://github.com/cabaletta/baritone) mod, which is an
+optional dependency. The script surface degrades honestly:
+
+- **Baritone not installed (or its API unusable):** every Baritone-requiring
+  action returns `{ ok = false, status = "unsupported" }` with a message naming
+  Baritone — no Lua error, no on-screen notification. Scripts that never touch
+  Baritone actions run completely clean without Baritone. (Graph nodes are
+  different on purpose: the editor shows its missing-Baritone popup, validation
+  reports `missing_baritone`, and running such a node shows the usual error
+  notification.)
+- **`goto_` verifies arrival.** A successful envelope means the final position
+  actually satisfies the goal — checked against Baritone's own goal criterion
+  (`Goal.isInGoal`) for every mode, including `goto_block`'s "near the block"
+  semantics. Two classified failures replace the old false-successes:
+  `no_route` (Baritone never started — no path) and `off_target` (it ran but
+  stopped short). Treat both as "waiting won't get you there" — an unreachable
+  goal can surface as either, depending on whether Baritone's process briefly
+  activated during the failed path calculation. The success fields still carry
+  the final `x`, `y`, `z`.
+- **Per-call `AllowBreak` / `AllowPlace`:** `goto_` accepts the two optional
+  boolean arguments and applies them only for that call — the global
+  *Allow break/place while executing GOTO* settings (both default off) are
+  untouched, as is every graph node.
+
+  ```lua
+  -- Dig down to Y 30 even through solid ground:
+  local r = pathmind.goto_({ Mode = "goto_y", Y = 30, AllowBreak = true })
+  ```
+
+- **`baritone_command_`** dispatches a raw Baritone chat command through
+  Baritone's command manager — the full `#...` surface (`#goto`, `#mine`,
+  `#follow`, `#thisway`, `#build`, settings toggles, …) without the chat
+  round-trip:
+
+  ```lua
+  local r = pathmind.baritone_command_({ Command = "#goto 100 -20" })
+  ```
+
+  The completion contract is **dispatch-only**: `ok = true` means Baritone
+  *accepted* the command, not that it finished — the command runs asynchronously
+  and the script observes progress itself (`getPosition`, `getInventory`,
+  `wait_`). An unknown command returns `status = "failed"`; without Baritone the
+  action returns `unsupported`. The leading `#` is optional.
+
+- **`collect_` and the `collected` field — informational only.** COLLECT's
+  completion waits for Baritone's mine process to go idle; it does **not**
+  guarantee the drops were picked up. `collected` is the inventory delta of the
+  literally requested ids (single `Block`/`Item`, or the summed `Blocks` list in
+  multiple mode) and does not translate drops — mining `stone` yields
+  `cobblestone` and reports `collected = 0`. Scripts that need certainty verify
+  the inventory themselves.
 
 ### External editors — generated LuaCATS definitions
 

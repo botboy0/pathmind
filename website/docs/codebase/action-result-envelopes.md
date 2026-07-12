@@ -71,6 +71,11 @@ codes from the original analogy were rejected as a wire-format legacy):
 - `transient` — timing/desync/blocked route; wait and retry
 - `unsupported` — the request cannot work this way (3×3 recipe in the 2×2 player grid)
 - `not_found` — target entity/item/player not found nearby
+- `no_route` — Baritone never started the navigation task (path unavailable); added
+  by the Baritone-integration milestone (2026-07-13, see the
+  [Baritone integration design doc](./baritone-integration.md))
+- `off_target` — navigation ran and stopped, but the final position misses the goal
+  (same milestone)
 - `failed` — unclassified fallback; message only, no detail fields
 
 An **unclassified** action failure returns `status = "failed"` with the executor's
