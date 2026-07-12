@@ -43,6 +43,16 @@ public final class FailureDetail {
         return new FailureDetail("not_found", Map.of());
     }
 
+    /** Baritone could not find or start a route to the requested goal. */
+    public static FailureDetail noRoute() {
+        return new FailureDetail("no_route", Map.of());
+    }
+
+    /** Navigation stopped without satisfying the requested goal. */
+    public static FailureDetail offTarget() {
+        return new FailureDetail("off_target", Map.of());
+    }
+
     private FailureDetail(String status, Map<String, Object> fields) {
         this.status = status;
         this.fields = Map.copyOf(fields);

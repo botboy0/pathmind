@@ -156,6 +156,12 @@ public final class BaritoneApiProxy {
         return invoke(baritone, "getBuilderProcess");
     }
 
+    public static Boolean executeCommand(Object baritone, String command) {
+        Object commandManager = invoke(baritone, "getCommandManager");
+        Object result = invoke(commandManager, "execute", new Class<?>[]{String.class}, command);
+        return result instanceof Boolean bool ? bool : null;
+    }
+
     public static boolean build(Object builderProcess, String schematicFile, BlockPos origin) {
         Object result = invokeBestMatch(builderProcess, "build", schematicFile, origin);
         return !(result instanceof Boolean bool) || bool;

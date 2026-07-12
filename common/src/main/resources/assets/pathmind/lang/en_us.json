@@ -435,6 +435,7 @@
   "pathmind.validation.missingStartTarget": "%s is missing a START target.",
   "pathmind.validation.missingTemplateGraph": "%s has no saved internal graph yet.",
   "pathmind.validation.missingTemplatePreset": "%s references preset \"%s\", but that preset was not found.",
+  "pathmind.validation.missingBaritone": "%s requires the Baritone mod, which is not installed.",
   "pathmind.validation.missingUiUtils": "%s requires UI Utils, but UI Utils is not available.",
   "pathmind.validation.multipleInputs": "%s has multiple connections into the same input.",
   "pathmind.validation.outdatedCustomNodeVersion": "%s is pinned to custom node v%s, but preset \"%s\" is now v%s.",

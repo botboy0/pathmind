@@ -7,6 +7,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.pathmind.execution.ExecutionManager;
+import com.pathmind.execution.FailureDetail;
+import com.pathmind.execution.GracefulTaskStops;
+import com.pathmind.util.BaritoneApiProxy;
+import com.pathmind.util.BaritoneDependencyChecker;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
@@ -78,6 +82,9 @@ public final class AddonActionInvoker {
             future.completeExceptionally(new IllegalArgumentException("Action name must not be empty"));
             return future;
         }
+        if (actionName.trim().equalsIgnoreCase("baritone_command")) {
+            return invokeBaritoneCommand(args, future);
+        }
         NodeType type;
         try {
             type = NodeType.valueOf(actionName.trim().toUpperCase(Locale.ROOT));
@@ -90,6 +97,14 @@ public final class AddonActionInvoker {
             future.completeExceptionally(new IllegalArgumentException(
                 "Action '" + actionName + "' is not invocable from scripts (category "
                     + type.getCategory() + " — only world/player/interface actions and 'wait' are allowed)"));
+            return future;
+        }
+        if (type.requiresBaritone() && !BaritoneDependencyChecker.isBaritoneApiPresent()) {
+            future.complete(com.pathmind.api.addon.ActionResult.failure(
+                "unsupported",
+                "Action '" + actionName.trim().toLowerCase(Locale.ROOT)
+                    + "' requires the Baritone mod, which is not installed",
+                Map.of()));
             return future;
         }
 
@@ -109,16 +124,29 @@ public final class AddonActionInvoker {
                     // (e.g. goto_xz / goto_y / goto_block on GOTO). Must be applied
                     // before the parameter args: setMode reinitializes the list.
                     String modeError = null;
+                    String guardError = null;
                     remainingArgs = new java.util.LinkedHashMap<>();
                     for (Map.Entry<String, Object> entry : args.entrySet()) {
                         if (entry.getKey() != null && entry.getKey().equalsIgnoreCase("Mode")) {
                             modeError = applyMode(node, type, entry.getValue());
+                        } else if ((type == NodeType.GOTO || type == NodeType.TRAVEL)
+                                && entry.getKey() != null
+                                && (entry.getKey().equalsIgnoreCase("AllowBreak")
+                                    || entry.getKey().equalsIgnoreCase("AllowPlace"))) {
+                            String error = applyGotoGuardOverrideArg(node, entry.getKey(), entry.getValue());
+                            if (error != null) {
+                                guardError = error;
+                            }
                         } else {
                             remainingArgs.put(entry.getKey(), entry.getValue());
                         }
                     }
                     if (modeError != null) {
                         future.completeExceptionally(new IllegalArgumentException(modeError));
+                        return;
+                    }
+                    if (guardError != null) {
+                        future.completeExceptionally(new IllegalArgumentException(guardError));
                         return;
                     }
                 }
@@ -146,6 +174,23 @@ public final class AddonActionInvoker {
                                 double[] positionAfter = type == NodeType.GOTO
                                     ? positionSnapshot(client)
                                     : null;
+                                String graceful = GracefulTaskStops.consume(actionFuture);
+                                FailureDetail postSuccessFailure = null;
+                                String postSuccessFailureMessage = null;
+                                if (graceful != null) {
+                                    postSuccessFailure = type == NodeType.COLLECT
+                                        ? FailureDetail.notFound()
+                                        : FailureDetail.noRoute();
+                                    postSuccessFailureMessage = graceful;
+                                } else if (type == NodeType.GOTO) {
+                                    postSuccessFailure = verifyGotoArrival(node, positionAfter);
+                                    if (postSuccessFailure != null && positionAfter != null && positionAfter.length >= 3) {
+                                        postSuccessFailureMessage = "GOTO finished off target at "
+                                            + (long) Math.floor(positionAfter[0]) + ", "
+                                            + (long) Math.floor(positionAfter[1]) + ", "
+                                            + (long) Math.floor(positionAfter[2]);
+                                    }
+                                }
                                 completeInvocation(
                                     future,
                                     throwable,
@@ -153,7 +198,9 @@ public final class AddonActionInvoker {
                                     executionManager.getNodeFailureCount(),
                                     executionManager.getLastNodeFailureMessage(),
                                     executionManager.getLastNodeFailureDetail(),
-                                    successFields(type, actionArgs, inventoryBefore, inventoryAfter, positionAfter)
+                                    successFields(type, actionArgs, inventoryBefore, inventoryAfter, positionAfter),
+                                    postSuccessFailure,
+                                    postSuccessFailureMessage
                                 );
                             } catch (Throwable t) {
                                 if (!future.isDone()) {
@@ -183,6 +230,81 @@ public final class AddonActionInvoker {
         return future;
     }
 
+    private static CompletableFuture<com.pathmind.api.addon.ActionResult> invokeBaritoneCommand(
+            Map<String, Object> args,
+            CompletableFuture<com.pathmind.api.addon.ActionResult> future) {
+        String normalized = null;
+        int commandArguments = 0;
+        if (args != null) {
+            for (Map.Entry<String, Object> entry : args.entrySet()) {
+                String key = entry.getKey();
+                if (key == null || !key.equalsIgnoreCase("Command")) {
+                    future.completeExceptionally(new IllegalArgumentException(
+                        "Unknown argument '" + key + "' for action 'baritone_command' (available: Command)"));
+                    return future;
+                }
+                commandArguments++;
+                if (commandArguments > 1) {
+                    future.completeExceptionally(new IllegalArgumentException(
+                        "Argument '" + key + "' must be supplied exactly once"));
+                    return future;
+                }
+                if (entry.getValue() instanceof String command) {
+                    normalized = normalizeBaritoneCommand(command);
+                }
+            }
+        }
+        if (commandArguments != 1 || normalized == null) {
+            future.completeExceptionally(new IllegalArgumentException(
+                "Argument 'Command' must be a non-empty string"));
+            return future;
+        }
+        if (!BaritoneDependencyChecker.isBaritoneApiPresent()) {
+            future.complete(com.pathmind.api.addon.ActionResult.failure(
+                "unsupported",
+                "Action 'baritone_command' requires the Baritone mod, which is not installed",
+                Map.of()));
+            return future;
+        }
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) {
+            future.completeExceptionally(new IllegalStateException("Minecraft client not available"));
+            return future;
+        }
+        String command = normalized;
+        try {
+            client.execute(() -> {
+                try {
+                    Boolean accepted = BaritoneApiProxy.executeCommand(
+                        BaritoneApiProxy.getPrimaryBaritone(), command);
+                    if (Boolean.TRUE.equals(accepted)) {
+                        future.complete(com.pathmind.api.addon.ActionResult.success(Map.of()));
+                    } else {
+                        future.complete(com.pathmind.api.addon.ActionResult.failure(
+                            "failed", "Unknown Baritone command '" + command + "'", Map.of()));
+                    }
+                } catch (Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            });
+        } catch (Throwable t) {
+            future.completeExceptionally(t);
+        }
+        return future;
+    }
+
+    /** Normalizes the raw command form accepted by the synthetic catalog action. */
+    static String normalizeBaritoneCommand(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String normalized = raw.trim();
+        if (normalized.startsWith("#")) {
+            normalized = normalized.substring(1).trim();
+        }
+        return normalized.isBlank() ? null : normalized;
+    }
+
     /**
      * Maps the outcome of a dispatched action onto the invocation future's result
      * envelope. Package-visible for unit tests — this method IS the three-class
@@ -204,6 +326,17 @@ public final class AddonActionInvoker {
                                    long failureCountBefore, long failureCountAfter, String failureMessage,
                                    com.pathmind.execution.FailureDetail failureDetail,
                                    Map<String, Object> successFields) {
+        completeInvocation(invocationFuture, actionFailure, failureCountBefore, failureCountAfter,
+            failureMessage, failureDetail, successFields, null, null);
+    }
+
+    static void completeInvocation(CompletableFuture<com.pathmind.api.addon.ActionResult> invocationFuture,
+                                   Throwable actionFailure,
+                                   long failureCountBefore, long failureCountAfter, String failureMessage,
+                                   com.pathmind.execution.FailureDetail failureDetail,
+                                   Map<String, Object> successFields,
+                                   FailureDetail postSuccessFailure,
+                                   String postSuccessFailureMessage) {
         if (actionFailure != null) {
             invocationFuture.completeExceptionally(actionFailure);
             return;
@@ -217,7 +350,38 @@ public final class AddonActionInvoker {
             invocationFuture.complete(com.pathmind.api.addon.ActionResult.failure(status, message, fields));
             return;
         }
+        if (postSuccessFailure != null) {
+            String message = postSuccessFailureMessage == null || postSuccessFailureMessage.isBlank()
+                ? "Pathmind action failed"
+                : postSuccessFailureMessage;
+            invocationFuture.complete(com.pathmind.api.addon.ActionResult.failure(
+                postSuccessFailure.getStatus(), message, postSuccessFailure.getFields()));
+            return;
+        }
         invocationFuture.complete(com.pathmind.api.addon.ActionResult.success(successFields));
+    }
+
+    /** Verifies a nominally successful GOTO against Baritone's stored goal. */
+    static FailureDetail verifyGotoArrival(Node node, double[] positionAfter) {
+        if (node == null || node.getAddonGotoGoal() == null
+                || positionAfter == null || positionAfter.length < 3) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Method isInGoal = node.getAddonGotoGoal().getClass()
+                .getMethod("isInGoal", int.class, int.class, int.class);
+            isInGoal.setAccessible(true);
+            Object result = isInGoal.invoke(
+                node.getAddonGotoGoal(),
+                (int) Math.floor(positionAfter[0]),
+                (int) Math.floor(positionAfter[1]),
+                (int) Math.floor(positionAfter[2]));
+            return result instanceof Boolean inGoal && !inGoal
+                ? FailureDetail.offTarget()
+                : null;
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return null;
+        }
     }
 
     /**
@@ -247,9 +411,18 @@ public final class AddonActionInvoker {
             if (itemId == null) {
                 itemId = namespacedArgument(args, "Item");
             }
-            return itemId == null
-                ? Map.of()
-                : Map.of("collected", inventoryDelta(itemId, inventoryBefore, inventoryAfter));
+            if (itemId != null) {
+                return Map.of("collected", inventoryDelta(itemId, inventoryBefore, inventoryAfter));
+            }
+            List<String> itemIds = namespacedArguments(args, "Blocks");
+            if (itemIds.isEmpty()) {
+                return Map.of();
+            }
+            int collected = 0;
+            for (String id : itemIds) {
+                collected += inventoryDelta(id, inventoryBefore, inventoryAfter);
+            }
+            return Map.of("collected", Math.max(0, collected));
         }
         if (type == NodeType.GOTO && positionAfter != null && positionAfter.length >= 3) {
             Map<String, Object> fields = new LinkedHashMap<>();
@@ -312,6 +485,30 @@ public final class AddonActionInvoker {
         }
         String normalized = itemId.trim();
         return normalized.contains(":") ? normalized : "minecraft:" + normalized;
+    }
+
+    private static List<String> namespacedArguments(Map<String, Object> args, String name) {
+        if (args == null || args.isEmpty()) {
+            return List.of();
+        }
+        Object value = null;
+        for (Map.Entry<String, Object> entry : args.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(name)) {
+                value = entry.getValue();
+                break;
+            }
+        }
+        if (!(value instanceof String itemIds) || itemIds.isBlank()) {
+            return List.of();
+        }
+        java.util.LinkedHashSet<String> normalized = new java.util.LinkedHashSet<>();
+        for (String itemId : itemIds.split(",")) {
+            String trimmed = itemId.trim();
+            if (!trimmed.isEmpty()) {
+                normalized.add(trimmed.contains(":") ? trimmed : "minecraft:" + trimmed);
+            }
+        }
+        return List.copyOf(normalized);
     }
 
     /**
@@ -404,6 +601,22 @@ public final class AddonActionInvoker {
                 + "' (available: " + availableModeNames(type) + ")";
         }
         node.setMode(requested);
+        return null;
+    }
+
+    /** Applies a fork-only per-call GOTO/TRAVEL Baritone guard override. */
+    static String applyGotoGuardOverrideArg(Node node, String key, Object value) {
+        if (!"AllowBreak".equalsIgnoreCase(key) && !"AllowPlace".equalsIgnoreCase(key)) {
+            return "Unknown GOTO guard override argument '" + key + "'";
+        }
+        if (!(value instanceof Boolean enabled)) {
+            return "Argument '" + key + "' must be a boolean";
+        }
+        if ("AllowBreak".equalsIgnoreCase(key)) {
+            node.setAddonGotoAllowBreakOverride(enabled);
+        } else {
+            node.setAddonGotoAllowPlaceOverride(enabled);
+        }
         return null;
     }
 

@@ -90,7 +90,7 @@ public class Sidebar {
     private int currentRenderedWidth = INNER_SIDEBAR_WIDTH;
     
     public Sidebar() {
-        this(BaritoneDependencyChecker.isBaritonePresent(), UiUtilsDependencyChecker.isUiUtilsPresent());
+        this(BaritoneDependencyChecker.isBaritoneApiPresent(), UiUtilsDependencyChecker.isUiUtilsPresent());
     }
 
     public Sidebar(boolean baritoneAvailable, boolean uiUtilsAvailable) {

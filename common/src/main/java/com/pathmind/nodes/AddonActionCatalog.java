@@ -63,6 +63,11 @@ public final class AddonActionCatalog {
             }
             actions.add(describe(type));
         }
+        actions.add(new ActionInfo(
+            "baritone_command",
+            "Baritone Command",
+            "Runs a raw Baritone chat command (#goto, #mine, ...) through Baritone's command manager.",
+            List.of(new ActionInfo.Param("Command", "TEXT", ""))));
         actions.sort((a, b) -> a.name().compareTo(b.name()));
         return List.copyOf(actions);
     }

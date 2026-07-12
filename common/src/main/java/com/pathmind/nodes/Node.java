@@ -337,6 +337,10 @@ public class Node {
     private String stickyNoteText;
     private boolean gotoAllowBreakWhileExecuting;
     private boolean gotoAllowPlaceWhileExecuting;
+    // Fork-only (addon per-call guard override / arrival check).
+    private Object addonGotoGoal;
+    private Boolean addonGotoAllowBreakOverride;
+    private Boolean addonGotoAllowPlaceOverride;
     private boolean keyPressedActivatesInGuis;
     private String templateName;
     private int templateVersion;
@@ -1045,8 +1049,15 @@ public class Node {
         if (type != NodeType.GOTO && type != NodeType.TRAVEL) {
             return false;
         }
+        if (addonGotoAllowBreakOverride != null) {
+            return addonGotoAllowBreakOverride;
+        }
         com.pathmind.data.SettingsManager.Settings settings = com.pathmind.data.SettingsManager.getCurrent();
         return settings.gotoAllowBreakWhileExecuting != null && settings.gotoAllowBreakWhileExecuting;
+    }
+
+    public void setAddonGotoAllowBreakOverride(Boolean addonGotoAllowBreakOverride) {
+        this.addonGotoAllowBreakOverride = addonGotoAllowBreakOverride;
     }
 
     public void setGotoAllowBreakWhileExecuting(boolean gotoAllowBreakWhileExecuting) {
@@ -1060,8 +1071,23 @@ public class Node {
         if (type != NodeType.GOTO && type != NodeType.TRAVEL) {
             return false;
         }
+        if (addonGotoAllowPlaceOverride != null) {
+            return addonGotoAllowPlaceOverride;
+        }
         com.pathmind.data.SettingsManager.Settings settings = com.pathmind.data.SettingsManager.getCurrent();
         return settings.gotoAllowPlaceWhileExecuting != null && settings.gotoAllowPlaceWhileExecuting;
+    }
+
+    public void setAddonGotoAllowPlaceOverride(Boolean addonGotoAllowPlaceOverride) {
+        this.addonGotoAllowPlaceOverride = addonGotoAllowPlaceOverride;
+    }
+
+    public void setAddonGotoGoal(Object addonGotoGoal) {
+        this.addonGotoGoal = addonGotoGoal;
+    }
+
+    public Object getAddonGotoGoal() {
+        return addonGotoGoal;
     }
 
     public void setGotoAllowPlaceWhileExecuting(boolean gotoAllowPlaceWhileExecuting) {

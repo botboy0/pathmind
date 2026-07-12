@@ -61,6 +61,7 @@ final class NodeNavigationCommandExecutor {
     }
 
     void executeGotoCommand(CompletableFuture<Void> future) {
+        owner.setAddonGotoGoal(null);
         if (preprocessAttachedParameter(EnumSet.of(Node.ParameterUsage.POSITION), future) == Node.ParameterHandlingResult.COMPLETE) {
             return;
         }
@@ -106,6 +107,7 @@ final class NodeNavigationCommandExecutor {
 
                 startGotoTaskWithBreakGuard(future);
                 Object goal = BaritoneApiProxy.createGoalBlock(x, y, z);
+                if (goal != null) owner.setAddonGotoGoal(goal);
                 BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal);
                 break;
                 
@@ -124,6 +126,7 @@ final class NodeNavigationCommandExecutor {
 
                 startGotoTaskWithBreakGuard(future);
                 Object goal2 = BaritoneApiProxy.createGoalXZ(x2, z2);
+                if (goal2 != null) owner.setAddonGotoGoal(goal2);
                 BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal2);
                 break;
                 
@@ -140,6 +143,7 @@ final class NodeNavigationCommandExecutor {
                         return;
                     }
                     Object goal3 = BaritoneApiProxy.createGoalYLevel(y3);
+                    if (goal3 != null) owner.setAddonGotoGoal(goal3);
                     BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal3);
                 }
                 break;
@@ -158,6 +162,7 @@ final class NodeNavigationCommandExecutor {
                 if (nearbyBlockTarget != null) {
                     startGotoTaskWithBreakGuard(future);
                     Object nearbyGoal = BaritoneApiProxy.createGoalNear(nearbyBlockTarget, 1);
+                    if (nearbyGoal != null) owner.setAddonGotoGoal(nearbyGoal);
                     BaritoneApiProxy.setGoalAndPath(customGoalProcess, nearbyGoal);
                     break;
                 }
@@ -782,6 +787,7 @@ final class NodeNavigationCommandExecutor {
         BlockPos pos = targetEntity.getBlockPos();
         startGotoTaskWithBreakGuard(future);
         Object goal = BaritoneApiProxy.createGoalBlock(pos.getX(), pos.getY(), pos.getZ());
+        if (goal != null) owner.setAddonGotoGoal(goal);
         BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal);
         return true;
     }
@@ -838,6 +844,7 @@ final class NodeNavigationCommandExecutor {
 
         startGotoTaskWithBreakGuard(future);
         Object goal = BaritoneApiProxy.createGoalBlock(pos.getX(), pos.getY(), pos.getZ());
+        if (goal != null) owner.setAddonGotoGoal(goal);
         BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal);
         return true;
     }
@@ -886,6 +893,7 @@ final class NodeNavigationCommandExecutor {
         BlockPos pos = nearest.getBlockPos();
         startGotoTaskWithBreakGuard(future);
         Object goal = BaritoneApiProxy.createGoalBlock(pos.getX(), pos.getY(), pos.getZ());
+        if (goal != null) owner.setAddonGotoGoal(goal);
         BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal);
         return true;
     }
@@ -934,6 +942,7 @@ final class NodeNavigationCommandExecutor {
         BlockPos pos = match.get().getBlockPos();
         startGotoTaskWithBreakGuard(future);
         Object goal = BaritoneApiProxy.createGoalBlock(pos.getX(), pos.getY(), pos.getZ());
+        if (goal != null) owner.setAddonGotoGoal(goal);
         BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal);
         return true;
     }
@@ -998,6 +1007,7 @@ final class NodeNavigationCommandExecutor {
 
             startGotoTaskWithBreakGuard(future);
             Object goal = BaritoneApiProxy.createGoalNear(targetPos, 1);
+            if (goal != null) owner.setAddonGotoGoal(goal);
             BaritoneApiProxy.setGoalAndPath(customGoalProcess, goal);
             return true;
         }

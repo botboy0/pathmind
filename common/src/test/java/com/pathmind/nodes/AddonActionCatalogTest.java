@@ -19,18 +19,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><strong>Completeness contract:</strong> the catalog must mirror
  * {@link AddonActionInvoker#isInvocable} exactly in both directions — every
- * invocable {@link NodeType} appears, and nothing else does. This is the
- * guarantee that lets the Lua addon generate bindings and completions from the
- * catalog without missing any part of the action surface.
+ * invocable {@link NodeType} appears, and nothing else does, plus the
+ * fork-owned <em>synthetic</em> actions the invoker special-cases before enum
+ * resolution ({@code baritone_command}). This is the guarantee that lets the
+ * Lua addon generate bindings and completions from the catalog without missing
+ * any part of the action surface.
  */
 class AddonActionCatalogTest {
+
+    /** Fork-owned actions dispatched without a NodeType (invoker special cases). */
+    private static final Set<String> SYNTHETIC_ACTIONS = Set.of("baritone_command");
 
     @Test
     void catalogMirrorsInvocableSetExactly() {
         Set<String> expected = java.util.Arrays.stream(NodeType.values())
             .filter(AddonActionInvoker::isInvocable)
             .map(t -> t.name().toLowerCase(Locale.ROOT))
-            .collect(Collectors.toSet());
+            .collect(Collectors.toCollection(java.util.HashSet::new));
+        expected.addAll(SYNTHETIC_ACTIONS);
         Set<String> actual = AddonActionCatalog.list().stream()
             .map(ActionInfo::name)
             .collect(Collectors.toSet());
@@ -92,6 +98,9 @@ class AddonActionCatalogTest {
     @Test
     void everyReportedParamIsAcceptedByTheInvoker() {
         for (ActionInfo action : AddonActionCatalog.list()) {
+            if (SYNTHETIC_ACTIONS.contains(action.name())) {
+                continue; // no NodeType behind it; args are matched by the invoker's special case
+            }
             NodeType type = NodeType.valueOf(action.name().toUpperCase(Locale.ROOT));
             Node node = new Node(type, 0, 0);
             for (ActionInfo.Param param : action.params()) {

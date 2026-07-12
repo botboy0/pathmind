@@ -93,6 +93,11 @@ public final class GraphValidator {
                     tr("pathmind.validation.missingUiUtils", type.getDisplayName()), node));
             }
 
+            if (type.requiresBaritone() && !baritoneAvailable) {
+                issues.add(issue(GraphValidationSeverity.ERROR, "missing_baritone",
+                    tr("pathmind.validation.missingBaritone", type.getDisplayName()), node));
+            }
+
             if ((type == NodeType.START || type == NodeType.EVENT_FUNCTION)
                 && outgoingById.getOrDefault(node.getId(), List.of()).isEmpty()) {
                 issues.add(issue(GraphValidationSeverity.WARNING, "dead_entry",

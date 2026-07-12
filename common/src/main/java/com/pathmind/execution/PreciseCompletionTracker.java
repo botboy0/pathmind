@@ -454,6 +454,7 @@ public class PreciseCompletionTracker {
         notifyPlayer(userMessage);
 
         if (future != null && !future.isDone()) {
+            GracefulTaskStops.mark(future, logMessage);
             future.complete(null);
         }
     }
