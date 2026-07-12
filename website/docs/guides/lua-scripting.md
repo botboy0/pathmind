@@ -167,6 +167,15 @@ a newly recorded failure into a Lua error. As a result, coordinate-directed plac
 requested block does not appear at the exact target coordinates, while regular graph
 PLACE nodes retain their existing continue-on-error behavior.
 
+This strictness covers the full action surface: a 2026-07-12 sweep routed every
+executor failure path that used to complete silently (crafting failures such as
+missing ingredients or a closed crafting screen, no matching hotbar item, invalid
+inventory slot selections, GUI clicks without an open screen, unknown key/mouse
+names, unresolved entity/item/player parameters, list-item lookups, and more)
+through the shared failure record. If an action could not do what you asked,
+the corresponding `pathmind.*_` call raises with the executor's actual error
+message — wrap calls in `pcall` where you want to handle the failure yourself.
+
 ### External editors — generated LuaCATS definitions
 
 On first editor open the addon writes `<minecraft>/pathmind/pathmind-api.lua` — a
