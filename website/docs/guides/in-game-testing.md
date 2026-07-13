@@ -118,13 +118,17 @@ no-ops when nothing changed.)
 
 ### Presets ride along in the loadout
 
-A loadout can preload the Pathmind workspace itself: the default loadout ships
-`pathmind/presets/Survival Bootstrap.json` plus `pathmind/active_preset.txt`,
-so the dev client boots with the mission preset already open — specs assert on
-the preloaded workspace instead of typing scripts in-game. The Lua source of
-that mission stays canonical in `pathmind-lua/examples/survival-bootstrap.lua`;
+A loadout can preload the Pathmind workspace itself: the `diamond-mission`
+loadout layer (declared by the mission spec via `loadout_extra:`, mounted on
+top of the default loadout) ships `pathmind/presets/Survival Bootstrap.json`
+plus `pathmind/active_preset.txt`, so the dev client boots with the mission
+preset already open — the spec asserts on the preloaded workspace instead of
+typing scripts in-game. Spec-specific workspace state lives in such layers,
+never in the default loadout: every other spec expects a clean seeded
+workspace. The Lua source of the mission stays canonical in
+`pathmind-lua/examples/survival-bootstrap.lua`;
 `testing/tools/sync-survival-bootstrap.py` regenerates the example preset and
-the loadout copy from it after every script edit.
+the loadout-layer copy from it after every script edit.
 
 Every run records the loadout manifest (path/size/sha256) in `meta.json`; the run
 dashboard lists it per run. Legacy mod-source mode — mounting a Pathmind repo at
