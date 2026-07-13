@@ -24,6 +24,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 final class NodeCollectCommandExecutor {
     private final Node owner;
@@ -225,7 +226,9 @@ final class NodeCollectCommandExecutor {
         MinecraftClient client = MinecraftClient.getInstance();
         Object customGoalProcess = baritone != null ? BaritoneApiProxy.getCustomGoalProcess(baritone) : null;
         if (client == null || client.player == null || preferredTarget == null || customGoalProcess == null
-            || isPlayerNearBlock(client, preferredTarget, 6.25D)) {
+            || isPlayerNearBlock(client, preferredTarget, 6.25D)
+            || client.world == null
+            || !hasPassableFaceNeighbor(pos -> isPassableForApproach(client, pos), preferredTarget)) {
             startMiningAction.run();
             return;
         }
@@ -251,6 +254,33 @@ final class NodeCollectCommandExecutor {
             }
             startMiningAction.run();
         });
+    }
+
+    /**
+     * The approach goto runs with block breaking disabled and targets GoalNear(target, 1); the only
+     * cells inside that radius are the six face neighbours. A target whose face neighbours are all
+     * solid is therefore unreachable without breaking — the approach would only burn its start
+     * timeout and fail. Callers skip the approach then and hand over to Baritone's MineProcess,
+     * which paths with its own break permissions.
+     */
+    static boolean hasPassableFaceNeighbor(Predicate<BlockPos> isPassable, BlockPos target) {
+        if (target == null) {
+            return false;
+        }
+        for (Direction direction : Direction.values()) {
+            if (isPassable.test(target.offset(direction))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isPassableForApproach(MinecraftClient client, BlockPos pos) {
+        if (client == null || client.world == null || pos == null) {
+            return false;
+        }
+        BlockState state = client.world.getBlockState(pos);
+        return state.isAir() || !state.getFluidState().isEmpty() || state.isReplaceable();
     }
 
     private void breakSpecificBlockForCollect(BlockPos targetPos, CompletableFuture<Void> future) {
