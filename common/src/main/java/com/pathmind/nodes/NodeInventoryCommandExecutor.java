@@ -681,6 +681,14 @@ final class NodeInventoryCommandExecutor {
     }
 
     private SlotSelectionType resolveMoveItemSlotSelectionType(Node parameterNode, int parameterSlotIndex) {
+        // Fork-only: addon per-call slot-space override (script MOVE_ITEM has no
+        // attached parameter nodes to express GUI-container slots otherwise).
+        SlotSelectionType addonOverride = parameterSlotIndex == 0
+            ? owner.getAddonMoveItemSourceSpace()
+            : owner.getAddonMoveItemTargetSpace();
+        if (addonOverride != null) {
+            return addonOverride;
+        }
         if (type != NodeType.MOVE_ITEM || parameterNode == null || parameterNode.getType() != NodeType.PARAM_ITEM) {
             return resolveInventorySlotSelectionType(parameterNode);
         }

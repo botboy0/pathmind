@@ -266,6 +266,33 @@ optional dependency. The script surface degrades honestly:
   `cobblestone` and reports `collected = 0`. Scripts that need certainty verify
   the inventory themselves.
 
+### GUI container slots — `move_item_` slot spaces
+
+Without attached parameter nodes, `move_item_` resolves both slot arguments in
+the **player inventory** (the 0-based indices `getInventory()` reports). Scripts
+that need to reach the slots of an open container GUI — a furnace's input `0`,
+fuel `1`, output `2`, or a chest's grid — pass the optional
+`SourceSpace`/`TargetSpace` arguments with `"player"` or `"gui"`:
+
+```lua
+-- Load a furnace (interact_ opened it): 3 raw iron into input, planks as fuel,
+-- then poll the output back into a free inventory slot.
+pathmind.move_item_({ SourceSpace = "player", SourceSlot = ironSlot,
+                      TargetSpace = "gui", TargetSlot = 0, Count = 3 })
+pathmind.move_item_({ SourceSpace = "player", SourceSlot = plankSlot,
+                      TargetSpace = "gui", TargetSlot = 1, Count = 4 })
+pathmind.wait_({ Duration = 8 })
+pathmind.move_item_({ SourceSpace = "gui", SourceSlot = 2,
+                      TargetSpace = "player", TargetSlot = emptySlot })
+```
+
+`"gui"` slots are the container's raw handler indices and must belong to the
+open GUI (not the player inventory rows below it); a wrong index returns a
+classified failure. `Count = 0` (or omitted) moves the whole stack. Graph
+MOVE_ITEM nodes are unchanged — they express slot spaces via attached
+parameter nodes instead. The shipped `survival-bootstrap.lua` mission drives
+its furnace smelting exactly this way.
+
 ### External editors — generated LuaCATS definitions
 
 On first editor open the addon writes `<minecraft>/pathmind/pathmind-api.lua` — a

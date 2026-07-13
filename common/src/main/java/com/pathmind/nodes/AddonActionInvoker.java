@@ -137,6 +137,14 @@ public final class AddonActionInvoker {
                             if (error != null) {
                                 guardError = error;
                             }
+                        } else if (type == NodeType.MOVE_ITEM
+                                && entry.getKey() != null
+                                && (entry.getKey().equalsIgnoreCase("SourceSpace")
+                                    || entry.getKey().equalsIgnoreCase("TargetSpace"))) {
+                            String error = applySlotSpaceArg(node, entry.getKey(), entry.getValue());
+                            if (error != null) {
+                                guardError = error;
+                            }
                         } else {
                             remainingArgs.put(entry.getKey(), entry.getValue());
                         }
@@ -601,6 +609,41 @@ public final class AddonActionInvoker {
                 + "' (available: " + availableModeNames(type) + ")";
         }
         node.setMode(requested);
+        return null;
+    }
+
+    /**
+     * Applies a fork-only per-call MOVE_ITEM slot-space override. The synthetic
+     * arguments {@code SourceSpace}/{@code TargetSpace} ("player" or "gui") let
+     * scripts address GUI-container slots (e.g. a furnace's input 0 / fuel 1 /
+     * output 2 raw handler indices), which the default player-inventory
+     * resolution cannot reach. Package-visible for unit tests.
+     *
+     * @return an error message on failure (unknown key, non-string or unknown
+     *         space value; no side effect then), or null on success
+     */
+    static String applySlotSpaceArg(Node node, String key, Object value) {
+        boolean source = "SourceSpace".equalsIgnoreCase(key);
+        if (!source && !"TargetSpace".equalsIgnoreCase(key)) {
+            return "Unknown slot-space argument '" + key + "'";
+        }
+        SlotSelectionType space = null;
+        if (value instanceof String name) {
+            String normalized = name.trim();
+            if ("gui".equalsIgnoreCase(normalized)) {
+                space = SlotSelectionType.GUI_CONTAINER;
+            } else if ("player".equalsIgnoreCase(normalized)) {
+                space = SlotSelectionType.PLAYER_INVENTORY;
+            }
+        }
+        if (space == null) {
+            return "Argument '" + key + "' must be the string 'player' or 'gui'";
+        }
+        if (source) {
+            node.setAddonMoveItemSourceSpace(space);
+        } else {
+            node.setAddonMoveItemTargetSpace(space);
+        }
         return null;
     }
 

@@ -341,6 +341,9 @@ public class Node {
     private Object addonGotoGoal;
     private Boolean addonGotoAllowBreakOverride;
     private Boolean addonGotoAllowPlaceOverride;
+    // Fork-only (addon per-call MOVE_ITEM slot-space override).
+    private SlotSelectionType addonMoveItemSourceSpace;
+    private SlotSelectionType addonMoveItemTargetSpace;
     private boolean keyPressedActivatesInGuis;
     private String templateName;
     private int templateVersion;
@@ -1088,6 +1091,22 @@ public class Node {
 
     public Object getAddonGotoGoal() {
         return addonGotoGoal;
+    }
+
+    void setAddonMoveItemSourceSpace(SlotSelectionType addonMoveItemSourceSpace) {
+        this.addonMoveItemSourceSpace = addonMoveItemSourceSpace;
+    }
+
+    SlotSelectionType getAddonMoveItemSourceSpace() {
+        return addonMoveItemSourceSpace;
+    }
+
+    void setAddonMoveItemTargetSpace(SlotSelectionType addonMoveItemTargetSpace) {
+        this.addonMoveItemTargetSpace = addonMoveItemTargetSpace;
+    }
+
+    SlotSelectionType getAddonMoveItemTargetSpace() {
+        return addonMoveItemTargetSpace;
     }
 
     public void setGotoAllowPlaceWhileExecuting(boolean gotoAllowPlaceWhileExecuting) {
